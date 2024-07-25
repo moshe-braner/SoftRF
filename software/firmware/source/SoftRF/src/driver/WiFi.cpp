@@ -31,7 +31,7 @@ void WiFi_fini()    {}
 #include "GNSS.h"
 #include "EEPROM.h"
 #include "WiFi.h"
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 #include "../TrafficHelper.h"
 #include "RF.h"
 #include "../ui/Web.h"
