@@ -58,7 +58,7 @@ class FreqPlan
 #endif
           break;
         case RF_BAND_IN:
-          { BaseFreq=866000000; ChanSepar=200000; Channels= 1; MaxTxPower = 30; } // India
+          { BaseFreq=866200000; ChanSepar=250000; Channels= 1; MaxTxPower = 30; } // India
           break;
         case RF_BAND_IL:
           { BaseFreq=916200000; ChanSepar=200000; Channels= 1; MaxTxPower = 30; } // Israel
