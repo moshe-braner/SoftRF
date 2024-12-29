@@ -1,0 +1,99 @@
+In file included from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/driver/WiFi.cpp:35:
+/home/nrb/.arduino15/packages/esp32/hardware/esp32/2.0.3/tools/sdk/esp32/include/tcpip_adapter/include/tcpip_adapter.h:15:2: warning: #warning "This header is deprecated, please use new network related API in esp_netif.h" [-Wcpp]
+ #warning "This header is deprecated, please use new network related API in esp_netif.h"
+  ^~~~~~~
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:10: warning: "TFT_CS" redefined
+ #define TFT_CS              5
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:128: note: this is the location of the previous definition
+ #define TFT_CS   PIN_D8  // Chip select control pin D8
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:11: warning: "TFT_DC" redefined
+ #define TFT_DC              27
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:129: note: this is the location of the previous definition
+ #define TFT_DC   PIN_D3  // Data Command control pin
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:19: warning: "SPI_FREQUENCY" redefined
+ #define SPI_FREQUENCY  80000000
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/+/SoftRF_MB/software/firmware/source/SoftRF/src/platform/ESP32.cpp:76:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:256: note: this is the location of the previous definition
+ #define SPI_FREQUENCY  27000000 // Actually sets it to 26.67MHz = 80/3
+ 
+In file included from /home/nrb/Arduino/libraries/NeoPixelBus/src/internal/Esp32_i2s.c:29:
+/home/nrb/.arduino15/packages/esp32/hardware/esp32/2.0.3/tools/sdk/esp32/include/esp_hw_support/include/esp_intr.h:8:2: warning: #warning esp_intr.h is deprecated, please include esp_intr_alloc.h instead [-Wcpp]
+ #warning esp_intr.h is deprecated, please include esp_intr_alloc.h instead
+  ^~~~~~~
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:10: warning: "TFT_CS" redefined
+ #define TFT_CS              5
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:128: note: this is the location of the previous definition
+ #define TFT_CS   PIN_D8  // Chip select control pin D8
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:11: warning: "TFT_DC" redefined
+ #define TFT_DC              27
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:129: note: this is the location of the previous definition
+ #define TFT_DC   PIN_D3  // Data Command control pin
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:23,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setups/TTGO_Watch.h:19: warning: "SPI_FREQUENCY" redefined
+ #define SPI_FREQUENCY  80000000
+ 
+In file included from /home/nrb/Arduino/libraries/TFT_eSPI/User_Setup_Select.h:22,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.h:24,
+                 from /home/nrb/Arduino/libraries/TFT_eSPI/TFT_eSPI.cpp:17:
+/home/nrb/Arduino/libraries/TFT_eSPI/User_Setup.h:256: note: this is the location of the previous definition
+ #define SPI_FREQUENCY  27000000 // Actually sets it to 26.67MHz = 80/3
+ 
+/home/nrb/Arduino/libraries/adsb_encoder/adsb_encoder.cpp:470:28: warning: ISO C++ forbids converting a string constant to 'char*' [-Wwrite-strings]
+ static char *ais_charset = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
+                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/nrb/Arduino/libraries/nmealib/src/gmtime_r.c:18:
+/home/nrb/Arduino/libraries/nmealib/src/local.h:63:1: warning: parameter names (without types) in function declaration
+ void _EXFUN(__tz_lock,(_VOID));
+ ^~~~
+/home/nrb/Arduino/libraries/nmealib/src/local.h:64:1: warning: parameter names (without types) in function declaration
+ void _EXFUN(__tz_unlock,(_VOID));
+ ^~~~
+In file included from /home/nrb/Arduino/libraries/nmealib/src/month_lengths.c:9:
+/home/nrb/Arduino/libraries/nmealib/src/local.h:63:1: warning: parameter names (without types) in function declaration
+ void _EXFUN(__tz_lock,(_VOID));
+ ^~~~
+/home/nrb/Arduino/libraries/nmealib/src/local.h:64:1: warning: parameter names (without types) in function declaration
+ void _EXFUN(__tz_unlock,(_VOID));
+ ^~~~
+Sketch uses 1800669 bytes (91%) of program storage space. Maximum is 1966080 bytes.
+Global variables use 69780 bytes (21%) of dynamic memory, leaving 257900 bytes for local variables. Maximum is 327680 bytes.
