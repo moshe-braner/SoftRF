@@ -1,12 +1,11 @@
 # Release notes
 
-
-## revision MB06
+## revision MB07
 
 ### Major improvements
 
-Aircraft icons in radar view rotate to show track directions (thanks, Nick Bonniere).
-Show two data fields from DB at once on traffic text info screen.
+Fixed bug in rotation of radar view.
+Updated ogn.cdb in March, 2025.
 
 
 ## revision MB05

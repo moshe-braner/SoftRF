@@ -2,7 +2,7 @@ SkyView documentation
 =====================
 
 By Moshe Braner
-This version last updated April 17, 2023 to fit version MB06
+This version last updated March 8, 2025 to fit version MB07
 
 
 This document only mentions what I have changed in SkyView.  For general information about what SkyView is, how to build it, and how to use it, can be found here:  https://github.com/lyusupov/SoftRF/wiki/SkyView-EZ
@@ -17,7 +17,7 @@ In my view this is useless as a collision avoidance tool.  So I revised the beha
 
 These voice warnings are given based on both PFLAU and PFLAA sentences.
 
-As a secondary feature, only when there are no aircraft around that are considered a collision danger (to avoid distraction), voice traffic advisories are given about other aircraft when they first get closer than 6 km (about 4 miles) from this aircraft.  After that, no further notifications are given about the same aircraft, unless its signal is lost and regained, or if it goes outside of that threshold and then returns.  Also, if that aircraft is later deemed to be a collision danger, the warning messages are given as explained above.
+As a secondary feature, only when there are no aircraft around that are considered a collision danger (to avoid distraction), and only if the "voice: warnings only" setting is not chosen, voice traffic advisories are given about other aircraft when they first get closer than 6 km (about 4 miles) from this aircraft.  After that, no further notifications are given about the same aircraft, unless its signal is lost and regained, or if it goes outside of that threshold and then returns.  Also, if that aircraft is later deemed to be a collision danger, the warning messages are given as explained above.
 
 In addition, I made the following further changes:
 * Collision danger voice warnings are short, e.g., "danger, 3 o'clock, high".

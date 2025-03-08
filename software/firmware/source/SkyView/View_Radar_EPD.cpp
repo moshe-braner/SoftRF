@@ -208,13 +208,14 @@ static void EPD_Draw_Radar()
 {
   int16_t  tbx, tby;
   uint16_t tbw, tbh;
-  uint16_t x;
-  uint16_t y;
+  int16_t x;
+  int16_t y;
   char cog_text[6];
   int16_t scale;
   
   /* divider is distance range */
-  int32_t divider = 2000; // default 2000m 
+  //int32_t divider = 2000; // default 2000m 
+  float divider = (1.0 / 2000.0); // default 2000m 
 
   display->setFont(&FreeMono9pt7b);
   display->getTextBounds("N", 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -225,9 +226,9 @@ static void EPD_Draw_Radar()
 
   display->fillRect(radar_x, radar_y, radar_w, radar_w, GxEPD_WHITE);
 
-  uint16_t radar_center_x = radar_w / 2;
-  uint16_t radar_center_y = radar_y + radar_w / 2;
-  uint16_t radius = radar_w / 2 - 2;
+  int16_t radar_center_x = radar_w / 2;
+  int16_t radar_center_y = radar_y + radar_w / 2;
+  int16_t radius = radar_w / 2 - 2;
 
   float epd_Points[MAX_DRAW_POINTS][2];
 
@@ -235,41 +236,43 @@ static void EPD_Draw_Radar()
     switch(EPD_zoom)
     {
     case ZOOM_LOWEST:
-      divider = 10000; /* 20 KM */
+      divider = (1.0 / 10000.0); /* 20 KM */
       break;
     case ZOOM_LOW:
-      divider =  5000; /* 10 KM */
+      divider = (1.0 /  5000.0); /* 10 KM */
       break;
     case ZOOM_HIGH:
-      divider =  1000; /*  2 KM */
+      divider = (1.0 /  1000);   /*  2 KM */
       break;
     case ZOOM_MEDIUM:
     default:
-      divider =  2000;  /* 4 KM */
+      divider = (1.0 /  2000.0); /*  4 KM */
       break;
     }
   } else {
     switch(EPD_zoom)
     {
     case ZOOM_LOWEST:
-      divider = 9260;  /* 10 NM */
+      divider = (1.0 / 9260.0);  /* 10 NM */
       break;
     case ZOOM_LOW:
-      divider = 4630;  /*  5 NM */
+      divider = (1.0 / 4630.0);  /*  5 NM */
       break;
     case ZOOM_HIGH:
-      divider =  926;  /*  1 NM */
+      divider = (1.0 /  926.0);  /*  1 NM */
       break;
-    case ZOOM_MEDIUM:  /*  2 NM */
+    case ZOOM_MEDIUM:
     default:
-      divider = 1852;
+      divider = (1.0 / 1852.0);  /*  2 NM */
       break;
     }
   }
 
   {
-    float trSin = sin_approx(-ThisAircraft.Track);
-    float trCos = cos_approx(-ThisAircraft.Track);
+//  float trSin = sin_approx(-ThisAircraft.Track);   // an error from 2023
+//  float trCos = cos_approx(-ThisAircraft.Track);
+    float trSin = sin_approx(ThisAircraft.Track);
+    float trCos = cos_approx(ThisAircraft.Track);
 
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
       if (Container[i].ID && (now() - Container[i].timestamp) <= EPD_EXPIRATION_TIME) {
@@ -340,65 +343,65 @@ static void EPD_Draw_Radar()
       Serial.flush();
 #endif
 
-        int16_t x = constrain((rel_x * radius) / divider, -32768, 32767);
-        int16_t y = constrain((rel_y * radius) / divider, -32768, 32767);
+        float radius_divider = divider * (float)radius;
+        x = constrain((int)(rel_x * radius_divider), -32768, 32767);
+        y = constrain((int)(rel_y * radius_divider), -32768, 32767);
 
         scale = Container[i].alarm_level + 1;
 
-        switch(Container[i].alarm_level)
+        switch(scale)
         {
-        case 0:
-          // draw target as triangle
-          display->fillTriangle(radar_center_x + x + (int) epd_Points[0][0],
-                                radar_center_y - y + (int) epd_Points[0][1],
-                                radar_center_x + x + (int) epd_Points[1][0],
-                                radar_center_y - y + (int) epd_Points[1][1],
-                                radar_center_x + x + (int) epd_Points[2][0],
-                                radar_center_y - y + (int) epd_Points[2][1],
-                                GxEPD_BLACK);
-          break;
         case 1:
-          //break;
-        case 2:
-          //break;
-        case 3:
-          display->fillTriangle(radar_center_x + x + scale * ((int) epd_Points[0][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[0][1]),
-                                radar_center_x + x + scale * ((int) epd_Points[1][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[1][1]),
-                                radar_center_x + x + scale * ((int) epd_Points[4][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[4][1]),
-                                GxEPD_BLACK);
-          display->fillTriangle(radar_center_x + x + scale * ((int) epd_Points[2][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[2][1]),
-                                radar_center_x + x + scale * ((int) epd_Points[1][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[1][1]),
-                                radar_center_x + x + scale * ((int) epd_Points[4][0]),
-                                radar_center_y - y + scale * ((int) epd_Points[4][1]),
+          // alarm level 0 - draw target as a simple triangle
+          display->fillTriangle(radar_center_x + x + (int16_t) epd_Points[0][0],
+                                radar_center_y - y + (int16_t) epd_Points[0][1],
+                                radar_center_x + x + (int16_t) epd_Points[1][0],
+                                radar_center_y - y + (int16_t) epd_Points[1][1],
+                                radar_center_x + x + (int16_t) epd_Points[2][0],
+                                radar_center_y - y + (int16_t) epd_Points[2][1],
                                 GxEPD_BLACK);
           break;
-        default:
+        case 2:
+        case 3:
+        case 4:
+          // draw an arrowhead (triangle with a rear notch)
+          display->fillTriangle(radar_center_x + x + scale * (int16_t) epd_Points[0][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[0][1],
+                                radar_center_x + x + scale * (int16_t) epd_Points[1][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[1][1],
+                                radar_center_x + x + scale * (int16_t) epd_Points[4][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[4][1],
+                                GxEPD_BLACK);
+          display->fillTriangle(radar_center_x + x + scale * (int16_t) epd_Points[2][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[2][1],
+                                radar_center_x + x + scale * (int16_t) epd_Points[1][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[1][1],
+                                radar_center_x + x + scale * (int16_t) epd_Points[4][0],
+                                radar_center_y - y + scale * (int16_t) epd_Points[4][1],
+                                GxEPD_BLACK);
+          break;
+        default:   // should never happen
           break;
         }
 
         if (Container[i].RelativeVertical >   EPD_RADAR_V_THRESHOLD) {
           // draw a '+' next to target triangle
-          display->drawLine(radar_center_x + x - 2 + (int) epd_Points[3][0],
-                            radar_center_y - y     + (int) epd_Points[3][1],
-                            radar_center_x + x + 2 + (int) epd_Points[3][0],
-                            radar_center_y - y     + (int) epd_Points[3][1],
+          display->drawLine(radar_center_x + x - 2 + (int16_t) epd_Points[3][0],
+                            radar_center_y - y     + (int16_t) epd_Points[3][1],
+                            radar_center_x + x + 2 + (int16_t) epd_Points[3][0],
+                            radar_center_y - y     + (int16_t) epd_Points[3][1],
                                 GxEPD_BLACK);
-          display->drawLine(radar_center_x + x     + (int) epd_Points[3][0],
-                            radar_center_y - y + 2 + (int) epd_Points[3][1],
-                            radar_center_x + x     + (int) epd_Points[3][0],
-                            radar_center_y - y - 2 + (int) epd_Points[3][1],
+          display->drawLine(radar_center_x + x     + (int16_t) epd_Points[3][0],
+                            radar_center_y - y + 2 + (int16_t) epd_Points[3][1],
+                            radar_center_x + x     + (int16_t) epd_Points[3][0],
+                            radar_center_y - y - 2 + (int16_t) epd_Points[3][1],
                                 GxEPD_BLACK);
         } else if (Container[i].RelativeVertical < - EPD_RADAR_V_THRESHOLD) {
           // draw a '-' next to target triangle
-          display->drawLine(radar_center_x + x - 2 + (int) epd_Points[3][0],
-                            radar_center_y - y     + (int) epd_Points[3][1],
-                            radar_center_x + x + 2 + (int) epd_Points[3][0],
-                            radar_center_y - y     + (int) epd_Points[3][1],
+          display->drawLine(radar_center_x + x - 2 + (int16_t) epd_Points[3][0],
+                            radar_center_y - y     + (int16_t) epd_Points[3][1],
+                            radar_center_x + x + 2 + (int16_t) epd_Points[3][0],
+                            radar_center_y - y     + (int16_t) epd_Points[3][1],
                                 GxEPD_BLACK);
         } else {
             // TBD
@@ -436,35 +439,35 @@ static void EPD_Draw_Radar()
       /* TBD */
       break;
     }
-    display->drawLine(radar_center_x + (int) epd_Points[0][0],
-                      radar_center_y + (int) epd_Points[0][1],
-                      radar_center_x + (int) epd_Points[1][0],
-                      radar_center_y + (int) epd_Points[1][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[0][0],
+                      radar_center_y + (int16_t) epd_Points[0][1],
+                      radar_center_x + (int16_t) epd_Points[1][0],
+                      radar_center_y + (int16_t) epd_Points[1][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[2][0],
-                      radar_center_y + (int) epd_Points[2][1],
-                      radar_center_x + (int) epd_Points[3][0],
-                      radar_center_y + (int) epd_Points[3][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[2][0],
+                      radar_center_y + (int16_t) epd_Points[2][1],
+                      radar_center_x + (int16_t) epd_Points[3][0],
+                      radar_center_y + (int16_t) epd_Points[3][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[4][0],
-                      radar_center_y + (int) epd_Points[4][1],
-                      radar_center_x + (int) epd_Points[5][0],
-                      radar_center_y + (int) epd_Points[5][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[4][0],
+                      radar_center_y + (int16_t) epd_Points[4][1],
+                      radar_center_x + (int16_t) epd_Points[5][0],
+                      radar_center_y + (int16_t) epd_Points[5][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[6][0],
-                      radar_center_y + (int) epd_Points[6][1],
-                      radar_center_x + (int) epd_Points[7][0],
-                      radar_center_y + (int) epd_Points[7][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[6][0],
+                      radar_center_y + (int16_t) epd_Points[6][1],
+                      radar_center_x + (int16_t) epd_Points[7][0],
+                      radar_center_y + (int16_t) epd_Points[7][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[8][0],
-                      radar_center_y + (int) epd_Points[8][1],
-                      radar_center_x + (int) epd_Points[9][0],
-                      radar_center_y + (int) epd_Points[9][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[8][0],
+                      radar_center_y + (int16_t) epd_Points[8][1],
+                      radar_center_x + (int16_t) epd_Points[9][0],
+                      radar_center_y + (int16_t) epd_Points[9][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[10][0],
-                      radar_center_y + (int) epd_Points[10][1],
-                      radar_center_x + (int) epd_Points[11][0],
-                      radar_center_y + (int) epd_Points[11][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[10][0],
+                      radar_center_y + (int16_t) epd_Points[10][1],
+                      radar_center_x + (int16_t) epd_Points[11][0],
+                      radar_center_y + (int16_t) epd_Points[11][1],
                       GxEPD_BLACK);
 #else  //ICON_AIRPLANE
     /* draw arrow tip */
@@ -486,25 +489,25 @@ static void EPD_Draw_Radar()
       /* TBD */
       break;
     }
-    display->drawLine(radar_center_x + (int) epd_Points[0][0],
-                      radar_center_y + (int) epd_Points[0][1],
-                      radar_center_x + (int) epd_Points[1][0],
-                      radar_center_y + (int) epd_Points[1][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[0][0],
+                      radar_center_y + (int16_t) epd_Points[0][1],
+                      radar_center_x + (int16_t) epd_Points[1][0],
+                      radar_center_y + (int16_t) epd_Points[1][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[1][0],
-                      radar_center_y + (int) epd_Points[1][1],
-                      radar_center_x + (int) epd_Points[2][0],
-                      radar_center_y + (int) epd_Points[2][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[1][0],
+                      radar_center_y + (int16_t) epd_Points[1][1],
+                      radar_center_x + (int16_t) epd_Points[2][0],
+                      radar_center_y + (int16_t) epd_Points[2][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[2][0],
-                      radar_center_y + (int) epd_Points[2][1],
-                      radar_center_x + (int) epd_Points[3][0],
-                      radar_center_y + (int) epd_Points[3][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[2][0],
+                      radar_center_y + (int16_t) epd_Points[2][1],
+                      radar_center_x + (int16_t) epd_Points[3][0],
+                      radar_center_y + (int16_t) epd_Points[3][1],
                       GxEPD_BLACK);
-    display->drawLine(radar_center_x + (int) epd_Points[3][0],
-                      radar_center_y + (int) epd_Points[3][1],
-                      radar_center_x + (int) epd_Points[0][0],
-                      radar_center_y + (int) epd_Points[0][1],
+    display->drawLine(radar_center_x + (int16_t) epd_Points[3][0],
+                      radar_center_y + (int16_t) epd_Points[3][1],
+                      radar_center_x + (int16_t) epd_Points[0][0],
+                      radar_center_y + (int16_t) epd_Points[0][1],
                       GxEPD_BLACK);
 #endif //ICON_AIRPLANE
 
