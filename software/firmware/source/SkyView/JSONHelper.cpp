@@ -176,12 +176,10 @@ void parseSettings(JsonObject& root)
     const char * voice_s = voice.as<char*>();
     if (!strcmp(voice_s,"OFF")) {
       eeprom_block.field.settings.voice = VOICE_OFF;
-    } else if (!strcmp(voice_s,"VOICE1")) {
-      eeprom_block.field.settings.voice = VOICE_1;
-    } else if (!strcmp(voice_s,"VOICE2")) {
-      eeprom_block.field.settings.voice = VOICE_2;
-    } else if (!strcmp(voice_s,"VOICE3")) {
-      eeprom_block.field.settings.voice = VOICE_3;
+    } else if (!strcmp(voice_s,"ADVISE")) {
+      eeprom_block.field.settings.voice = VOICE_ADVISE;
+    } else if (!strcmp(voice_s,"WARN")) {
+      eeprom_block.field.settings.voice = VOICE_WARN;
     }
   }
 

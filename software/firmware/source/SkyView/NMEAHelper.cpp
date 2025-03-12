@@ -73,7 +73,12 @@ static void NMEA_Parse_Character(char c)
         ThisAircraft.altitude = nmea.altitude.meters();
       }
       if (nmea.course.isUpdated()) {
-        ThisAircraft.Track = nmea.course.deg();
+        int raw = nmea.course.deg();
+        // make sure it will fit in the uint16 Track variable:
+        if (raw < 0)          raw += 360;
+        else if (raw >= 360)  raw -= 360;
+        if (raw < 0 || raw >= 360)  raw = 0;
+        ThisAircraft.Track = raw;
       }
       if (nmea.speed.isUpdated()) {
         ThisAircraft.GroundSpeed = nmea.speed.knots();
@@ -127,7 +132,12 @@ static void NMEA_Parse_Character(char c)
         if (T_Track.isUpdated())
         {
 //          Serial.print(F(" Track=")); Serial.print(T_Track.value());
-          fo.Track = atoi(T_Track.value());
+          int raw = atoi(T_Track.value());
+          // make sure it will fit in the uint16 Track variable:
+          if (raw < 0)          raw += 360;
+          else if (raw >= 360)  raw -= 360;
+          if (raw < 0 || raw >= 360)  raw = 0;
+          fo.Track = raw;
 //          Serial.print(F(" Track=")); Serial.println(fo.Track);
         }
         if (T_TurnRate.isUpdated())

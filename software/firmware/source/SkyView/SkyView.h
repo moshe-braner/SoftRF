@@ -25,7 +25,7 @@
 #include <Arduino.h>
 #endif /* ARDUINO */
 
-#define SKYVIEW_FIRMWARE_VERSION  "MB07a"
+#define SKYVIEW_FIRMWARE_VERSION  "MB07c"
 #define SKYVIEW_IDENT     "SkyView-"
 
 #define DEFAULT_AP_SSID   "SoftRF-abc123"
@@ -195,13 +195,17 @@ enum
 
 enum
 {
-	VOICE_OFF,
 	VOICE_1,
 	VOICE_2,
 	VOICE_3
 };
 
-#define VOICE_ON VOICE_1
+enum
+{
+	VOICE_OFF,
+	VOICE_ADVISE,
+	VOICE_WARN
+};
 
 enum
 {

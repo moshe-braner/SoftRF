@@ -925,7 +925,7 @@ static bool play_file(char *filename, int volume)
     return true;
 }
 
-static void ESP32_TTS(char *message)
+static void ESP32_TTS(char *message, int voice)
 {
     char filename[MAX_FILENAME_LEN];
 
@@ -955,15 +955,15 @@ static void ESP32_TTS(char *message)
       while (word != NULL)
       {
           strcpy(filename, WAV_FILE_PREFIX);
-          strcat(filename, settings->voice == VOICE_1 ? VOICE1_SUBDIR :
-                          (settings->voice == VOICE_2 ? VOICE2_SUBDIR :
-                          (settings->voice == VOICE_3 ? VOICE3_SUBDIR :
+          strcat(filename, voice == VOICE_1 ? VOICE1_SUBDIR :
+                          (voice == VOICE_2 ? VOICE2_SUBDIR :
+                          (voice == VOICE_3 ? VOICE3_SUBDIR :
                            "" )));
           strcat(filename, word);
           strcat(filename, WAV_FILE_SUFFIX);
           // voice_3 in the existing collection of .wav files is quieter than voice_1,
           // so make it a bit louder since we use it for more-urgent advisories
-          int volume = (settings->voice == VOICE_3)? 1 : 0;
+          int volume = (voice == VOICE_3)? 1 : 0;
           play_file(filename, volume);
           word = strtok (NULL, " ");
 
@@ -990,7 +990,6 @@ static void ESP32_TTS(char *message)
         return;
       }
 
-      //settings->voice = VOICE_2;
       strcpy(filename, WAV_FILE_PREFIX);
       strcat(filename, "POST");
       strcat(filename, WAV_FILE_SUFFIX);
@@ -998,14 +997,12 @@ static void ESP32_TTS(char *message)
 
       /* demonstrate the voice output */
       delay(1500);
-      settings->voice = VOICE_1;
       strcpy(filename, WAV_FILE_PREFIX);
       strcat(filename, VOICE1_SUBDIR);
       strcat(filename, "notice");
       strcat(filename, WAV_FILE_SUFFIX);
       play_file(filename, 0);
       delay(1500);
-      settings->voice = VOICE_3;
       strcpy(filename, WAV_FILE_PREFIX);
       strcat(filename, VOICE3_SUBDIR);
       strcat(filename, "notice");

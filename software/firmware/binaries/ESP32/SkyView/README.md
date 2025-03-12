@@ -4,7 +4,7 @@
 
 ### Major improvements
 
-Fixed bug in rotation of radar view.
+Fixed bugs in rotation of radar view.
 Updated ogn.cdb in March, 2025.
 
 

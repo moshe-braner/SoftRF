@@ -17,13 +17,15 @@
  */
 
 #include <TimeLib.h>
+#include <math.h>
+#define D2R (3.141593f/180.0f)
+#define R2D (180.0f/3.141593f)
 
 #include "SoCHelper.h"
 #include "TrafficHelper.h"
 #include "NMEAHelper.h"
 #include "EEPROMHelper.h"
 #include "EPDHelper.h"
-#include "ApproxMath.h"
 
 #include "SkyView.h"
 
@@ -58,25 +60,51 @@ void Traffic_Add()
           if (fo.packet_type == 2) {  // PFLAU
             time_t interval = fo.timestamp - cip->timestamp;
             if (interval <= 3) {
-              if (cip->packet_type == 1) {
-                // PFLAU following PFLAA, use the track from the previous packet
-                fo.Track = cip->Track;
+              if (cip->packet_type == 1) {  // previous data was from PFLAA
+                if (interval > 0) {  // new data
+#if 0
+                  // PFLAU following PFLAA, use the track, groundspeed, etc from the previous packet
+                  fo.IDType = cip->IDType;
+                  fo.Track = cip->Track;
+                  fo.GroundSpeed = cip->GroundSpeed;
+                  //fo.ClimbRate = cip->ClimbRate;   not available, empty in the PFLAA
+                  fo.AcftType = cip->AcftType;
+                  *cip = fo;
+#else
+                  // or, keep the previous data and only change the fields known from the PFLAU
+                  // directly from the PFLAU:
+                  cip->alarm_level = fo.alarm_level;
+                  cip->distance = fo.distance;
+                  cip->RelativeVertical = fo.RelativeVertical;
+                  cip->RelativeBearing = fo.RelativeBearing;
+                  // computed in Traffic_Update():
+                  cip->adj_dist = fo.adj_dist;
+                  cip->RelativeNorth = fo.RelativeNorth;
+                  cip->RelativeEast = fo.RelativeEast;
+                  // fields kept: IDType, Track, GroundSpeed, AcftType
+#endif
+                }  // else (PFLAU & PFLAA from same time) ignore the PFLAU
               } else {
                 // compute track from the two distance/bearing points
                 // also taking into account that this aircraft has moved too
                 //  (very approximate since the time interval units are coarse)
                 float our_move = ThisAircraft.GroundSpeed * 0.5 /*MPS_PER_KNOT*/ * interval;
-                float x = fo.distance * sin_approx(fo.RelativeBearing)
-                             - cip->distance * sin_approx(cip->RelativeBearing);
-                float y = our_move + fo.distance * cos_approx(fo.RelativeBearing) 
-                             - cip->distance * cos_approx(cip->RelativeBearing);
-                fo.Track = atan2_approx(y,x) + ThisAircraft.Track;
+                float x = fo.distance * sin(D2R * (float)fo.RelativeBearing)
+                             - cip->distance * sin(D2R * (float)cip->RelativeBearing);
+                float y = our_move + fo.distance * cos(D2R * (float)fo.RelativeBearing) 
+                             - cip->distance * cos(D2R * (float)cip->RelativeBearing);
+                fo.Track = R2D * atan2(x,y) + ThisAircraft.Track;
+                *cip = fo;
               }
             } else {
               // if PFLAU with no recent history, track remains unknown
+              fo.Track = 0;
+              *cip = fo;
             }
+          } else {
+            // PFLAA - copy all the data from the new packet
+            *cip = fo;
           }
-          *cip = fo;
           return;
         }
       }
@@ -119,6 +147,20 @@ void Traffic_Add()
     }
 }
 
+/* cos(latitude) is used to convert longitude difference into linear distance. */
+/* Once computed, accurate enough through a significant range of latitude. */
+float CosLat()
+{
+  static float cos_lat = 0.7071;
+  static float oldlat = 45.0;
+  float latitude = ThisAircraft.latitude;
+  if (fabs(latitude-oldlat) > 0.3) {
+    cos_lat = cos(D2R*latitude);
+    oldlat = latitude;
+  }
+  return cos_lat;
+}
+
 void Traffic_Update(traffic_t *fop)
 {
   float distance, bearing;
@@ -128,9 +170,9 @@ void Traffic_Update(traffic_t *fop)
     /* use an approximation for distance & bearing between 2 points */
     float x, y;
     y = 111300.0 * (fop->latitude - ThisAircraft.latitude);         /* meters */
-    x = 111300.0 * (fop->longitude - ThisAircraft.longitude) * CosLat(ThisAircraft.latitude);
-    distance = approxHypotenuse(x, y);      /* meters  */
-    bearing = atan2_approx(y, x);
+    x = 111300.0 * (fop->longitude - ThisAircraft.longitude) * CosLat();
+    distance = hypot(x, y);      /* meters  */
+    bearing = R2D * atan2(x, y);
 
     fop->RelativeNorth    = y;
     fop->RelativeEast     = x;
@@ -144,19 +186,19 @@ void Traffic_Update(traffic_t *fop)
     fop->adj_dist = fabs(fop->distance) + VERTICAL_SLOPE * fabs(fop->RelativeVertical);
 
     bearing = fop->RelativeBearing + ThisAircraft.Track;
-    fop->RelativeNorth = fop->distance * cos_approx(bearing);
-    fop->RelativeEast  = fop->distance * sin_approx(bearing);
+    fop->RelativeNorth = fop->distance * cos(D2R * bearing);
+    fop->RelativeEast  = fop->distance * sin(D2R * bearing);
 
-    fop->Track = -360;   // unknown track, will display same as 0 (North)
+    //fop->Track = -360;   // unknown track, but may be filled in later
 
   } else {           /* a PFLAA sentence */
 
-    distance = approxHypotenuse(fop->RelativeNorth, fop->RelativeEast);
+    distance = hypot((float) fop->RelativeNorth, (float) fop->RelativeEast);
 
     fop->distance = distance;
     fop->adj_dist = fabs(distance) + VERTICAL_SLOPE * fabs(fop->RelativeVertical);
 
-    bearing = atan2_approx(fop->RelativeNorth, fop->RelativeEast);
+    bearing = R2D * atan2((float) fop->RelativeEast, (float) fop->RelativeNorth);
     fop->RelativeBearing = bearing - ThisAircraft.Track;
   }
 
@@ -168,6 +210,9 @@ static void Traffic_Voice_One(traffic_t *fop)
 {
     int bearing;
     char message[80];
+
+    if (settings->voice == VOICE_OFF)
+        return;
 
     const char *u_dist, *u_alt;
     float voc_dist;
@@ -230,10 +275,12 @@ static void Traffic_Voice_One(traffic_t *fop)
         snprintf(message, sizeof(message), "%s %s %s",
              (fop->alarm_level < ALARM_LEVEL_URGENT ? WARNING_WORD1 : WARNING_WORD3),
              where, (voc_alt > 70 ? "high" : voc_alt < -70 ? "low" : "level"));
-        settings->voice = VOICE_3;  // faster female voice
-        SoC->TTS(message);
+        SoC->TTS(message, VOICE_3);  // faster female voice
         return;
     }
+
+    if (settings->voice == VOICE_WARN)  // only voice collision alarms, not advisories
+        return;
 
     /* for traffic advisory messages use longer wording */
 
@@ -288,8 +335,7 @@ static void Traffic_Voice_One(traffic_t *fop)
                 "%s %s %s %s",           // was "traffic %s distance %s altitude %s"
                 ADVISORY_WORD, where, how_far, elev);
 
-    settings->voice = VOICE_1;  // slower male voice
-    SoC->TTS(message);
+    SoC->TTS(message, VOICE_1);  // slower male voice
 }
 
 

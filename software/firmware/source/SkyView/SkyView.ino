@@ -126,7 +126,7 @@ void setup()
 
   char buf[8];
   strcpy(buf,"POST");
-  SoC->TTS(buf);
+  SoC->TTS(buf, VOICE_1);
 
   Web_setup();
   Traffic_setup();

@@ -365,18 +365,14 @@ void handleSettings() {
 <td align=right>\
 <select name='voice'>\
 <option %s value='%d'>Off</option>\
-<option %s value='%d'>On</option>\
+<option %s value='%d'>Advisories</option>\
+<option %s value='%d'>Warnings only</option>\
 </select>\
 </td>\
 </tr>"),
-//<option %s value='%d'>voice 1</option>\
-//<option %s value='%d'>voice 2</option>\
-//<option %s value='%d'>voice 3</option>
-    (settings->voice == VOICE_OFF ? "selected" : ""), VOICE_OFF,
-    (settings->voice != VOICE_OFF ? "selected" : ""), VOICE_ON
-//    (settings->voice == VOICE_1    ? "selected" : ""), VOICE_1,
-//    (settings->voice == VOICE_2    ? "selected" : ""), VOICE_2,
-//    (settings->voice == VOICE_3    ? "selected" : ""), VOICE_3
+    (settings->voice == VOICE_OFF    ? "selected" : ""), VOICE_OFF,
+    (settings->voice == VOICE_ADVISE ? "selected" : ""), VOICE_ADVISE,
+    (settings->voice == VOICE_WARN   ? "selected" : ""), VOICE_WARN
     );
 
     len = strlen(offset);

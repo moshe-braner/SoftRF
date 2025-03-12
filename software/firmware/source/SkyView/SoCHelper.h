@@ -49,7 +49,7 @@ typedef struct SoC_ops_struct {
   bool (*DB_init)();
   int  (*DB_query)(uint8_t, uint32_t, char *, size_t, char *, size_t);
   void (*DB_fini)();
-  void (*TTS)(char *);
+  void (*TTS)(char *, int);
   void (*Button_setup)();
   void (*Button_loop)();
   void (*Button_fini)();

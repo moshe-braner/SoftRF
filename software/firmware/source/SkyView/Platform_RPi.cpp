@@ -196,7 +196,7 @@ static void RPi_setup()
   eeprom_block.field.settings.zoom            = ZOOM_MEDIUM;
   eeprom_block.field.settings.adb             = DB_AUTO;
   eeprom_block.field.settings.idpref          = ID_REG;
-  eeprom_block.field.settings.voice           = VOICE_1;
+  eeprom_block.field.settings.voice           = VOICE_ADVISE;
   eeprom_block.field.settings.aghost          = ANTI_GHOSTING_OFF;
 
   eeprom_block.field.settings.filter          = TRAFFIC_FILTER_OFF;
@@ -441,7 +441,7 @@ static void play_file(snd_pcm_t *pcm_handle, char *filename, short int* buf, snd
     sf_close(infile);
 }
 
-static void RPi_TTS(char *message)
+static void RPi_TTS(char *message, int voice)
 {
   snd_pcm_t *pcm_handle;
   snd_pcm_hw_params_t *params;
@@ -484,9 +484,9 @@ static void RPi_TTS(char *message)
     while (word != NULL)
     {
         strcpy(filename, WAV_FILE_PREFIX);
-        strcat(filename,  settings->voice == VOICE_1 ? VOICE1_SUBDIR :
-                         (settings->voice == VOICE_2 ? VOICE2_SUBDIR :
-                         (settings->voice == VOICE_3 ? VOICE3_SUBDIR :
+        strcat(filename,  voice == VOICE_1 ? VOICE1_SUBDIR :
+                         (voice == VOICE_2 ? VOICE2_SUBDIR :
+                         (voice == VOICE_3 ? VOICE3_SUBDIR :
                           "" )));
         strcat(filename, word);
         strcat(filename, WAV_FILE_SUFFIX);
