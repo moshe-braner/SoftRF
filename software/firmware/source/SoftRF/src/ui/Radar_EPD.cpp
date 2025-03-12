@@ -18,6 +18,8 @@
 
 // this is modified from v1.1.
 
+#include <math.h>
+
 #include "../system/SoC.h"
 
 #if defined(USE_EPAPER)
@@ -143,10 +145,8 @@ static void EPD_Draw_Radar()
             break;
           }
 
-          rel_x = constrain(distance * sin(radians(bearing)),
-                                       -32768, 32767);
-          rel_y = constrain(distance * cos(radians(bearing)),
-                                       -32768, 32767);
+          rel_x = constrain(distance * sin(D2R * bearing), -32768, 32767);
+          rel_y = constrain(distance * cos(D2R * bearing), -32768, 32767);
 
           int16_t x = ((int32_t) rel_x * (int32_t) radius) / divider;
           int16_t y = ((int32_t) rel_y * (int32_t) radius) / divider;

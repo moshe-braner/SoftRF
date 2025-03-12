@@ -76,7 +76,7 @@ static bool reboot_pending = false;
 const char *page_message()
 {
     if (settings->debug_flags & DEBUG_SIMULATE)
-        return "Warning: simulation mode (debug_flag)";
+        return "Warning: simulation mode (debug_flag 800000)";
     if (BTpaused)
         return "Bluetooth paused, reboot to resume";
     return settings_message();
@@ -242,6 +242,8 @@ void serve_file(File file, const char *filename, const char *RAMbuf=NULL)
     char buf[64];
     snprintf(buf, 64, "attachment; filename=%s", filename);
     SoC->swSer_enableRx(false);
+    yield();
+    SoC->WDT_fini();    // otherwise serving large files result in WDT crash
     server.sendHeader("Content-Type", octet);
     server.sendHeader("Content-Disposition", buf);
     server.sendHeader("Connection", "close");
@@ -249,6 +251,8 @@ void serve_file(File file, const char *filename, const char *RAMbuf=NULL)
         server.send(200, octet, RAMbuf);  // must be null-terminated
     else
         server.streamFile(file, octet);
+    yield();
+    SoC->WDT_setup();
     SoC->swSer_enableRx(true);
 }
 
@@ -291,7 +295,13 @@ void anyUpload(bool toSD)
   else if (uploading.status == UPLOAD_FILE_WRITE)
   {
     if (UploadFile) {
+      SoC->swSer_enableRx(false);
+      yield();
+      SoC->WDT_fini();    // in case the file.write() will take a while
       size_t loaded = UploadFile.write(uploading.buf, uploading.currentSize);
+      delay(30);
+      SoC->WDT_setup();
+      SoC->swSer_enableRx(true);
       // Serial.print(F("... bytes: ")); Serial.println(loaded);
     }
   } 
@@ -310,8 +320,7 @@ void anyUpload(bool toSD)
       server.send(500, textplain, "couldn't create file");
     }
   }
-  //yield();
-  delay(30);
+  yield();
 }
 
 #if defined(USE_EGM96)
@@ -1560,6 +1569,7 @@ enum {
     FILE_OP_DELTRASH,
     FILE_OP_DELETE_LOGS,
     FILE_OP_TRASH_LOGS,
+    FILE_OP_TRASH_ALL,
     FILE_OP_EMPTY_TRASH,
     FILE_OP_DELALRMLOG
 };
@@ -1569,7 +1579,7 @@ void confirmDelete(int file_op, const char *filename=NULL)
   char f[32];
   f[0] = 's';
   f[1] = '\0';
-  const char *g = "all flight log";
+  const char *g = "all";
   char h[32];
   h[0] = '\0';     // default, will be overwritten below
   if (filename) {
@@ -1588,6 +1598,8 @@ void confirmDelete(int file_op, const char *filename=NULL)
           strcpy(h,"doclearlogs");
       else if (file_op == FILE_OP_TRASH_LOGS)
           strcpy(h,"dotrashlogs");
+      else if (file_op == FILE_OP_TRASH_ALL)
+          strcpy(h,"dotrashall");
       else if (file_op == FILE_OP_DELALRMLOG) {
           g = "the alarm log";
           f[0] = '\0';
@@ -1596,7 +1608,7 @@ void confirmDelete(int file_op, const char *filename=NULL)
       else
           strcpy(h,"doemptytrash");
   }
-  bool trash = (file_op == FILE_OP_TRASH || file_op == FILE_OP_TRASH_LOGS);
+  bool trash = (file_op == FILE_OP_TRASH || file_op == FILE_OP_TRASH_LOGS || file_op == FILE_OP_TRASH_ALL);
   char buf[240];
   snprintf_P ( buf, 240, PSTR(
  "<html>%s\
@@ -1662,6 +1674,10 @@ bool trash_file(const char *filename)
   String filepath = "/logs/";
   filepath += &filename[6];
   if (SD.exists(filepath)) {
+      if (filepath.endsWith("sdlog.txt"))
+          closeSDlog();
+      else if (filepath.endsWith("NMEA.txt"))
+          closeNMEAlog();
       String oldpath = "/logs/old/";
       oldpath += &filename[6];
       if (SD.exists(oldpath))
@@ -1794,6 +1810,8 @@ bool handleFileRead(String path) {
   if (SD.exists(zpath)) {
       if (strcmp(zpath,"/logs/sdlog.txt")==0)
           closeSDlog();
+      else if (path.endsWith("NMEA.txt"))
+          closeNMEAlog();
       File file = SD.open(zpath, FILE_READ);
       if (file) {
           serve_file(file, filename);
@@ -1826,8 +1844,8 @@ enum {
     LIST_SPIFFS_LOGS,
     LIST_SPIFFS_ALL,
     LIST_SD_LOGS,
-    LIST_SD_OLD,
-    LIST_SD_ALL
+    LIST_SD_ALL,
+    LIST_SD_OLD
 };
 
 void list_files(int mode)
@@ -1838,6 +1856,15 @@ void list_files(int mode)
       server.send ( 500, textplain, "Cannot allocate memory for file list");
       return;
   }
+#if defined(USE_SD_CARD)
+  if (mode==LIST_SD_LOGS || mode==LIST_SD_ALL || mode==LIST_SD_OLD) {
+      // update directory data for open files
+      // (mainly current NMEA log - flight logs are closed between block writes)
+      //SD.sync();
+      // not supported, need to flush() the individual files instead
+      flushNMEAlog();
+  }
+#endif
   int len = 0;
   char *cp = filelist;
   int more;
@@ -1864,13 +1891,15 @@ void list_files(int mode)
       root = SD.open("/logs/old");
       Serial.println(F("Files in SD/logs/old:"));
       snprintf(filelist, FILELSTSIZ, "%sFiles in SD/logs/old:<br><br>", home);
+#if 0
   } else if (mode == LIST_SD_LOGS) {
       folder = "/logs/";
       del_op = "conftrash~";        // move to /old
       root = SD.open("/logs");
       Serial.println(F("Flight log files in SD/logs:"));
       snprintf(filelist, FILELSTSIZ, "%sFlight log files in SD/logs:<br><br>", home);
-  } else {    // LIST_SD_ALL 
+#endif
+  } else {    // LIST_SD_ALL or LIST_SD_LOGS
       folder = "/logs/";
       del_op = "conftrash~";        // move to /old
       root = SD.open("/logs");
@@ -1904,26 +1933,36 @@ void list_files(int mode)
       bool is_igc = file_name.endsWith(igc_suffix);
       if (is_igc)
           ++nlogs;
-      // show NMEA & SD logs too
-      if ((mode == LIST_SPIFFS_LOGS || mode == LIST_SD_LOGS) && (! is_igc) &&
-           (strcmp(fn,"NMEAlog.txt") && strcmp(fn,"NMEAold.txt") && strcmp(fn,"sdlog.txt")))
+      // show NMEA & SD logs too (actually all .txt files)
+      bool is_txt = file_name.endsWith(".txt");
+      if ((mode == LIST_SPIFFS_LOGS || mode == LIST_SD_LOGS) && (! is_igc) && (! is_txt))
           continue;
       if (len < FILELSTSIZ-160) {
         strcpy(cp, "&nbsp;<a href=\"");
         more = strlen(cp);
         len += more;
         cp  += more;
+        int file_size = file.size();
+        char buf[16];
+        if (file_size)
+          snprintf(buf, 16, "%d bytes", file_size);
+        else
+          strcpy(buf,"size unknown");
         if (is_igc) {
           if (mode == LIST_SPIFFS_LOGS || mode == LIST_SPIFFS_ALL)
               fn[11] = 'C';   // replace "IGZ" with "IGC" - will decompress before download
           int year = igc2num(fn[0]);
           snprintf(cp, FILELSTSIZ-len,
-            "%s%s\">%s</a>&nbsp;[20%d%d-%02d-%02d]&nbsp;[%d bytes]",
-            folder, fn, file.name(), (year<4? 3 : 2), year, igc2num(fn[1]), igc2num(fn[2]), file.size());
+            "%s%s\">%s</a>&nbsp;[20%d%d-%02d-%02d]&nbsp;[%s]",
+            folder, fn, file.name(), (year<4? 3 : 2), year, igc2num(fn[1]), igc2num(fn[2]), buf);
+        } else if (file_name.endsWith("NMEA.txt")) {
+            int year = igc2num(fn[0]);
+            snprintf(cp, FILELSTSIZ-len,
+              "%s%s\">%s</a>&nbsp;[20%d%d-%02d-%02d]&nbsp;[%s]",
+              folder, fn, fn, (year<4? 3 : 2), year, igc2num(fn[1]), igc2num(fn[2]), buf);
         } else {
           snprintf(cp, FILELSTSIZ-len,
-            "%s%s\">%s</a>&nbsp;&nbsp;&nbsp;&nbsp;[%d bytes]",
-            folder, fn, fn, file.size());
+            "%s%s\">%s</a>&nbsp;&nbsp;&nbsp;&nbsp;[%s]", folder, fn, fn, buf);
         }
         more = strlen(cp);
         len += more;
@@ -1958,14 +1997,18 @@ void list_files(int mode)
   root.close();
   const char *label = "Back to Home";
   const char *url = "/";
-  if (len < FILELSTSIZ-120  && nlogs > 0) {
+  if (len < FILELSTSIZ-120  && nfiles > 0) {
       if (mode == LIST_SPIFFS_LOGS || mode == LIST_SPIFFS_ALL) {
           label = "Delete All Flight Logs";
           url = "/clearlogs";
       }
-      if (mode == LIST_SD_LOGS) {
+      if (mode == LIST_SD_LOGS && nlogs > 0) {
           label = "Move All Flight Logs to Trash";
           url = "/trashlogs";
+      }
+      if (mode == LIST_SD_ALL) {
+          label = "Move All Files to Trash";
+          url = "/trashall";
       }
       if (mode == LIST_SD_OLD) {
           label = "Empty Trash";
@@ -1978,7 +2021,7 @@ void list_files(int mode)
       cp  += more;
   }
   if (len < FILELSTSIZ-120) {
-    if (mode == LIST_SD_LOGS) {
+    if (mode == LIST_SD_LOGS || mode == LIST_SD_ALL) {
       label = "Open Trash";
       url = "/listsdold";
       snprintf(cp, FILELSTSIZ-len, "<br><br><input type=button onClick=\"location.href='%s'\" value='%s'>",
@@ -2030,8 +2073,9 @@ void list_logs()
 {
 #if defined(USE_SD_CARD)
     if (SD_is_mounted) {
-        closeSDlog();
-        closeNMEAlog();
+        //closeSDlog();
+        //closeNMEAlog();
+        // - only close logs before download or deletion or shutdown
         list_files(LIST_SD_LOGS);
     } else {
         list_files(LIST_SPIFFS_LOGS);
@@ -2076,11 +2120,14 @@ void doClearLogs()
     server.send(200, texthtml, buf);
 }
 
-void doClearSDLogs()
+void doClearSD(bool allfiles)
 {
 #if defined(USE_SD_CARD)
-    closeSDlog();
     closeFlightLog();
+    if (allfiles) {
+        closeSDlog();
+        closeNMEAlog();
+    }
     int nmoved = 0;
     int ndeleted = 0;
     File root = SD.open("/logs");
@@ -2089,7 +2136,10 @@ void doClearSDLogs()
         server.send ( 500, textplain, "(cannot open SD/logs)");
         return;
     }
-    Serial.println(F("clearing flight logs..."));
+    if (allfiles)
+        Serial.println(F("clearing all files..."));
+    else
+        Serial.println(F("clearing flight logs..."));
     File file = root.openNextFile();
     String file_name;
     while(file) {
@@ -2099,7 +2149,7 @@ void doClearSDLogs()
         logpath += file_name;
         bool move = (file.size() > 4000);
         file = root.openNextFile();
-        if (file_name.endsWith(".IGC") || file_name.endsWith(".igc")) {
+        if (allfiles || file_name.endsWith(".IGC") || file_name.endsWith(".igc")) {
             if (move) {            // move large files
                 String oldpath;
                 oldpath = "/logs/old/";
@@ -2137,10 +2187,14 @@ void doClearSDLogs()
     Serial.print(ndeleted);
     Serial.println(" small files");
     char buf[148];
-    snprintf_P ( buf, 148, PSTR("<h3>Moved %d files to /old/</h3>%s"), nmoved, home);
+    snprintf_P ( buf, 148, PSTR("<h3>Moved %d files & deleted %d</h3>%s"),
+                                     nmoved, ndeleted, home);
     server.send(200, texthtml, buf);
 #endif
 }
+
+void doClearSDLogs() { doClearSD(false); }
+void doClearSDAll()  { doClearSD(true); }
 
 void doEmptyTrash()
 {
@@ -2151,19 +2205,20 @@ void doEmptyTrash()
         Serial.println(F("Cannot open SD/logs/old"));
         server.send ( 500, textplain, "(cannot open SD/logs/old)");
     }
-    Serial.println(F("deleting old flight logs..."));
+    Serial.println(F("deleting files in SD/logs/old..."));
     File file = root.openNextFile();
     String file_name;
     while(file) {
         file_name = "/logs/old/";
         file_name += file.name();
         file = root.openNextFile();
-        if (file_name.endsWith(".IGC") || file_name.endsWith(".igc")) {
+        //if (file_name.endsWith(".IGC") || file_name.endsWith(".igc")) {
+        //rather, delete all files in /logs/old/
             Serial.print("...");
             Serial.println(file_name.c_str());
             SD.remove(file_name.c_str());
             ++nfiles;
-        }
+        //}
         yield();
     }
     file.close();
@@ -2185,6 +2240,11 @@ void handleClearLogs()
 void handleClearSDLogs()
 {
     confirmDelete(FILE_OP_TRASH_LOGS);
+}
+
+void handleClearSDAll()
+{
+    confirmDelete(FILE_OP_TRASH_ALL);
 }
 
 void handleEmptyTrash()
@@ -2343,7 +2403,9 @@ void Web_setup()
   server.on ( "/listsdold", list_sd_old );
   server.on ( "/listsdall", list_sd_all );
   server.on ( "/trashlogs", handleClearSDLogs );
+  server.on ( "/trashall", handleClearSDAll );
   server.on ( "/dotrashlogs", doClearSDLogs );
+  server.on ( "/dotrashall", doClearSDAll );
   server.on ( "/emptytrash", handleEmptyTrash );
   server.on ( "/doemptytrash", doEmptyTrash );
 #endif

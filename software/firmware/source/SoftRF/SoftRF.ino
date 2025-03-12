@@ -73,6 +73,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
+
 #include "src/system/SoC.h"
 #include "src/system/OTA.h"
 #include "src/system/Time.h"
@@ -96,7 +98,6 @@
 #include "src/TTNHelper.h"
 #include "src/TrafficHelper.h"
 #include "src/Wind.h"
-#include "src/ApproxMath.h"
 
 #if !defined(EXCLUDE_VOICE)
 #if defined(ESP32)
@@ -236,6 +237,8 @@ void setup()
     ThisAircraft.addr = 0;  /* will be filled in later */
   } else if (settings->id_method == ADDR_TYPE_ICAO && settings->aircraft_id != 0) {
     ThisAircraft.addr = settings->aircraft_id;
+  } else if (settings->id_method == ADDR_TYPE_OVERRIDE && settings->aircraft_id != 0) {
+    ThisAircraft.addr = settings->aircraft_id;
   } else {
     uint32_t id = SoC->getChipId() & 0x00FFFFFF;
     ThisAircraft.addr = id;
@@ -250,7 +253,8 @@ settings->id_method, settings->aircraft_id, ThisAircraft.addr);
 
 Serial.println(F("calling Baro_setup()..."));
   // do this before Filesys_setup since this tickles pins 13,2
-  hw_info.baro = Baro_setup();
+  if (! (settings->debug_flags & DEBUG_SIMULATE))
+      hw_info.baro = Baro_setup();
 Serial.println(F("... Baro_setup() returned"));
 
 //#if defined(USE_SD_CARD)
@@ -502,7 +506,7 @@ void normal()
         if (validfix && ThisAircraft.airborne) {
           float dy = (gnss.location.lat() - prev_lat);
           float dx = (gnss.location.lng() - prev_lon) * CosLat(ThisAircraft.latitude);
-          float course2 = atan2_approx(dy, dx);
+          float course2 = atan2(dx, dy);
           float coursediff = fabs(course2-gnss.course.deg());
           if (coursediff > 180)  coursediff = 360 - coursediff;
           if (coursediff > 30) {
@@ -548,15 +552,23 @@ void normal()
              // - converts MSL altitude in GGA to altitude above ellipsoid
       if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_WINCH) {
         /* for "winch" aircraft type, elevate above ground */
-        ThisAircraft.altitude += ((ThisAircraft.timestamp & 0x03) * 100) + 100;
+        ThisAircraft.altitude += (float) (((ThisAircraft.timestamp & 0x03) * 100) + 100);
       }
       ThisAircraft.course = gnss.course.deg();
+      if (ThisAircraft.course < 0.0)   ThisAircraft.course += 360.0;
       ThisAircraft.speed = gnss.speed.knots();
       ThisAircraft.hdop = (uint16_t) gnss.hdop.value();
 
       /* allow knowing when there was a good fix for 30 sec */
       if (initial_time == 0) {
         initial_time = millis();
+Serial.printf("First fix:\r\n\
+    lat/lon: %.5f %.5f\r\n\
+    date: %d %d %d\r\n\
+    time: %d %d %d\r\n",
+gnss.location.lat(), gnss.location.lng(),
+gnss.date.year(), gnss.date.month(), gnss.date.day(),
+gnss.time.hour(), gnss.time.minute(), gnss.time.second());
       } else if (GNSSTimeMarker == 0) {
         if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
           /* 30 sec after first fix */
@@ -569,7 +581,7 @@ void normal()
         /* only do this once every 4 seconds */
         static uint32_t time_to_estimate_climb = 0;
         if (ThisAircraft.gnsstime_ms > time_to_estimate_climb) {
-          time_to_estimate_climb = ThisAircraft.gnsstime_ms + 4100;
+          time_to_estimate_climb = ThisAircraft.gnsstime_ms + 3900;
           ThisAircraft.vs = Estimate_Climbrate();
         }
       } /* else it was filled above in Baro_loop() */
@@ -698,7 +710,7 @@ if (rx_success) which_rx_try = 2;
       logFlightPosition();
       if (settings->logflight == FLIGHT_LOG_TRAFFIC)
           logCloseTraffic();
-      IGCTimeMarker = ref_time_ms + (1000 * settings->loginterval) + 320;
+      IGCTimeMarker = ref_time_ms + (1000 * (uint32_t) settings->loginterval) + 320;
     }
 #else
     // on T-Echo don't worry about SPI bus
@@ -706,7 +718,7 @@ if (rx_success) which_rx_try = 2;
       logFlightPosition();
       if (settings->logflight == FLIGHT_LOG_TRAFFIC)
           logCloseTraffic();
-      IGCTimeMarker = ref_time_ms + (1000 * settings->loginterval) + 320;
+      IGCTimeMarker = ref_time_ms + (1000 * (uint32_t) settings->loginterval) + 320;
     }
 #endif
   }

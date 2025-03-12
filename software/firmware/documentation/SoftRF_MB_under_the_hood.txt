@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated February 26, 2025 to fit software version MB156
+This version last updated March 10, 2025 to fit software version MB157
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -53,7 +53,7 @@ baud_rate - baud rate code (1=4800 2=9600 3=19200 4=38400 5=57600 6=115200) for 
 
 gdl90 - GDL90 output: this is for a different local data transfer protocol, usually leave Off (0).  If used, should not choose the same destination (e.g., UDP) as an NMEA output destination.
 
-d1090 - Dump1090: yet another local data output protocol, usually leave Off (0).
+d1090 - Dump1090: yet another local data output protocol, usually leave Off (0).  If used, should not choose the same destination (e.g., UDP) as an NMEA output destination.
 
 gdl90_in - GDL90 input: this is for importing data from an external ADS-B receiver in GLD90 format, else leave Off.  GDL90 uses UDP port 4000, while NMEA uses 10110.  Cannot use the same port for both input and output.  Values: same codes as for nmea_out: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT 6=secondary serial.
 
@@ -64,7 +64,7 @@ compflash - On a T-Beam with an SD card this setting is ignored.  On a T-Beam wi
 
 alarmlog - Alarms Log: If enabled (1), every time a traffic alarm is issued (whether audible or not), a line of text is written into the alarmlog.txt file (in flash). (If flight logging, similar data is also inserted as an LPLT comment.)  This line includes the date, time, lat/lon, alarm level (1-3), aircraft ID, relative heading, and horizontal and vertical separation (in meters).  On the T-Beam, if you want to download this data, use the web interface and click the "Alarm Log: [Download]" button at the bottom of the status page.  The existing file is normally appended to.  If space in the flash file system is low, the alarm log file is erased and a new one created.  You can also do that manually by clicking the "Alarm Log: [Clear]" button on the status page.
 
-log_nmea - option to log all NMEA output to /logs/NMEAlog.txt in the SD card.  (T-Beam only.)
+log_nmea - option to log all NMEA output to the SD card.  (T-Beam only.)  Logging starts only when a GNSS fix is attained, using the date to name the file, similar to the IGC flight log file naming.  E.g., 52B1NMEA.txt.
 
 leapsecs - Leap seconds.  Only accessible via editing the settings.txt file.  The value here is used if the GNSS module says "have a fix but leap seconds not known".  This value (default=18 which is correct for 2025) is automatically set to what the GNSS module reports after it gets the leap seconds from a satellite.  Thus there should never be a need to edit it manually.  This is currently only relevant to Ublox GNSS modules (T-Beam).
 
@@ -191,7 +191,7 @@ Relayed packets from landed-out aircraft (marked by the aircraft type being zero
 
 How to upload and download files
 
-To see the list of files in SPIFFS, click the "manage files" button in the web interface.  The "Upload egm96s.dem" button, or the Settings "Upload" button, on the status web page can actually be used to upload any file into SPIFFS.  To download any file from SPIFFS, click on the file name in the "manage files" page that lists the files.  Or use the URL 192.168.1.1/filename (where the "192.168.1.1" will be something else if using an external network).  The page listing flight logs on the SD card does not show other types of files that may be there.  To see a list of all files in the /logs folder, use the URL .../listsdall.  To upload any file into the /logs folder on the SD card, use .../logupload.
+To see the list of files in SPIFFS, click the "manage files" button in the web interface.  The "Upload egm96s.dem" button, or the Settings "Upload" button, on the status web page can actually be used to upload any file into SPIFFS.  To download any file from SPIFFS, click on the file name in the "manage files" page that lists the files.  Or use the URL 192.168.1.1/filename (where the "192.168.1.1" will be something else if using an external network).  The page listing flight logs on the SD card does not show files other than .igc and .txt that may be there.  To see a list of all files in the /logs folder, use the URL .../listsdall.  To upload any file into the /logs folder on the SD card, use .../logupload.
 
 How to monitor RSSI of received signals
 

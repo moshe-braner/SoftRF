@@ -71,7 +71,9 @@ typedef time_t(*getExternalTime)();
 #define SECS_PER_WEEK (SECS_PER_DAY * DAYS_PER_WEEK)
 #define SECS_PER_YEAR (SECS_PER_WEEK * 52UL)
 #define SECS_YR_2000  (946684800UL) // the time at the start of y2k
- 
+#define SECS_YR_2020  (1577836800UL) // the time at the start of 2020
+#define SECS_YR_2025  (1735689600UL) // the time at the start of 2025
+
 /* Useful Macros for getting elapsed time */
 #define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)  
 #define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN) 

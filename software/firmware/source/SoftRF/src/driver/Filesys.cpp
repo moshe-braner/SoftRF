@@ -193,6 +193,7 @@ void Filesys_setup() {
   if (! SD.exists("/logs/old"))
       SD.mkdir("/logs/old");
 
+#if defined(SD_LOG)
   // if the existing sdlog.txt is above a certain size
   // then keep a copy and start a new one
   size_t logsize = 0;
@@ -216,6 +217,7 @@ void Filesys_setup() {
       SDlogOpen = true;
   else
       Serial.println("Failed to open SD/logs/sdlog.txt for writing");
+#endif
 
   if (settings->debug_flags & DEBUG_SIMULATE) {
       // try to open file with simulated GNSS sentences

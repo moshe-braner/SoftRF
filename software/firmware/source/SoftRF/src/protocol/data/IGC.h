@@ -3,6 +3,7 @@
 
 #if defined(IGCFILESYS)
 
+void makeLogNameDate(char *buf);  // needs buf[4]
 void FlightLog_setup();
 void openFlightLog();
 size_t PSRAMavailable();

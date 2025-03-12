@@ -18,6 +18,8 @@
 
 #if !defined(EXCLUDE_D1090)
 
+#include <math.h>
+
 #include <adsb_encoder.h>
 #include <TimeLib.h>
 
@@ -25,6 +27,7 @@
 #include "NMEA.h"
 #include "D1090.h"
 #include "../../driver/GNSS.h"
+#include "../../driver/Bluetooth.h"
 #include "GDL90.h"
 #include "../../driver/Settings.h"
 #include "../../TrafficHelper.h"
@@ -67,7 +70,7 @@ static void D1090_Out(byte *buf, size_t size)
       SoC->USB_ops->write(buf, size);
     break;
   case DEST_BLUETOOTH:
-    if (SoC->Bluetooth_ops)
+    if (BTactive && SoC->Bluetooth_ops)
       SoC->Bluetooth_ops->write(buf, size);
     break;
   case DEST_UDP:
@@ -164,8 +167,8 @@ void D1090_Export()
           str += ";\r\n*";
 
           df17 = make_velocity_frame(Container[i].addr,
-            Container[i].speed * cos(Container[i].course * PI / 180),
-            Container[i].speed * sin(Container[i].course * PI / 180),
+            Container[i].speed * cos(D2R * Container[i].course),
+            Container[i].speed * sin(D2R * Container[i].course),
             Container[i].vs,
             DF17);
 

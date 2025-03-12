@@ -97,6 +97,12 @@ void save_range_stats(void);
 void EmptyContainer(container_t *p);
 void EmptyFO(ufo_t *p);
 
+#define D2R (3.141593f/180.0f)
+#define R2D (180.0f/3.141593f)
+
+float CosLat(void);
+float InvCosLat(void);
+
 extern container_t Container[MAX_TRACKING_OBJECTS];  // EmptyContainer;
 extern ufo_t fo;  // EmptyFO;
 extern char fo_callsign[10];

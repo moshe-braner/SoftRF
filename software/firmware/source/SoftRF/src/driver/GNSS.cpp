@@ -2182,7 +2182,7 @@ void PickGNSSFix()
         }
       }        // infinite loop unless !available() above, or pausing, or SentenceType == 2
       return;
-    }
+    }              // end of if (settings->debug_flags & DEBUG_SIMULATE)
 
     // only use the internal (or add-on serial) GNSS, leave other ports alone for data bridging
     while (true) {

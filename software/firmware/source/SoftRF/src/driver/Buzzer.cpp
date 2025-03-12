@@ -156,8 +156,8 @@ bool Buzzer_Notify(int8_t alarm_level, bool multi_alarm)
         BuzzerBeeps  = ALARM_BEEPS_IMPORTANT * 2;
         double_beep = true;
     } else {
-        BuzzerBeepMS = ALARM_TONE_MS_LOW;
-        BuzzerBeeps  = ALARM_BEEPS_LOW;
+        BuzzerBeepMS = ALARM_TONE_MS_IMPORTANT;
+        BuzzerBeeps  = ALARM_BEEPS_IMPORTANT;
     }
   } else if (alarm_level == ALARM_LEVEL_URGENT) {
     BuzzerToneHz = ALARM_TONE_HZ_URGENT;
@@ -181,6 +181,10 @@ bool Buzzer_Notify(int8_t alarm_level, bool multi_alarm)
   }
   BuzzerState = 1;
   BuzzerTimeMarker = millis() + BuzzerBeepMS;
+//if (settings->debug_flags & 0x80) {
+//snprintf_P(NMEABuffer, sizeof(NMEABuffer),"alarm level %d buzzer turned on at %d ms\r\n", alarm_level, millis());
+//NMEAOutD();
+//}
   return true;
 }
 
@@ -205,6 +209,10 @@ void Buzzer_loop(void)
         else
             gap = BuzzerBeepMS;         /* gap is same length as the beep */
         BuzzerTimeMarker = millis() + gap;           /* time of next beep */
+//if (settings->debug_flags & 0x80) {
+//snprintf_P(NMEABuffer, sizeof(NMEABuffer),"... buzzer turned off at %d ms\r\n", millis());
+//NMEAOutD();
+//}
       } else {  /* sound is off, start another beep */
         if (settings->volume == BUZZER_EXT)
           ext_buzzer(true);
@@ -214,6 +222,10 @@ void Buzzer_loop(void)
         --BuzzerBeeps;
         ++BuzzerBeep;
         BuzzerTimeMarker = millis() + BuzzerBeepMS;  /* timer of next gap */
+//if (settings->debug_flags & 0x80) {
+//snprintf_P(NMEABuffer, sizeof(NMEABuffer),"... buzzer turned on  at %d ms\r\n", millis());
+//NMEAOutD();
+//}
       }
 
     } else {   /* done beeping, turn it all off */
@@ -223,6 +235,10 @@ void Buzzer_loop(void)
       else
         noToneAC();
       BuzzerTimeMarker = 0;
+//if (settings->debug_flags & 0x80) {
+//snprintf_P(NMEABuffer, sizeof(NMEABuffer),"... buzzer final off at  %d ms\r\n", millis());
+//NMEAOutD();
+//}
     }
 
     return;
@@ -232,11 +248,16 @@ void Buzzer_loop(void)
   if (do_alarm_demo && BuzzerTimeMarker == 0) {
       delay(1000);
       uint32_t t = millis() - SetupTimeMarker;
-      if (t < (1000*STROBE_INITIAL_RUN)) {
-          int8_t level = (t > (1000*(STROBE_INITIAL_RUN-3)) ? ALARM_LEVEL_URGENT :
-                          t > (1000*(STROBE_INITIAL_RUN-7)) ? ALARM_LEVEL_IMPORTANT :
+      if (t < (1000*(STROBE_INITIAL_RUN+3))) {
+          // STROBE_INITIAL_RUN = 9
+          // 3s LOW, 3s IMPORTANT, 3s IMPORTANT-multi, 3s URGENT
+          int8_t level = (t > (1000*(STROBE_INITIAL_RUN-0)) ? ALARM_LEVEL_URGENT :
+                          t > (1000*(STROBE_INITIAL_RUN-6)) ? ALARM_LEVEL_IMPORTANT :
                           ALARM_LEVEL_LOW);
-          Buzzer_Notify(level,(level==ALARM_LEVEL_IMPORTANT? true : false));
+          bool multalarm = false;
+          if (level==ALARM_LEVEL_IMPORTANT && t > (1000*(STROBE_INITIAL_RUN-3)))
+               multalarm = true;
+          Buzzer_Notify(level, multalarm);
       } else {
           OLED_no_msg();
           do_alarm_demo = false;

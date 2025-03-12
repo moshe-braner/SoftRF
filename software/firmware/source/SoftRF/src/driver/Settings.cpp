@@ -207,7 +207,7 @@ static void init_stgdesc()
 
   const char *yesno = "1=yes 0=no";
   const char *destinations = "0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT ...";
-  const char *bauds = "0=default(38) 2=9600 3=19200 4=38400 ...";
+  //const char *bauds = "0=default(38) 2=9600 3=19200 4=38400 ...";
 
   stgcomment[STG_MODE]       = "0=Normal ...";
   stgcomment[STG_PROTOCOL]   = "7=Latest 1=OGNTP 5=FANET 2=P3I";
@@ -223,7 +223,7 @@ static void init_stgdesc()
   stgcomment[STG_TCPMODE]    = "0=server 1=client";
   stgcomment[STG_TCPPORT]    = "if client, 0=2000 1=8880";
   stgcomment[STG_BLUETOOTH]  = "0=off 1=classic 2=BLE";
-  stgcomment[STG_BAUD_RATE]  = bauds;
+  stgcomment[STG_BAUD_RATE]  = "0=default(38) 2=9600 3=19200 4=38400 ...";
   stgcomment[STG_NMEA_OUT]   = destinations;
   stgcomment[STG_NMEA_G]     = "0=off 1=basic 3=GSA ...";
   stgcomment[STG_NMEA_T]     = "0=off 1=basic";
@@ -236,7 +236,7 @@ static void init_stgdesc()
   stgcomment[STG_NMEA2_S]    = "0=off 1=basic 3=LK8EX1";
   stgcomment[STG_NMEA2_D]    = yesno;
   stgcomment[STG_NMEA2_E]    = "0=off 1=tunnel 2=output 3=both";
-  stgcomment[STG_BAUDRATE2]  = bauds;
+  stgcomment[STG_BAUDRATE2]  = "0=off 2=9600 3=19200 4=38400 ...";
   stgcomment[STG_ALT_UDP]    = "0=10110 1=10111";
   stgcomment[STG_RX1090]     = "0=none 1=GNS5892";
   stgcomment[STG_RX1090X]    = "comparator offset";
@@ -425,6 +425,9 @@ void Adjust_Settings()
     }
 #endif /* CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3 */
 
+  if (settings->debug_flags & DEBUG_SIMULATE)
+      settings->rx1090 = ADSB_RX_NONE;
+
   /* enforce some restrictions on input and output routes */
   int nmea1 = settings->nmea_out;
   int nmea2 = settings->nmea_out2;
@@ -441,6 +444,14 @@ void Adjust_Settings()
           Serial.println(F("GDL input from UDP, GDL output turned OFF"));
       }
   }
+  if (settings->gdl90 == nmea1)
+      settings->nmea_out = DEST_NONE;   // can't do both at the same time
+  if (settings->gdl90 == nmea2)
+      settings->nmea_out2 = DEST_NONE;
+  if (settings->d1090 == nmea1)
+      settings->nmea_out = DEST_NONE;   // can't do both at the same time
+  if (settings->d1090 == nmea2)
+      settings->nmea_out2 = DEST_NONE;
 //  bool wireless1 = (nmea1==DEST_UDP || nmea1==DEST_TCP || nmea1==DEST_BLUETOOTH);
 //  bool wireless2 = (nmea2==DEST_UDP || nmea2==DEST_TCP || nmea2==DEST_BLUETOOTH);
   bool wifi1 = (nmea1==DEST_UDP || nmea1==DEST_TCP);

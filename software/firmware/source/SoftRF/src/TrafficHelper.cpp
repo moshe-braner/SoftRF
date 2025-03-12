@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
+
 #include "../SoftRF.h"
 #include "system/SoC.h"
 #include "system/Time.h"
@@ -32,7 +34,6 @@
 #include "protocol/radio/Legacy.h"
 #include "protocol/data/NMEA.h"
 #include "protocol/data/IGC.h"
-#include "ApproxMath.h"
 #include "Wind.h"
 
 #if !defined(EXCLUDE_VOICE)
@@ -361,14 +362,18 @@ static int8_t Alarm_Vector(container_t *this_aircraft, container_t *fop)
     if (adj_distance < distance)
         adj_distance = distance;
 
-    /* Subtract 2D velocity vector of traffic from 2D velocity vector of this aircraft */ 
-    float V_rel_y = this_aircraft->speed * cos_approx(this_aircraft->course) -
-                    fop->speed * cos_approx(fop->course);                      /* N-S */
-    float V_rel_x = this_aircraft->speed * sin_approx(this_aircraft->course) -
-                    fop->speed * sin_approx(fop->course);                      /* E-W */
+    /* Subtract 2D velocity vector of traffic from 2D velocity vector of this aircraft */
+    float this_course = D2R * this_aircraft->course;
+    float that_course = D2R * fop->course;
+    float V_rel_y = this_aircraft->speed * cos(this_course) -
+                    fop->speed * cos(that_course);                      /* N-S */
+    float V_rel_x = this_aircraft->speed * sin(this_course) -
+                    fop->speed * sin(that_course);                      /* E-W */
 
-    V_rel_magnitude = approxHypotenuse(V_rel_x, V_rel_y) * _GPS_MPS_PER_KNOT;
-    V_rel_direction = atan2_approx(V_rel_y, V_rel_x);     /* direction fop is coming from */
+    V_rel_magnitude = hypot(V_rel_x, V_rel_y) * _GPS_MPS_PER_KNOT;
+    V_rel_direction = R2D * atan2(V_rel_x, V_rel_y);     /* direction fop is coming from */
+    if (V_rel_direction < 0.0)
+        V_rel_direction += 360.0;
 
     /* +- some degrees tolerance for collision course */
     /* also check the relative speed, ALARM_VECTOR_SPEED = 2 m/s */
@@ -594,7 +599,7 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
          int32_t v;
          v = this_aircraft->air_ew[i];
          v *= factor;
-         vx = v >> 6;
+         vx = v >> 6;                   // for the 64x scaling of factor
          v = this_aircraft->air_ns[i];
          v *= factor;
          vy = v >> 6;
@@ -651,7 +656,6 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
   /* convert from meters to quarter-meters */
   int dx = fop->dx << 2;
   int dy = fop->dy << 2;
-  int cursqdist = dx*dx + dy*dy;
 
   /* project paths over time and find minimum 3D distance */
   int minsqdist = 200*200*4*4;
@@ -677,9 +681,12 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
   }
   int t;
   adjdz <<= 3;
-  // <<2 for units: convert to quarter-meters,
+  // <<2 for units: convert to quarter-meters, and
   // another <<1 to consider vertical separation 2x better than horizontal distance
   int sqdz = adjdz * adjdz;
+  //int cursqdist = dx*dx + dy*dy;        // previous version
+  int cursqdist = dx*dx + dy*dy + sqdz;   // causes more alarms
+
   for (t=0; t<18; t++) {  /* loop over the 1-second time points prepared */
     vx = thatvx[i] - thisvx[j];   /* relative velocity */
     vy = thatvy[i] - thisvy[j];
@@ -697,8 +704,11 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
     ++j;
   }
 
-  if (cursqdist <= minsqdist)     // if not getting any closer than current situation
-      return ALARM_LEVEL_NONE;    // then don't sound an alarm
+  if (cursqdist <= minsqdist || mintime == 0) {
+      // if not getting any closer than current situation
+      //     then don't sound an alarm
+      return ALARM_LEVEL_NONE;
+  }
 
   int8_t rval = ALARM_LEVEL_NONE;
 
@@ -811,6 +821,28 @@ void logCloseTraffic()
 //#endif
 }
 
+/* cos(latitude) is used to convert longitude difference into linear distance. */
+/* Once computed, accurate enough through a significant range of latitude. */
+
+static float cos_lat = 0.7071;
+//static float cos_lat_m = 111300.0 * 0.7071;
+static float inv_cos_lat = 1.4142;
+
+float CosLat()
+{
+  static float oldlat = 45.0;
+  float latitude = ThisAircraft.latitude;
+  if (fabs(latitude-oldlat) > 0.3) {
+    cos_lat = cos(D2R*latitude);
+    if (cos_lat > 0.01)
+        inv_cos_lat = 1.0 / cos_lat;
+    oldlat = latitude;
+  }
+  return cos_lat;
+}
+
+float InvCosLat() { return inv_cos_lat; }
+
 struct {
     float distance;
     float bearing;
@@ -824,12 +856,12 @@ void Calc_Traffic_Distances(container_t *cip)
 {
     cip->alt_diff = cip->altitude - ThisAircraft.altitude;
     /* use an approximation for distance & bearing between 2 points */
-    int32_t y = (int32_t)(111300.0 * (cip->latitude - ThisAircraft.latitude));     // meters
-    int32_t x = (int32_t)(111300.0 * (cip->longitude - ThisAircraft.longitude) * CosLat(/*ThisAircraft.latitude*/));
-    cip->dx = x;
-    cip->dy = y;
-    cip->distance = (float) iapproxHypotenuse1(x, y);   /* meters  */
-    cip->bearing = (float) iatan2_approx(y, x);         /* degrees from ThisAircraft to fop */
+    float y = 111300.0 * (cip->latitude - ThisAircraft.latitude);     // meters
+    float x = 111300.0 * (cip->longitude - ThisAircraft.longitude) * CosLat(/*ThisAircraft.latitude*/);
+    cip->dx = (int32_t) x;
+    cip->dy = (int32_t) y;
+    cip->distance = hypot(x, y);   /* meters  */
+    cip->bearing = R2D * atan2(x, y);         /* degrees from ThisAircraft to fop */
     if (cip->bearing < 0)
         cip->bearing += 360;
 }
@@ -844,10 +876,8 @@ void Stash_Traffic_Distances(ufo_t *fop)
     x = 111300.0 * (fop->longitude - ThisAircraft.longitude) * CosLat(/*ThisAircraft.latitude*/);
     stash.dx = (int32_t) x;
     stash.dy = (int32_t) y;
-    //stash.distance = approxHypotenuse(x, y);                         /* meters  */
-    stash.distance = (float) iapproxHypotenuse1(stash.dx, stash.dy);   /* meters  */
-    //stash.bearing = atan2_approx(y, x);                        /* degrees from ThisAircraft to fop */
-    stash.bearing = (float) iatan2_approx(stash.dy, stash.dx);   /* degrees from ThisAircraft to fop */
+    stash.distance = hypot(x, y);                 /* meters  */
+    stash.bearing = R2D * atan2(x, y);            /* degrees from ThisAircraft to fop */
     if (stash.bearing < 0)
         stash.bearing += 360;
 }
@@ -1060,7 +1090,7 @@ void sample_range(container_t *fop)
     if (oclock < 0)     oclock += 360;
     if (oclock >= 360)  oclock -= 360;
     oclock /= 30;
-    newrange[oclock] += log2_approx2(0.001 * fop->distance);
+    newrange[oclock] += log2(0.001f * fop->distance);
     ++newrange_n[oclock];
     float rssi = (float) fop->rssi;
     newrssi_sum += rssi;
@@ -1092,7 +1122,7 @@ void save_range_stats()
             newrange_n[oclock] = oldrange_n[oclock];
         }
         snprintf(buf, 64, "AN,%.1f,%f,%d",
-            (newrange_n[oclock]? exp2_approx2(newrange[oclock]) : 0.0),
+            (newrange_n[oclock]? exp2(newrange[oclock]) : 0.0),
             newrange[oclock],
             newrange_n[oclock]);
         Serial.println(buf+3);
@@ -1626,23 +1656,25 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
       }
     }
 
-    if (sound_alarm_level > ALARM_LEVEL_CLOSE) {
+    if (sound_alarm_level > ALARM_LEVEL_CLOSE) {   // implies mfop != NULL
       // use alarmcount to modify the sounds
       bool notified = Buzzer_Notify(sound_alarm_level, (alarmcount > 1));
 #if !defined(EXCLUDE_VOICE)
 #if defined(ESP32)
-      if (mfop != NULL)
+      //if (mfop != NULL)
         notified |= Voice_Notify(mfop, (alarmcount > 1));
 #endif
 #endif
+
       /* Doing this here means that alarms via $PSRAA follow the same
        * hysteresis algorithm as the sound alarms.
        * External devices (XCsoar) sounding alarms based on $PFLAU have
        * their own algorithms, are not affected and may be continuous */
-      snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("$PSRAA,%d*"), sound_alarm_level-1);
+      snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("$PSRAA,%d,%d,%06X*"),
+                     sound_alarm_level-1, (alarmcount > 1), mfop->addr);
       NMEAOutC(NMEA_E_OUTPUT);
 
-      if (mfop != NULL) {
+      //if (mfop != NULL) {
         // if (notified)
         {
           mfop->alert_level = mfop->alarm_level;   // was + 1;
@@ -1687,7 +1719,7 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
           }
         }
 #endif
-      }
+      //}
     }
 
     UpdateTrafficTimeMarker = millis();

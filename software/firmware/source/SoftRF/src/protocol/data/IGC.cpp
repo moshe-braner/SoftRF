@@ -738,9 +738,33 @@ XXX = unique FR Serial Number; 3 alphanumeric characters
 F = Flight number of the day; 1 to 9 then A=10 through Z=35
 */
 
+void makeLogNameDate(char *p)
+{
+    uint16_t year = gnss.date.year() - 2000;
+    char c = ((uint8_t)'0' + (uint8_t)(year % 10));
+    *p++ = c;
+    uint8_t month = gnss.date.month();
+    if (month < 10)
+        c = ((uint8_t)'0' + month);
+    else
+        c = ((uint8_t)'A' + (month-10));
+    *p++ = c;
+    uint8_t day = gnss.date.day();
+    if (day < 10)
+        c = ((uint8_t)'0' + day);
+    else
+        c = ((uint8_t)'A' + (day-10));
+    *p++ = c;
+}
+
 void makeFlightLogName()
 {
-    char buf[4];
+    char buf[8];
+    makeLogNameDate(buf);
+    buf[3] = 'X';
+    String chip = String((SoC->getChipId() & 0x0FFF), HEX);
+    strncpy(buf+4,chip.c_str(),4);
+    strupr(buf+4);
 #if defined(ESP32)
     String basename = "/logs/";   // SD_BASEPATH;
     if (PSRAMbuf)
@@ -748,25 +772,7 @@ void makeFlightLogName()
 #else
     String basename = "/";  // BASEPATH;
 #endif
-    uint16_t year = gnss.date.year() - 2000;
-    char c = ((uint8_t)'0' + (uint8_t)(year % 10));
-    basename += c;
-    uint8_t month = gnss.date.month();
-    if (month < 10)
-        c = ((uint8_t)'0' + month);
-    else
-        c = ((uint8_t)'A' + (month-10));
-    basename += c;
-    uint8_t day = gnss.date.day();
-    if (day < 10)
-        c = ((uint8_t)'0' + day);
-    else
-        c = ((uint8_t)'A' + (day-10));
-    basename += c;
-    basename += "X";
-    String chip = String((SoC->getChipId() & 0x0FFF), HEX);
-    strcpy(buf,chip.c_str());
-    basename += strupr(buf);
+    basename += buf;
     int flightnum = 1;
     char flightn = '1';
     String filename = basename;
@@ -1087,7 +1093,7 @@ void logFlightPosition()
 
     int galt = (int) ThisAircraft.altitude;   // assumes this is height above ellipsoid
     int palt;
-    if (baro_chip != NULL && ! (settings->debug_flags & DEBUG_SIMULATE))
+    if (baro_chip != NULL /* && ! (settings->debug_flags & DEBUG_SIMULATE) */ )
         palt = (int) ThisAircraft.pressure_altitude;
     else
         palt = galt;

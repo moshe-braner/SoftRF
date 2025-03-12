@@ -13,7 +13,6 @@
 
 #include <math.h>
 #include <protocol.h>
-#include "../../ApproxMath.h"
 #include "../../../SoftRF.h"
 #include "../../system/SoC.h"
 #include "../../system/Time.h"
@@ -248,7 +247,8 @@ static void sample_rssi_zone(uint8_t rssi, float distance, float alt_diff)
     if (distance > 6000)  return;         // only sample smaller distances
     if (rssi < MINRSSI)   return;
     if (stats_count < 0)  return;         // do not collect any more data
-    uint32_t distance_3d = iapproxHypotenuse0((int32_t) distance, (int32_t) alt_diff);
+    //uint32_t distance_3d = iapproxHypotenuse0((int32_t) distance, (int32_t) alt_diff);
+    uint32_t distance_3d = (uint32_t) hypot(distance, alt_diff);
     //if (distance_3d > 6000)  return;     // only sample smaller distances
     if (rssi > MAXRSSI)  rssi = MAXRSSI;   // fold higher RSSIs into this top value
     int index = rssi - MINRSSI;
@@ -1286,7 +1286,7 @@ static bool parse_position(int index)
         }
         // weed out remaining too-far using pre-computed squared-hypotenuse
         // - no need to compute the un-squared distance at this point
-        // - will compute more exact distance below using hypotenus-approximation
+        // - will compute more exact distance below using hypot()
         //   & relative to this target's actual location rather than reference
         abslatdiff >>= 4;
         abslondiff >>= 4;
@@ -1309,7 +1309,7 @@ static bool parse_position(int index)
     int32_t x = (int32_t)(111300.0 * (fo1090.longitude - ThisAircraft.longitude) * CosLat(/*ThisAircraft.latitude*/));
     fo1090.dx = x;
     fo1090.dy = y;
-    fo1090.distance = (float)iapproxHypotenuse1(x, y);
+    fo1090.distance = hypot(x, y);
     if (settings->hrange1090 && fo1090.distance > maxdistance1090) {
         if (fo1090.addr != settings->follow_id) {
             if (index < MAX_TRACKING_OBJECTS) {   // found, so used to be closer
@@ -1326,7 +1326,7 @@ static bool parse_position(int index)
     if (fo1090.distance == 0) {
         fo1090.bearing = 0;
     } else {
-        fo1090.bearing = iatan2_approx(y,x);
+        fo1090.bearing = R2D * atan2((float)x,(float)y);
         if (fo1090.bearing < 0)
             fo1090.bearing += 360;
     }
@@ -1407,10 +1407,10 @@ static bool parse_velocity(int i)
           mm.nsv = ns_velocity;
 
       // Compute velocity and angle from the two speed components
-      cip->speed = (float) iapproxHypotenuse1((int32_t) mm.nsv, (int32_t) mm.ewv);   // knots
+      cip->speed = (float) hypot((float) mm.nsv, (float) mm.ewv);   // knots
       if (cip->speed > 0) {
           cip->prevcourse = cip->course;
-          cip->course = iatan2_approx((int32_t) mm.nsv, (int32_t) mm.ewv);
+          cip->course = R2D * atan2((float) mm.ewv, (float) mm.nsv);
           // We don't want negative values but a 0-360 scale.
           if (cip->course < 0)
               cip->course += 360;

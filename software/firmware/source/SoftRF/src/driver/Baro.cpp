@@ -73,11 +73,14 @@ static float prev_pressure_altitude         = 0;
 static float Baro_VS[VS_AVERAGING_FACTOR];
 static int avg_ndx = 0;
 
-// polynomial approximation of altitude as a function of pressure ratio
-// - courtesy of Rick Sheppe
-// - much faster to compute than the pow() used in the library
 static float altitude_from_pressure()
 {
+    // ensure the float (not double) version of pow() is called
+    return  44330.0f * (1.0f - pow(Baro_pressure_cache * (1.0f / 101325.0f), 0.1903f));
+#if 0
+// polynomial approximation of altitude as a function of pressure ratio
+// - courtesy of Rick Sheppe
+// - may or may not be faster to compute than the formula using pow()
     float ratio = Baro_pressure_cache * (1.0 / 101325.0);
     float sum = ratio * -1.752317e+04;
     sum = ratio * (sum + 6.801427e+04);
@@ -85,6 +88,7 @@ static float altitude_from_pressure()
     sum = ratio * (sum + 9.498147e+04);
     sum = ratio * (sum - 5.669573e+04);
     return (sum + 1.997137e+04);
+#endif
 }
 
 #if !defined(EXCLUDE_BMP180)
@@ -124,10 +128,10 @@ static void bmp180_setup()
   
   // Calculate altitude assuming 'standard' barometric
   // pressure of 1013.25 millibar = 101325 Pascal
-  Serial.print(F("Altitude = "));
+  Serial.print(F("Altitude using library = "));
   Serial.print(bmp180.readAltitude());
   Serial.println(F(" meters"));
-  Serial.print(F("Altitude using polynomial = "));
+  Serial.print(F("Altitude using our code = "));
   Serial.print(altitude_from_pressure());
   
   Serial.println();
@@ -219,10 +223,10 @@ static void bmp280_setup()
     Serial.print(Baro_pressure_cache);
     Serial.println(F(" Pa"));
 
-    Serial.print(F("Altitude using pow() = "));
+    Serial.print(F("Altitude using library = "));
     Serial.print(bmp280.readAltitude(1013.25)); // this should be adjusted to your local pressure
     Serial.println(F(" m"));
-    Serial.print(F("Altitude using polynomial = "));
+    Serial.print(F("Altitude using our code = "));
     Serial.print(altitude_from_pressure());
 
     Serial.println();

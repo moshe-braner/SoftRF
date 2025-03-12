@@ -21,6 +21,8 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+// modified by Moshe Braner, 2025, for efficiency as used by SoftRF
+
 #include "TinyGPS++.h"
 
 #include <string.h>
@@ -110,46 +112,126 @@ int TinyGPSPlus::fromHex(char a)
     return a - '0';
 }
 
+static const float powers_of_10[5] = {
+    0.1,
+    0.01,
+    0.001,
+    0.0001,
+    0.00001  
+};
+
 // static
-// Parse a (potentially negative) number with up to 2 decimal digits -xxxx.yy
-int32_t TinyGPSPlus::parseDecimal(const char *term)
+// Parse a (potentially negative) number with up to 5 decimal digits -xxxx.yyyyy
+float TinyGPSPlus::parseDecimal(const char *term)
 {
   bool negative = *term == '-';
   if (negative) ++term;
-  int32_t ret = 100 * (int32_t)atol(term);
-  while (isdigit(*term)) ++term;
-  if (*term == '.' && isdigit(term[1]))
-  {
-    ret += 10 * (term[1] - '0');
-    if (isdigit(term[2]))
-      ret += term[2] - '0';
+  float ret = (float) atol(term);
+  while (*term && *term != '.')  ++term;
+  if (*term == '.') {
+    ++term;
+    if (isdigit(*term)) {
+      int moredigits = 0;
+      uint32_t fraction = (*term - '0');
+      while (moredigits < 4 && isdigit(*(++term))) {
+        fraction = 10*fraction + (*term - '0');
+        ++moredigits;
+      }
+      ret += powers_of_10[moredigits] * (float) fraction;
+    }
   }
   return negative ? -ret : ret;
 }
 
-// static
-// Parse degrees in that funny NMEA format DDMM.MMMM
-void TinyGPSPlus::parseDegrees(const char *term, RawDegrees &deg)
+//static
+//Parse 2 digits in place within a longer string
+int TinyGPSPlus::parse2digits(const char *p)
 {
-  uint32_t leftOfDecimal = (uint32_t)atol(term);
-  uint16_t minutes = (uint16_t)(leftOfDecimal % 100);
-  uint32_t multiplier = 10000000UL;
-  uint32_t tenMillionthsOfMinutes = minutes * multiplier;
+  if (!isdigit(p[0]) || !isdigit(p[1]))
+      return -1;
+  uint8_t i;
+  i = 10 * (*p - '0');
+  ++p;
+  i += (*p - '0');
+  return i;
+}
 
-  deg.deg = (int16_t)(leftOfDecimal / 100);
+// static
+// Parse a date in the format YYMMDD
+void TinyGPSPlus::parseDate(const char *term, ymd_t *date)
+{
+  int i;
+  i = parse2digits(term);
+  if (i < 0) return;
+  date->Day  = i;
+  i = parse2digits(term+2);
+  if (i < 0) return;
+  date->Month = i;
+  i = parse2digits(term+4);
+  if (i < 0) return;
+  date->Year   = i;
+}
 
-  while (isdigit(*term))
+// static
+// Parse a time in the format HHMMSS.CC
+void TinyGPSPlus::parseTime(const char *term, hmsc_t *time)
+{
+  int i;
+  i = parse2digits(term);
+  if (i < 0) return;
+  time->Hour   = i;
+  term += 2;
+  i = parse2digits(term);
+  if (i < 0) return;
+  time->Minute = i;
+  term += 2;
+  i = parse2digits(term);
+  if (i < 0) return;
+  time->Second = i;
+  term += 2;
+  time->CentiSec = 0;
+  if (*term == '.') {
     ++term;
-
-  if (*term == '.')
-    while (isdigit(*++term))
-    {
-      multiplier /= 10;
-      tenMillionthsOfMinutes += (*term - '0') * multiplier;
+    if (isdigit(*term)) {
+      time->CentiSec = 10 * (*term - '0');
+      ++term;
+      if (isdigit(*term))
+      time->CentiSec += (*term - '0');
     }
+  }
+}
 
-  deg.billionths = (5 * tenMillionthsOfMinutes + 1) / 3;
-  deg.negative = false;
+// static
+// Parse degrees in that funny NMEA format DDMM.MMMM - always positive
+float TinyGPSPlus::parseDegrees(const char *term)
+{
+  //while (!isdigit(*term))
+  //  ++term;
+  int c0 = term[0];
+  if (!isdigit(c0))  return 0.0;
+  int c1 = term[1];
+  if (!isdigit(c1))  return 0.0;
+  int c2 = term[2];
+  if (!isdigit(c2))  return 0.0;
+  if (!isdigit(term[3]))  return 0.0;
+  int deg;
+  if (term[4] == '.') {                             // latitude DDMM.MMMM
+    deg = 10*(c0-'0') + (c1-'0');
+    term += 2;
+  } else if (isdigit(term[4]) && term[5] == '.') {  // longitude DDDMM.MMMM
+    if (c0 == '0') {
+      deg = 10*(c1-'0') + (c2-'0');
+      term += 3;
+    } else if (c0 == '1') {
+      deg = 100 + 10*(c1-'0') + (c2-'0');
+      term += 3;
+    } else {
+      return 0.0;
+    }
+  } else {
+    return 0.0;
+  }
+  return (float) deg + (1.0f / 60.0f) * parseDecimal(term);
 }
 
 #define COMBINE(sentence_type, term_number) (((unsigned)(sentence_type) << 5) | term_number)
@@ -241,7 +323,8 @@ bool TinyGPSPlus::endOfTermHandler()
       break;
     case COMBINE(GPS_SENTENCE_GPRMC, 4): // N/S
     case COMBINE(GPS_SENTENCE_GPGGA, 3):
-      location.rawNewLatData.negative = term[0] == 'S';
+      if (term[0] == 'S')
+        location.NewLatitude = -location.NewLatitude;
       break;
     case COMBINE(GPS_SENTENCE_GPRMC, 5): // Longitude
     case COMBINE(GPS_SENTENCE_GPGGA, 4):
@@ -249,7 +332,8 @@ bool TinyGPSPlus::endOfTermHandler()
       break;
     case COMBINE(GPS_SENTENCE_GPRMC, 6): // E/W
     case COMBINE(GPS_SENTENCE_GPGGA, 5):
-      location.rawNewLngData.negative = term[0] == 'W';
+      if (term[0] == 'W')
+        location.NewLongitude = -location.NewLongitude;
       break;
     case COMBINE(GPS_SENTENCE_GPRMC, 7): // Speed (GPRMC)
       speed.set(term);
@@ -289,43 +373,45 @@ bool TinyGPSPlus::endOfTermHandler()
   return false;
 }
 
+#if 0   // SoftRF does not use these
+
 /* static */
-double TinyGPSPlus::distanceBetween(double lat1, double long1, double lat2, double long2)
+float TinyGPSPlus::distanceBetween(float lat1, float long1, float lat2, float long2)
 {
   // returns distance in meters between two positions, both specified
   // as signed decimal-degrees latitude and longitude. Uses great-circle
   // distance computation for hypothetical sphere of radius 6372795 meters.
   // Because Earth is no exact sphere, rounding errors may be up to 0.5%.
   // Courtesy of Maarten Lamers
-  double delta = radians(long1-long2);
-  double sdlong = sin(delta);
-  double cdlong = cos(delta);
+  float delta = radians(long1-long2);
+  float sdlong = sin(delta);
+  float cdlong = cos(delta);
   lat1 = radians(lat1);
   lat2 = radians(lat2);
-  double slat1 = sin(lat1);
-  double clat1 = cos(lat1);
-  double slat2 = sin(lat2);
-  double clat2 = cos(lat2);
+  float slat1 = sin(lat1);
+  float clat1 = cos(lat1);
+  float slat2 = sin(lat2);
+  float clat2 = cos(lat2);
   delta = (clat1 * slat2) - (slat1 * clat2 * cdlong);
   delta = sq(delta);
   delta += sq(clat2 * sdlong);
   delta = sqrt(delta);
-  double denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
+  float denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
   delta = atan2(delta, denom);
-  return delta * 6372795;
+  return delta * 6372795.0f;
 }
 
-double TinyGPSPlus::courseTo(double lat1, double long1, double lat2, double long2)
+float TinyGPSPlus::courseTo(float lat1, float long1, float lat2, float long2)
 {
   // returns course in degrees (North=0, West=270) from position 1 to position 2,
   // both specified as signed decimal-degrees latitude and longitude.
   // Because Earth is no exact sphere, calculated course may be off by a tiny fraction.
   // Courtesy of Maarten Lamers
-  double dlon = radians(long2-long1);
+  float dlon = radians(long2-long1);
   lat1 = radians(lat1);
   lat2 = radians(lat2);
-  double a1 = sin(dlon) * cos(lat2);
-  double a2 = sin(lat1) * cos(lat2) * cos(dlon);
+  float a1 = sin(dlon) * cos(lat2);
+  float a2 = sin(lat1) * cos(lat2) * cos(dlon);
   a2 = cos(lat1) * sin(lat2) - a2;
   a2 = atan2(a1, a2);
   if (a2 < 0.0)
@@ -335,17 +421,19 @@ double TinyGPSPlus::courseTo(double lat1, double long1, double lat2, double long
   return degrees(a2);
 }
 
-const char *TinyGPSPlus::cardinal(double course)
+const char *TinyGPSPlus::cardinal(float course)
 {
   static const char* directions[] = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"};
   int direction = (int)((course + 11.25f) / 22.5f);
   return directions[direction % 16];
 }
 
+#endif
+
 void TinyGPSLocation::commit()
 {
-   rawLatData = rawNewLatData;
-   rawLngData = rawNewLngData;
+   Latitude = NewLatitude;
+   Longitude = NewLongitude;
    fixQuality = newFixQuality;
    fixMode = newFixMode;
    lastCommitTime = millis();
@@ -354,93 +442,99 @@ void TinyGPSLocation::commit()
 
 void TinyGPSLocation::setLatitude(const char *term)
 {
-   TinyGPSPlus::parseDegrees(term, rawNewLatData);
+   NewLatitude = TinyGPSPlus::parseDegrees(term);
 }
 
 void TinyGPSLocation::setLongitude(const char *term)
 {
-   TinyGPSPlus::parseDegrees(term, rawNewLngData);
+   NewLongitude = TinyGPSPlus::parseDegrees(term);
 }
 
-double TinyGPSLocation::lat()
+float TinyGPSLocation::lat()
 {
    updated = false;
-   double ret = rawLatData.deg + rawLatData.billionths / 1000000000.0;
-   return rawLatData.negative ? -ret : ret;
+   return Latitude;
 }
 
-double TinyGPSLocation::lng()
+float TinyGPSLocation::lng()
 {
    updated = false;
-   double ret = rawLngData.deg + rawLngData.billionths / 1000000000.0;
-   return rawLngData.negative ? -ret : ret;
+   return Longitude;
 }
 
 void TinyGPSDate::commit()
 {
-   date = newDate;
+   //Date.Year  = newDate.Year;
+   //Date.Month = newDate.Month;
+   //Date.Day   = newDate.Day;
+   Date = newDate;
    lastCommitTime = millis();
    valid = updated = true;
 }
 
 void TinyGPSTime::commit()
 {
-   time = newTime;
+   //Time.Hour     = newTime.Hour;
+   //Time.Minute   = newTime.Minute;
+   //Time.Second   = newTime.Second;
+   //Time.CentiSec = newTime.CentiSec;
+   Time = newTime;
    lastCommitTime = millis();
    valid = updated = true;
 }
 
 void TinyGPSTime::setTime(const char *term)
 {
-   newTime = (uint32_t)TinyGPSPlus::parseDecimal(term);
+   //newTime = (uint32_t)TinyGPSPlus::parseDecimal(term);
+   TinyGPSPlus::parseTime(term, &newTime);
 }
 
 void TinyGPSDate::setDate(const char *term)
 {
-   newDate = atol(term);
+   //newDate = atol(term);
+   TinyGPSPlus::parseDate(term, &newDate);
 }
 
 uint16_t TinyGPSDate::year()
 {
    updated = false;
-   uint16_t year = date % 100;
-   return year + 2000;
+   return Date.Year + 2000;
 }
 
 uint8_t TinyGPSDate::month()
 {
    updated = false;
-   return (date / 100) % 100;
+   return Date.Month;
 }
 
 uint8_t TinyGPSDate::day()
 {
    updated = false;
-   return date / 10000;
+   return Date.Day;
 }
 
 uint8_t TinyGPSTime::hour()
 {
    updated = false;
-   return time / 1000000;
+   return Time.Hour;
 }
 
 uint8_t TinyGPSTime::minute()
 {
    updated = false;
-   return (time / 10000) % 100;
+   return Time.Minute;
 }
 
 uint8_t TinyGPSTime::second()
 {
    updated = false;
-   return (time / 100) % 100;
+   return Time.Second;
 }
 
 uint8_t TinyGPSTime::centisecond()
 {
    updated = false;
-   return time % 100;
+   return Time.CentiSec;
 }
 
 void TinyGPSDecimal::commit()

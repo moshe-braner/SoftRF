@@ -9,6 +9,8 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### Latest additions:
 
+* vMB157: revert approx math, optimize TinyGPS, bug fixes
+* vMB156: GNSS baud rate autodetection, option to log NMEA to SD card
 * vMB155: collect statistics on reception range by relative direction 
 * vMB153: record compressed flight logs in flash memory (T-Beam & T-Echo)
 * vMB152: settings stored in an editable text file

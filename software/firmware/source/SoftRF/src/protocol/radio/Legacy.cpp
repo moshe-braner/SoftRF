@@ -27,7 +27,6 @@
 #include "../../../SoftRF.h"
 #include "../../TrafficHelper.h"
 #include "../../Wind.h"
-#include "../../ApproxMath.h"
 #include "../../system/Time.h"
 #include "../../driver/RF.h"
 #include "../../driver/Settings.h"
@@ -559,14 +558,12 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     }
 
     uint8_t smult = pkt->smult;
-    //float nsf = (float) (((int16_t) pkt->ns[0]) << smult);      /* quarter-meters per sec */
-    //float ewf = (float) (((int16_t) pkt->ew[0]) << smult);
-    //float course = atan2_approx(nsf, ewf);
-    //float speed4 = approxHypotenuse(nsf, ewf);
-    int nsi = (((int) pkt->ns[0]) << smult);             // quarter-meters per sec
-    int ewi = (((int) pkt->ew[0]) << smult);
-    float course = (float) iatan2_approx(nsi, ewi);
-    float speed4 = (float) iapproxHypotenuse1(nsi, ewi);
+    float nsf = (float) (((int) pkt->ns[0]) << smult);      /* quarter-meters per sec */
+    float ewf = (float) (((int) pkt->ew[0]) << smult);
+    float course = R2D * atan2(ewf, nsf);
+    if (course < 0.0)
+        course += 360.0;
+    float speed4 = hypot(nsf, ewf);
     float interval, factor;
     if (pkt->aircraft_type == AIRCRAFT_TYPE_TOWPLANE) {      // known 4-second intervals
         //interval = 4.0;
@@ -586,7 +583,9 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     }
     float turnrate = 0;
     if (speed4 > 0) {
-      float nextcourse = (float) iatan2_approx(pkt->ns[1], pkt->ew[1]);
+      float nextcourse = R2D * atan2((float)pkt->ew[1], (float)pkt->ns[1]);
+      if (nextcourse < 0.0)
+          nextcourse += 360.0;
       float turnangle = (nextcourse - course);
       if (turnangle >  270.0) turnangle -= 360.0;
       if (turnangle < -270.0) turnangle += 360.0;
@@ -634,8 +633,8 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     /* adjust position to "now" - it sent a position 2 sec into future */
     float course2 = course - turnrate;     // average course over the previous 2 seconds
     float offset = speed4 * (2.0 / 4.0 / 111300.0);   // degslat/sec * 2 sec = degs moved
-    fop->latitude  = lat - (offset * cos_approx(course2));
-    fop->longitude = lon - (offset * sin_approx(course2) * InvCosLat());
+    fop->latitude  = lat - (offset * cos(D2R * course2));
+    fop->longitude = lon - (offset * sin(D2R * course2) * InvCosLat());
 
     fop->altitude = (float) alt;   // was  - this_aircraft->geoid_separation;
     fop->speed = (1.0 / (4.0 * _GPS_MPS_PER_KNOT)) * speed4;
@@ -916,8 +915,8 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     if (aircraft_type != AIRCRAFT_TYPE_STATIC) {
         course += aircraft->turnrate;     // average course over the next 2 seconds
         float offset = speedf * (2.0 / 111300.0);   // degslat/sec * 2 sec = degs moved
-        lat += (offset * cos_approx(course));
-        lon += (offset * sin_approx(course) * InvCosLat());
+        lat += (offset * cos(D2R * course));
+        lon += (offset * sin(D2R * course) * InvCosLat());
     }
 
     // this section revised by MB on 220526

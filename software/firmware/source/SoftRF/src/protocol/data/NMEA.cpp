@@ -57,6 +57,7 @@
 #if defined(ESP32)   // only on SD card
 File NMEALog;
 bool NMEALogOpen = false;
+uint32_t next_SD_sync = 0;
 #endif
 
 uint8_t NMEA_Source = DEST_NONE;   // identifies which port a sentence came from
@@ -437,21 +438,6 @@ void NMEA_setup()
         }
     }
   }
-
-  if (settings->log_nmea && SD_is_mounted) {
-        const char *filename = "/logs/NMEAlog.txt";
-        bool append = false;
-        if (SD.exists(filename)) {
-            const char *oldname = "/logs/NMEAold.txt";
-            SD.remove(oldname);
-            SD.rename(filename, oldname);
-        }
-        NMEALog = SD.open(filename, FILE_WRITE);
-        if (NMEALog)
-            NMEALogOpen = true;
-        else
-            Serial.println("Failed to open SD/logs/NMEAlog.txt for writing");
-  }
 #endif
 
 #if defined(USE_NMEA_CFG)
@@ -754,10 +740,16 @@ void NMEA_Outs(uint16_t nmeatype, const char *buf, unsigned int size, bool nl)
         NMEA_Out(settings->nmea_out2, buf, size, nl);
 
 #if defined(ESP32)   // only on SD card
-    if (NMEALogOpen) {
-        NMEALog.write((const uint8_t *) buf, size);
+    if ((out1 || out2) && NMEALogOpen) {
+        if (NMEALog.write((const uint8_t *) buf, size) < size) {
+            NMEALog.close();
+            const char *p = "Write to NMEAlog failed\r\n";
+            Serial.print(p);
+            SD_log(p);
+            FlightLogComment(p);
+        }
         if (nl)
-            NMEALog.print("\r\n");
+            NMEALog.write((const uint8_t *) "\r\n", 2);
     }
 #endif
 }
@@ -882,6 +874,43 @@ void NMEA_bridge_buf(char c, char* buf, int& n)
 
 void NMEA_loop()
 {
+#if defined(ESP32)
+  // open NMEA log file only after there is a GNSS fix
+  // - to be able to embed the date into the file name
+  if (next_SD_sync==0 && isValidGNSSFix()) {
+    next_SD_sync = millis() + (10*60*1000);
+    if (settings->log_nmea && SD_is_mounted) {
+      char filename[20];
+      strcpy(filename,"/logs/ymd1NMEA.txt");
+      makeLogNameDate(filename+6);   // fills in ymd
+      while (SD.exists(filename)) {
+          if (filename[6+3] == '9')
+              filename[6+3] = 'A';
+          else
+              ++filename[6+3];
+          if (filename[6+3] == 'Z')
+              break;
+      }
+      if (filename[6+3] != 'Z') {
+          NMEALog = SD.open(filename, FILE_WRITE);
+          if (NMEALog) {
+              NMEALogOpen = true;
+              Serial.print("New NMEA log file: ");
+              Serial.println(filename);
+          } else {
+              Serial.println("Failed to open NMEA log file for writing");
+          }
+      } else {
+          Serial.println("too many NMEA logs for today");
+      }
+    }
+  }
+  if (NMEALogOpen && millis() > next_SD_sync) {  // every 10 minutes
+      NMEALog.flush();     // keep most data in case of power loss
+      next_SD_sync = millis() + (10*60*1000);
+  }
+#endif
+
   NMEA_bridge_sent = false;
 
   NMEA_Source = DEST_NONE;
@@ -1155,6 +1184,11 @@ void NMEA_loop()
 }
 
 #if defined(ESP32)
+void flushNMEAlog()
+{
+  if (NMEALogOpen)
+      NMEALog.flush();
+}
 void closeNMEAlog()
 {
   if (NMEALogOpen) {

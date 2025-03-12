@@ -31,9 +31,9 @@
 #include "../../driver/GNSS.h"
 #include "../../driver/Settings.h"
 #include "../../driver/WiFi.h"
+#include "../../driver/Bluetooth.h"
 #include "../../TrafficHelper.h"
 #include "../radio/Legacy.h"
-#include "../../ApproxMath.h"
 #include "NMEA.h"
 
 #if defined(ENABLE_AHRS)
@@ -469,7 +469,7 @@ static void GDL90_Out(byte *buf, size_t size)
       break;
     case DEST_BLUETOOTH:
       {
-        if (SoC->Bluetooth_ops) {
+        if (BTactive && SoC->Bluetooth_ops) {
           SoC->Bluetooth_ops->write(buf, size);
         }
       }

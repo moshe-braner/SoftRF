@@ -27,13 +27,16 @@
   1.4  5  Sep 2014 - compatibility with Arduino 1.5.7
 */
 
-#if ARDUINO >= 100
+// modified by Moshe Braner, 2025, for efficiency as used by SoftRF
+// - specifically the makeTime() function now starts with known seconds as of 2025
+
+#if ARDUINO >= 100 || defined(HACKRF_ONE)
 #include <Arduino.h> 
 #else
-#if !defined(RASPBERRY_PI)
-#include <WProgram.h>
-#else
+#if defined(RASPBERRY_PI)
 #include <raspi/raspi.h>
+#else
+#include <WProgram.h>
 #endif /* RASPBERRY_PI */
 #endif
 
@@ -210,14 +213,28 @@ time_t makeTime(tmElements_t &tm){
 // note year argument is offset from 1970 (see macros in time.h to convert to other formats)
 // previous version used full four digit year (or digits since 2000),i.e. 2009 was 2009 or 9
   
-  int i;
+  int i, j;
   uint32_t seconds;
 
   // seconds from 1970 till 1 jan 00:00:00 of the given year
-  seconds= tm.Year*(SECS_PER_DAY * 365);
-  for (i = 0; i < tm.Year; i++) {
+  if (tm.Year >= 55) {
+    seconds = SECS_YR_2025;
+    j = 55;
+  } else if (tm.Year >= 50) {
+    seconds = SECS_YR_2020;
+    j = 50;
+  } else if (tm.Year >= 30) {
+    seconds = SECS_YR_2000;
+    j = 30;
+  } else {
+    seconds = 0;
+    j = 0;
+  }
+  seconds += (tm.Year - j) * (SECS_PER_DAY * 365);
+
+  for (i=j; i < tm.Year; i++) {
     if (LEAP_YEAR(i)) {
-      seconds +=  SECS_PER_DAY;   // add extra days for leap years
+      seconds += SECS_PER_DAY;   // add extra days for leap years
     }
   }
   

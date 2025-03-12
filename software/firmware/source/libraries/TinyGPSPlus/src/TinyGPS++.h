@@ -21,29 +21,37 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+// modified by Moshe Braner, 2025, for efficiency as used by SoftRF
+
 #ifndef __TinyGPSPlus_h
 #define __TinyGPSPlus_h
 
-#if defined(ARDUINO) && ARDUINO >= 100 && !defined(RASPBERRY_PI)
+#if (defined(ARDUINO) && ARDUINO >= 100 && !defined(RASPBERRY_PI)) || \
+    defined(HACKRF_ONE)
 #include "Arduino.h"
 #else
-#if !defined(RASPBERRY_PI)
-#include "WProgram.h"
-#else
+#if defined(RASPBERRY_PI)
 #include <raspi/raspi.h>
+#else
+#include "WProgram.h"
 #endif /* RASPBERRY_PI */
 #endif
 #include <limits.h>
 
 #define _GPS_VERSION "1.0.2" // software version of this library
-#define _GPS_MPH_PER_KNOT 1.15077945
-#define _GPS_MPS_PER_KNOT 0.51444444
-#define _GPS_KMPH_PER_KNOT 1.852
-#define _GPS_MILES_PER_METER 0.00062137112
-#define _GPS_KM_PER_METER 0.001
-#define _GPS_FEET_PER_METER 3.2808399
+#define _GPS_MPH_PER_KNOT 1.15077945f
+#define _GPS_MPS_PER_KNOT 0.51444444f
+#define _GPS_KMPH_PER_KNOT 1.852f
+#define _GPS_MILES_PER_METER 0.00062137112f
+#define _GPS_KM_PER_METER 0.001f
+#define _GPS_FEET_PER_METER 3.2808399f
+#if !defined(ARDUINO_ARCH_AVR) && !defined(ENERGIA_ARCH_CC13XX)
 #define _GPS_MAX_FIELD_SIZE 33
+#else
+#define _GPS_MAX_FIELD_SIZE 19
+#endif
 
+/*
 struct RawDegrees
 {
    uint16_t deg;
@@ -53,6 +61,7 @@ public:
    RawDegrees() : deg(0), billionths(0), negative(false)
    {}
 };
+*/
 
 enum FixQuality { Invalid = 0, GPS = 1, DGPS = 2, PPS = 3, RTK = 4, FloatRTK = 5, Estimated = 6, Manual = 7, Simulated = 8 };
 enum FixMode { N = 'N', A = 'A', D = 'D', E = 'E'};
@@ -64,10 +73,12 @@ public:
    bool isValid() const    { return valid; }
    bool isUpdated() const  { return updated; }
    uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
-   const RawDegrees &rawLat()     { updated = false; return rawLatData; }
-   const RawDegrees &rawLng()     { updated = false; return rawLngData; }
-   double lat();
-   double lng();
+   //const RawDegrees &rawLat()     { updated = false; return rawLatData; }
+   //const float &rawLat()     { updated = false; return Latitude; }
+   //const RawDegrees &rawLng()     { updated = false; return rawLngData; }
+   //const float &rawLng()     { updated = false; return Longitude; }
+   float lat();
+   float lng();
    FixQuality Quality() { updated = false; return fixQuality; }
    FixMode Mode() { updated = false; return fixMode; }
 
@@ -76,7 +87,8 @@ public:
 
 private:
    bool valid, updated;
-   RawDegrees rawLatData, rawLngData, rawNewLatData, rawNewLngData;
+   //float rawLatData, rawLngData, rawNewLatData, rawNewLngData;
+   float Latitude, Longitude, NewLatitude, NewLongitude;
    uint32_t lastCommitTime;
    void commit();
    void setLatitude(const char *term);
@@ -84,6 +96,12 @@ private:
    FixQuality fixQuality, newFixQuality;
    FixMode fixMode, newFixMode;
 };
+
+typedef struct ymd_s {
+   uint8_t Year;
+   uint8_t Month;
+   uint8_t Day;
+} ymd_t;
 
 struct TinyGPSDate
 {
@@ -93,21 +111,29 @@ public:
    bool isUpdated() const     { return updated; }
    uint32_t age() const       { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
 
-   uint32_t value()           { updated = false; return date; }
+   //uint32_t value()           { updated = false; return date; }
    uint16_t year();
    uint8_t month();
    uint8_t day();
 
-   TinyGPSDate() : valid(false), updated(false), date(0)
-   {}
+   TinyGPSDate() : valid(false), updated(false)
+   { Date.Year=0; Date.Month=0; Date.Day=0; }
 
 private:
    bool valid, updated;
-   uint32_t date, newDate;
+   //uint32_t date, newDate;
+   ymd_t Date, newDate;
    uint32_t lastCommitTime;
    void commit();
    void setDate(const char *term);
 };
+
+typedef struct hmsc_s {
+   uint8_t Hour;
+   uint8_t Minute;
+   uint8_t Second;
+   uint8_t CentiSec;   
+} hmsc_t;
 
 struct TinyGPSTime
 {
@@ -117,18 +143,19 @@ public:
    bool isUpdated() const     { return updated; }
    uint32_t age() const       { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
 
-   uint32_t value()           { updated = false; return time; }
+   //uint32_t value()           { updated = false; return time; }
    uint8_t hour();
    uint8_t minute();
    uint8_t second();
    uint8_t centisecond();
 
-   TinyGPSTime() : valid(false), updated(false), time(0)
-   {}
+   TinyGPSTime() : valid(false), updated(false)
+   { Time.Hour=0; Time.Minute=0; Time.Second=0; Time.CentiSec=0; }
 
 private:
    bool valid, updated;
-   uint32_t time, newTime;
+   //uint32_t time, newTime;
+   hmsc_t Time, newTime;
    uint32_t lastCommitTime;
    void commit();
    void setTime(const char *term);
@@ -141,7 +168,7 @@ public:
    bool isValid() const    { return valid; }
    bool isUpdated() const  { return updated; }
    uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
-   int32_t value()         { updated = false; return val; }
+   float value()           { updated = false; return val; }
 
    TinyGPSDecimal() : valid(false), updated(false), val(0)
    {}
@@ -149,7 +176,7 @@ public:
 private:
    bool valid, updated;
    uint32_t lastCommitTime;
-   int32_t val, newval;
+   float val, newval;
    void commit();
    void set(const char *term);
 };
@@ -176,36 +203,36 @@ private:
 
 struct TinyGPSSpeed : TinyGPSDecimal
 {
-   double knots()    { return value() / 100.0; }
-   double mph()      { return _GPS_MPH_PER_KNOT * value() / 100.0; }
-   double mps()      { return _GPS_MPS_PER_KNOT * value() / 100.0; }
-   double kmph()     { return _GPS_KMPH_PER_KNOT * value() / 100.0; }
+   float knots()    { return value(); }
+   float mph()      { return _GPS_MPH_PER_KNOT * value(); }
+   float mps()      { return _GPS_MPS_PER_KNOT * value(); }
+   float kmph()     { return _GPS_KMPH_PER_KNOT * value(); }
 };
 
 struct TinyGPSCourse : public TinyGPSDecimal
 {
-   double deg()      { return value() / 100.0; }
+   float deg()      { return value(); }
 };
 
 struct TinyGPSAltitude : TinyGPSDecimal
 {
-   double meters()       { return value() / 100.0; }
-   double miles()        { return _GPS_MILES_PER_METER * value() / 100.0; }
-   double kilometers()   { return _GPS_KM_PER_METER * value() / 100.0; }
-   double feet()         { return _GPS_FEET_PER_METER * value() / 100.0; }
+   float meters()       { return value(); }
+   float miles()        { return _GPS_MILES_PER_METER * value(); }
+   float kilometers()   { return _GPS_KM_PER_METER * value(); }
+   float feet()         { return _GPS_FEET_PER_METER * value(); }
 };
 
 struct TinyGPSGeoidSeparation : TinyGPSDecimal
 {
-   double meters()       { return value() / 100.0; }
-   double miles()        { return _GPS_MILES_PER_METER * value() / 100.0; }
-   double kilometers()   { return _GPS_KM_PER_METER * value() / 100.0; }
-   double feet()         { return _GPS_FEET_PER_METER * value() / 100.0; }
+   float meters()       { return value(); }
+   float miles()        { return _GPS_MILES_PER_METER * value(); }
+   float kilometers()   { return _GPS_KM_PER_METER * value(); }
+   float feet()         { return _GPS_FEET_PER_METER * value(); }
 };
 
 struct TinyGPSHDOP : TinyGPSDecimal
 {
-   double hdop() { return value() / 100.0; }
+   float hdop() { return value(); }
 };
 
 class TinyGPSPlus;
@@ -253,13 +280,17 @@ public:
   TinyGPSGeoidSeparation separation;
 
   static const char *libraryVersion() { return _GPS_VERSION; }
+#if 0
+  static float distanceBetween(float lat1, float long1, float lat2, float long2);
+  static float courseTo(float lat1, float long1, float lat2, float long2);
+  static const char *cardinal(float course);
+#endif
 
-  static double distanceBetween(double lat1, double long1, double lat2, double long2);
-  static double courseTo(double lat1, double long1, double lat2, double long2);
-  static const char *cardinal(double course);
-
-  static int32_t parseDecimal(const char *term);
-  static void parseDegrees(const char *term, RawDegrees &deg);
+  static float parseDecimal(const char *term);
+  static int parse2digits(const char *p);
+  static void parseDate(const char *term, ymd_t *date);
+  static void parseTime(const char *term, hmsc_t *time);
+  static float parseDegrees(const char *term);
 
   uint32_t charsProcessed()   const { return encodedCharCount; }
   uint32_t sentencesWithFix() const { return sentencesWithFixCount; }
