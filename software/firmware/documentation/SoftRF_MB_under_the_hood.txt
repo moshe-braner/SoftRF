@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated March 10, 2025 to fit software version MB157
+This version last updated March 22, 2025 to fit software version MB157
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -26,7 +26,7 @@ ignore_id - Aircraft ID to ignore: You can enter an aircraft (or device) ID that
 
 follow_id - Aircraft ID to follow: You can enter an aircraft (or device) ID to prioritize in traffic reports.  E.g., your flying buddy in another aircraft.  Leave as 000000 to not use this feature.  SoftRF tracks up to 8 aircraft, and reports up to 6, normally selecting the closest ones.  If an ID to follow is specified, it will be shown even if it is not one of the closest.  (An aircraft that is a collision danger will always take priority though.)
 
-tx_power - Only accessible via editing the settings.txt file.  2 for full transmission power (default), 1 for low power, 0 for receive-only.  Normally use "2" (which is 100 mW or less, depending on the regional legal limit).  Use "1" (2 mW) for short-range testing, and "0" when running SoftRF as a ground station, or when carrying a second device in the same aircraft.  If you want to limit visibility to other aircraft while retaining collision avoidance (it takes two to tango), use full power, and activate "Stealth mode".  To avoid being tracked by ground stations, activate "no_track".  Both of these are in the basic settings web page on the T-Beam.
+tx_power - Only accessible via editing the settings.txt file.  2 for full transmission power (default), 1 for low power, 0 for receive-only.  Normally use "2" (which is 100 mW or less, depending on the regional legal limit).  Use "1" (2 mW) for short-range testing, and "0" when running SoftRF as a ground station, or when carrying a second device in the same aircraft.  If you want to limit visibility to other aircraft while retaining collision avoidance (it takes two to tango), use full power, and activate "Stealth mode".  To avoid being tracked by ground stations, activate "no_track".  Both of these are in the basic settings web page on the T-Beam.  (Note: old settings.txt files may have the (still valid) setting "txpower" (not same as "tx_power") with the obsolete coding 2=off, 0=full power.)
 
 hrange - horizontal reporting range in km
 vrange - vertical reporting range in hundreds of meters

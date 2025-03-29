@@ -92,7 +92,7 @@ lmic_pinmap lmic_pins = {
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIX_NUM, SOC_GPIO_PIN_LED,
                               NEO_GRB + NEO_KHZ800);
 
-char UDPpacketBuffer[4]; // Dummy definition to satisfy build sequence
+//char UDPpacketBuffer[4]; // Dummy definition to satisfy build sequence
 
 static uint32_t prev_tx_packets_counter = 0;
 static uint32_t prev_rx_packets_counter = 0;

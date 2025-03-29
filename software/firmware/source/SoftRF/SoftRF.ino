@@ -768,7 +768,7 @@ void uav()
   MAVLinkTimeSync();
   MAVLinkSetWiFiPower();
 
-  ThisAircraft.timestamp = now();
+  ThisAircraft.timestamp = OurTime;  // now();
 
   if (isValidMAVFix()) {
     ThisAircraft.latitude = the_aircraft.location.gps_lat / 1e7;
@@ -877,7 +877,7 @@ void txrx_test()
   unsigned long export_start_ms, export_end_ms;
   unsigned long oled_start_ms, oled_end_ms;
 #endif
-  ThisAircraft.timestamp = now();
+  ThisAircraft.timestamp = OurTime;    // now();
 
   if (TxPosUpdMarker == 0 || (millis() - TxPosUpdMarker) > 4000 ) {
     ThisAircraft.latitude =  pgm_read_float( &txrx_test_positions[pos_ndx][0]);

@@ -24,6 +24,7 @@
 #include <protocol.h>
 
 #include "../../system/SoC.h"
+#include "../../system/Time.h"
 #include "GDL90.h"
 #include "GNS5892.h"
 #include "../../driver/RF.h"
@@ -195,7 +196,7 @@ uint8_t *GDL90_EscapeFilter(uint8_t *buf, uint8_t *p, int size)
 
 static void *msgHeartbeat()
 {
-  time_t ts = elapsedSecsToday(now());
+  time_t ts = elapsedSecsToday(OurTime);
 
   /* Status Byte 1 */
   HeartBeat.gnss_pos_valid  = isValidFix() ;
@@ -455,11 +456,19 @@ static void GDL90_Out(byte *buf, size_t size)
         Serial2.write(buf, size);
 #endif
       break;
+#if !defined(EXCLUDE_WIFI)
     case DEST_UDP:
       {
         SoC->WiFi_transmit_UDP(GDL90_DST_PORT, buf, size);
       }
       break;
+    case DEST_TCP:
+#if defined(NMEA_TCP_SERVICE)
+      WiFi_transmit_TCP((char*)buf, size);
+#endif
+      break;
+#endif
+#if defined(ARDUINO_ARCH_NRF52)
     case DEST_USB:
       {
         if (SoC->USB_ops) {
@@ -467,17 +476,13 @@ static void GDL90_Out(byte *buf, size_t size)
         }
       }
       break;
+#endif
     case DEST_BLUETOOTH:
       {
         if (BTactive && SoC->Bluetooth_ops) {
           SoC->Bluetooth_ops->write(buf, size);
         }
       }
-      break;
-    case DEST_TCP:
-#if defined(NMEA_TCP_SERVICE)
-      WiFi_transmit_TCP((char*)buf, size);
-#endif
       break;
     case DEST_NONE:
     default:
@@ -490,10 +495,10 @@ void GDL90_Export()
 {
   size_t size;
   float distance;
-  time_t this_moment = now();
+  time_t this_moment = OurTime;
 //  uint8_t *buf = (uint8_t *) (sizeof(UDPpacketBuffer) < UDP_PACKET_BUFSIZE ?
 //                              NMEABuffer : UDPpacketBuffer);
-  uint8_t *buf = (uint8_t *) UDPpacketBuffer;
+  uint8_t *buf = (uint8_t *) NMEABuffer;
 
   if (settings->gdl90 != DEST_NONE) {
     size = makeHeartbeat(buf);

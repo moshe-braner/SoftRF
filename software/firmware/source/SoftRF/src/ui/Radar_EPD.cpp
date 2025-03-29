@@ -21,6 +21,7 @@
 #include <math.h>
 
 #include "../system/SoC.h"
+#include "../system/Time.h"
 
 #if defined(USE_EPAPER)
 
@@ -121,7 +122,7 @@ static void EPD_Draw_Radar()
 
     {
       for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
-        if (Container[i].addr && (now() - Container[i].timestamp) <= EPD_EXPIRATION_TIME) {
+        if (Container[i].addr && (OurTime - Container[i].timestamp) <= EPD_EXPIRATION_TIME) {
 
           int16_t rel_x;
           int16_t rel_y;

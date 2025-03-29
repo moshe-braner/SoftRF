@@ -22,6 +22,7 @@
 #include <TinyGPS++.h>
 
 #include "../../system/SoC.h"
+#include "../../system/Time.h"
 #include "MAVLink.h"
 #include "GDL90.h"
 #include "../../driver/WiFi.h"
@@ -58,7 +59,7 @@ void MAVLinkTimeSync()
 
 void MAVLinkShareTraffic()
 {
-    time_t this_moment = now();
+    time_t this_moment = OurTime;
 
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
       if (Container[i].addr && (this_moment - Container[i].timestamp) <= EXPORT_EXPIRATION_TIME) {

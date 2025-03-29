@@ -19,6 +19,7 @@
 // this is modified from v1.1.
 
 #include "../system/SoC.h"
+#include "../system/Time.h"
 
 #if defined(USE_EPAPER)
 
@@ -63,7 +64,7 @@ static void EPD_Draw_Text()
   char id_text   [TEXT_VIEW_LINE_LENGTH];
 
   for (i=0; i < MAX_TRACKING_OBJECTS; i++) {
-    if (Container[i].addr && (now() - Container[i].timestamp) <= EPD_EXPIRATION_TIME) {
+    if (Container[i].addr && (OurTime - Container[i].timestamp) <= EPD_EXPIRATION_TIME) {
 
       traffic_by_dist[j].fop = &Container[i];
       traffic_by_dist[j].distance = Container[i].distance;

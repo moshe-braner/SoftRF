@@ -24,6 +24,7 @@
 #include <TimeLib.h>
 
 #include "../../system/SoC.h"
+#include "../../system/Time.h"
 #include "NMEA.h"
 #include "D1090.h"
 #include "../../driver/GNSS.h"
@@ -92,7 +93,7 @@ void D1090_Export()
   frame_data_t df17;
   float distance;
   String str;
-  time_t this_moment = now();
+  time_t this_moment = OurTime;
 
 #if defined(ENABLE_D1090_INPUT) || \
     defined(ENABLE_RTLSDR) || defined(ENABLE_HACKRF) || defined(ENABLE_MIRISDR)

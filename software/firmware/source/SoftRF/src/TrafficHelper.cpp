@@ -454,7 +454,7 @@ static int8_t Alarm_Vector(container_t *this_aircraft, container_t *fop)
 /*
  * VERY EXPERIMENTAL
  *
- * "Legacy" method is based on short history of (future) 2D velocity vectors (NS/EW).
+ * "Latest" method is based on short history of (future) 2D velocity vectors (NS/EW).
  * The approach here tried to use the velocity components from the time points
  * that FLARM sends out, in the way it probably intended by sending the data
  * out in that format, and given the weak computing power of early hardware

@@ -17,6 +17,7 @@
  */
 
 #include "../system/SoC.h"
+#include "../system/Time.h"
 
 #include <TimeLib.h>
 
@@ -172,7 +173,7 @@ void LED_DisplayTraffic() {
 
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
 
-      if (Container[i].addr && (now() - Container[i].timestamp) <= LED_EXPIRATION_TIME) {
+      if (Container[i].addr && (OurTime - Container[i].timestamp) <= LED_EXPIRATION_TIME) {
 
         bearing  = (int) Container[i].bearing;
         distance = (int) Container[i].distance;

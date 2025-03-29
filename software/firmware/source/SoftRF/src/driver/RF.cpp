@@ -2112,7 +2112,7 @@ void RF_SetChannel(void)
   switch (settings->mode)
   {
   case SOFTRF_MODE_TXRX_TEST:
-    Time = now();
+    Time = OurTime;
     RF_timing = RF_timing == RF_TIMING_2SLOTS_PPS_SYNC ?
                 RF_TIMING_INTERVAL : RF_timing;
     break;
@@ -2463,7 +2463,7 @@ OurTime, ms, (int)gnss.time.minute(), (int)gnss.time.second(), (RF_time & 0x0F),
 
     if (!wait || millis() > TxTimeMarker) {
 
-      time_t timestamp = now();
+      time_t timestamp = OurTime;
 
       rf_chip->transmit();
 

@@ -643,6 +643,7 @@ if (NMEA_Source != DEST_NONE) {     // only external sources
       }
     }
     break;
+#if !defined(EXCLUDE_WIFI)
   case DEST_UDP:
     {
       size_t udp_size = size;
@@ -670,6 +671,7 @@ if (NMEA_Source != DEST_NONE) {     // only external sources
 #endif
     }
     break;
+#endif
 #if defined(ARDUINO_ARCH_NRF52)
   case DEST_USB:
     {

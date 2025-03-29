@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated February 23, 2025 to fit software version MB155
+This version last updated March 17, 2025 to fit software version MB157
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -339,7 +339,7 @@ volume (buzzer)
 2	full
 3	external (active buzzer)
 
-nmea_out and nmea_out2
+nmea_out, nmea_out2, gdl90, gdl90_in and d1090
 0	none
 1	main serial
 2	UDP
