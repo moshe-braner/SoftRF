@@ -133,7 +133,7 @@ epd_rotate - display direction (upside down, sideways...)
 epd_orient - track up or North up
 epd_adb - aircraft database type
 epd_idpref - which field(s) in the database to display in the text page: 0=reg 1=tail 2=model 3=type
-epd_vmode - ?
+epd_vmode - default viewmode: 0=status 1=radar 2=text ...
 epd_aghost - automatic anti-ghosting screen-clearing: 0=off 1=auto 2=2min 3=5min
 epd_team - see Linar's T-Echo documentation
 
