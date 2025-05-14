@@ -1284,7 +1284,7 @@ void NMEA_Export()
 
         cip = &Container[i];
 
-        if (cip->addr && ((OurTime - cip->timestamp) <= EXPORT_EXPIRATION_TIME)) {
+        if (cip->addr && ((OurTime - cip->timestamp) <= settings->expire)) {
 #if 0
           Serial.println(i);
           Serial.printf("%06X\r\n", cip->addr);
@@ -1472,6 +1472,10 @@ void NMEA_Export()
           * based upon a protocol ID and the ICAO address
           */
 
+         const char *prefix = NMEA_CallSign_Prefix[fop->protocol];
+         if (data_source == 6)   // Mode A,C,S
+             prefix = "MDS";
+
          if (settings->pflaa_cs == false) {         // skip the callsign
 
            snprintf_P(NMEABuffer, sizeof(NMEABuffer),
@@ -1488,7 +1492,7 @@ void NMEA_Export()
 // aircraft type is supposed to be hex:
               PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X!%s_%06X,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
               alarm_level, dy, str_dx,
-              alt_diff, addr_type, id, NMEA_CallSign_Prefix[fop->protocol], id,
+              alt_diff, addr_type, id, prefix, id,
               ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
               (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
 
@@ -1500,7 +1504,7 @@ void NMEA_Export()
            snprintf_P(NMEABuffer, sizeof(NMEABuffer),
               PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X!%s_%s,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
               alarm_level, dy, str_dx,
-              alt_diff, addr_type, id, NMEA_CallSign_Prefix[fop->protocol], fop->callsign,
+              alt_diff, addr_type, id, prefix, fop->callsign,
               ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
               (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
          }
