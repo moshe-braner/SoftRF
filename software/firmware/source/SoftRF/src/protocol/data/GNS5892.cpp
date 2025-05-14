@@ -90,11 +90,11 @@ typedef struct zonestruct {
 static zonestats_t zone_stats[1+MAXRSSI-MINRSSI];
 static int32_t stats_count = 0;
 
-// RSSI thresholds, with defaults:  (adjusted down by value of settings->mode_s)
-static uint8_t close_rssi  = 28;    // at 28-30 still do not report
-static uint8_t report_rssi = 31;    // at 31-32 report, but no alarm
-static uint8_t alarm1_rssi = 33;    // at 33-35 give alarm level "low"
-static uint8_t alarm2_rssi = 36;    // at 36+ give alarm level "important"
+// RSSI threshold defaults:  (adjusted down by value of settings->mode_s)
+static uint8_t close_rssi  = 33;    // at 33-35 still do not report
+static uint8_t report_rssi = 36;    // at 36-37 report, but no alarm
+static uint8_t alarm1_rssi = 38;    // at 38-40 give alarm level "low"
+static uint8_t alarm2_rssi = 41;    // at 41+ give alarm level "important"
 
 static void zero_stats()
 {
@@ -173,8 +173,8 @@ static void set_zone_thresholds(bool force)
     if (closer < MINSAMPLE && (! force)) {
         // use the defaults (but continue to collect data)
         // adjust the defaults based on value of settings->mode_s:
-        uint8_t adj = settings->mode_s;
-        if (adj > 9)  adj = 9;
+        uint8_t adj = (uint8_t) settings->mode_s;
+        //if (adj > 9)  adj = 9;
         close_rssi  -= adj;
         report_rssi -= adj;
         alarm1_rssi -= adj;
@@ -951,13 +951,13 @@ float estimate_distance_from_rssi(uint8_t rssi)
 // will be revised - and possibly should be calibrated for the individual installation
     if (rssi < close_rssi)
         return ALARM_ZONE_NONE;           // 15 km, will not be reported at all
-    if (rssi < report_rssi)               // for RSSI 27-29
+    if (rssi < report_rssi)               // for RSSI 30-32 (with mode_s=3)
         return 2*ALARM_ZONE_CLOSE;        // estimate as 3000m, not reported in PFLAA
-    if (rssi < alarm1_rssi)               // for RSSI 30-31
+    if (rssi < alarm1_rssi)               // for RSSI 33-34
         return 2*ALARM_ZONE_LOW;          // report as 2000m, report, but still no alarm
-    if (rssi < alarm2_rssi)               // for RSSI 32-34
+    if (rssi < alarm2_rssi)               // for RSSI 35-37
         return ALARM_ZONE_IMPORTANT;      // report as 700m, generate alarm level LOW
-    return ALARM_ZONE_URGENT;             // 400m, alarm level IMPORTANT for RSSI 35+
+    return ALARM_ZONE_URGENT;             // 400m, alarm level IMPORTANT for RSSI 38+
     // note: alarm will only be generated if this reported distance plus 5*alt_diff < zone,
     // i.e., with up to 60m alt_diff (possibly 120m alt_diff for alarm level 1 if level 2 RSSI)
 }
