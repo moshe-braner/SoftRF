@@ -503,7 +503,8 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
         Serial.print(NMEABuffer);
         NMEAOutD();
 #if defined(USE_SD_CARD)
-        FlightLogComment(NMEABuffer+2);   // it will prepend LPLT
+        if (SD_is_mounted)
+            FlightLogComment(NMEABuffer+2);   // it will prepend LPLT
 #endif
     }
 #endif
@@ -830,16 +831,9 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
 
     float course = aircraft->course;
     float speedf = aircraft->speed * _GPS_MPS_PER_KNOT; /* m/s */
-    float vsf = aircraft->vs / (_GPS_FEET_PER_METER * 60.0); /* m/s */
+    float vsf = aircraft->vs * (1.0 / (_GPS_FEET_PER_METER * 60.0)); /* m/s */
 
     uint16_t speed4 = (uint16_t) roundf(speedf * 4.0f);
-    if (speed4 > 0x3FF) {
-        // speed4 = 0x3FF;
-        /* sanity checks, don't send bad data */
-        Serial.println("skipping sending bad speed");
-        return 0;
-    }
-
     uint8_t smult;
     if        (speed4 & 0x200) {
       smult = 3;
@@ -873,11 +867,6 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
              // quarter-meters per sec if smult==0
          }
          vs10 = (int16_t) roundf(vsf * 10.0f);
-         /* sanity checks, don't send bad data */
-         if (vs10 > 150 || vs10 < -150) {
-             Serial.println("skipping sending bad vs");
-             return 0;
-         }
       } else {
          // >>> trying to avoid FLARM warnings about parked SoftRF devices
          for (int i=0; i<4; i++) {
