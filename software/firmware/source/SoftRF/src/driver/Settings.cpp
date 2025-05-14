@@ -85,7 +85,7 @@ struct setting_minmax {
     int8_t min;
     int8_t max;
 };
-#define NUM_MINMAX 4    // may need to manually enlarge this
+#define NUM_MINMAX 6    // may need to manually enlarge this
 setting_minmax stgminmax[NUM_MINMAX];
 
 inline int8_t esp_only(int8_t stg_type)
@@ -156,13 +156,14 @@ static void init_stgdesc()
   stgdesc[STG_ALT_UDP]    = { "alt_udp",    (char*)&settings->alt_udp,    esp_only(STG_UINT1) };
   stgdesc[STG_RX1090]     = { "rx1090",     (char*)&settings->rx1090,     esp_only(STG_UINT1) };
   stgdesc[STG_RX1090X]    = { "rx1090x",    (char*)&settings->rx1090x,    esp_only(STG_UINT1) };
-  stgdesc[STG_MODE_S]     = { "mode_s",     (char*)&settings->mode_s,     esp_only(STG_UINT1) };
+  stgdesc[STG_MODE_S]     = { "mode_s",     (char*)&settings->mode_s,     esp_only(STG_INT1) };
   stgdesc[STG_HRANGE1090] = { "hrange1090", (char*)&settings->hrange1090, STG_UINT1 };
   stgdesc[STG_VRANGE1090] = { "vrange1090", (char*)&settings->vrange1090, STG_UINT1 };
   stgdesc[STG_GDL90_IN]   = { "gdl90_in",   (char*)&settings->gdl90_in,   esp_only(STG_UINT1) };
   stgdesc[STG_GDL90]      = { "gdl90",      (char*)&settings->gdl90,      STG_UINT1 };
   stgdesc[STG_D1090]      = { "d1090",      (char*)&settings->d1090,      STG_UINT1 };
   stgdesc[STG_RELAY]      = { "relay",      (char*)&settings->relay,      STG_UINT1 };
+  stgdesc[STG_EXPIRE]     = { "expire",     (char*)&settings->expire,     STG_INT1 };
   stgdesc[STG_PFLAA_CS]   = { "pflaa_cs",   (char*)&settings->pflaa_cs,   STG_UINT1 };
   stgdesc[STG_STEALTH]    = { "stealth",    (char*)&settings->stealth,    STG_UINT1 };
   stgdesc[STG_NO_TRACK]   = { "no_track",   (char*)&settings->no_track,   STG_UINT1 };
@@ -247,6 +248,7 @@ static void init_stgdesc()
 //stgcomment[STG_GDL90]      = destinations;
 //stgcomment[STG_D1090]      = destinations;
   stgcomment[STG_RELAY]      = "0=off 1=landed 2=ADS-B 3=only";
+  stgcomment[STG_EXPIRE]     = "secs no-rx report 1-30";
   stgcomment[STG_PFLAA_CS]   = yesno;
   stgcomment[STG_STEALTH]    = yesno;
   stgcomment[STG_NO_TRACK]   = yesno;
@@ -265,6 +267,7 @@ static void init_stgdesc()
 #endif
 #if defined(USE_EPAPER)
   stgcomment[STG_EPD_UNITS]  = "0=metric 1=imperial 2=mixed";
+  stgcomment[STG_EPD_VMODE]  = "0=status 1=radar 2=text ...";
   stgcomment[STG_EPD_IDPREF] = "0=reg 1=tail 2=model 3=type";
   stgcomment[STG_EPD_AGHOST] = "0=off 1=auto 2=2min 3=5min";
 #endif
@@ -273,6 +276,8 @@ static void init_stgdesc()
   stgminmax[1] = { STG_GEOID,    -104, 84 };
   stgminmax[2] = { STG_LEAPSECS,   17, 19 };  // 18 is correct for 2025
   stgminmax[3] = { STG_TXPOWER,     0,  2 };
+  stgminmax[4] = { STG_EXPIRE,      1, 30 };
+  stgminmax[5] = { STG_MODE_S,      0,  9 };
 }
 
 // copy the settings from settingb (EEPROM) to settings (file)
@@ -873,6 +878,7 @@ void Settings_defaults(bool keepsome)
   settings->hrange1090  = 27;   // km
   settings->vrange1090  = 20;   // 2000m
   settings->compflash   = false;
+  settings->expire      = EXPORT_EXPIRATION_TIME;   // 5 secs
   settings->pflaa_cs    = true;
   settings->leapsecs    = 18;   // <<< hardcoded!
       // - Correct for 2025, and will automatically adjust after valid fix if necessary
