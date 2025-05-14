@@ -2323,7 +2323,8 @@ void RF_loop()
         && in_family(settings->rf_protocol)
         && in_family(settings->altprotocol)
         && (rf_chip == &sx1276_ops || rf_chip == &sx1262_ops)*/
-        && (RF_time & 0x0F) == 0x0F && RF_current_slot == 1) {
+        && (RF_time & 0x0F) == 0x0F && RF_current_slot == 1
+        && ThisAircraft.airborne) {
 
       current_RF_protocol = settings->altprotocol;
       Serial.println("switching to altprotocol for one time slot");
@@ -2370,7 +2371,23 @@ size_t RF_Encode(container_t *fop, bool wait)
   if (RF_ready && protocol_encode) {
 
     if (settings->txpower == RF_TX_POWER_OFF ) {
-      return size;
+        return 0;
+    }
+
+    /* sanity checks: don't send bad data */
+    char *p = NULL;
+    if (ThisAircraft.altitude > 30000.0)
+        p = "altitude";
+    if (ThisAircraft.speed > (250.0 / _GPS_MPS_PER_KNOT))
+        p = "speed";
+    if (fabs(ThisAircraft.vs) > (20.0 * (_GPS_FEET_PER_METER * 60.0)))
+        p = "vs";
+    if (fabs(ThisAircraft.turnrate) > 100.0)
+        p = "turnrate";
+    if (p) {
+        Serial.print("skipping sending bad ");
+        Serial.println(p);
+        return 0;
     }
 
     // encode in the current tx protocol (may differ from rx protocol)
