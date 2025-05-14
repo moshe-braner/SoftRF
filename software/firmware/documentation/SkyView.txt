@@ -2,7 +2,7 @@ SkyView documentation
 =====================
 
 By Moshe Braner
-This version last updated March 8, 2025 to fit version MB07
+This version last updated May 11, 2025 to fit version MB07
 
 
 This document only mentions what I have changed in SkyView.  For general information about what SkyView is, how to build it, and how to use it, can be found here:  https://github.com/lyusupov/SoftRF/wiki/SkyView-EZ
@@ -29,6 +29,6 @@ In addition, I made the following further changes:
 * Can get even louder warnings by replacing some WAV files in /Audio/voice3 with those in:
      https://github.com/moshe-braner/SoftRF/blob/master/software/data/Audio/voice3_louder.zip
 
-Skyview also offers the option of loading into its SD card a database of aircraft, so that they can be displayed on the screen with the tail (competition) number, registration, or make and model.  I have replaced the use of SQLITE in SkyView.  Instead, it now uses uCDB, similar to the "Badge Edition" of SoftRF.  Put the file ogn.cdb in the Aircrafts folder on the SD card.  A recent copy of ogn.cdb is in the software/data/Aircrafts folder.  An up to date copy can be downloaded at any time from http://soaringweather.no-ip.info/ADB/data  At this time only the OGN data is available in this format, not the Flarmnet data nor ICAO.  Two data items, e.g., contest ID and registration, are displayed, which ones depending on the preference in the settings.  If database data is not available, the first display line shows the device (or ICAO) ID and the second shows the reason: empty data record, not found in the database, or there is no valid database on the SD card.
+Skyview also offers the option of loading into its SD card a database of aircraft, so that they can be displayed on the screen with the tail (competition) number, registration, or make and model.  I have replaced the use of SQLITE in SkyView.  Instead, it now uses uCDB, similar to the "Badge Edition" of SoftRF.  Put the file ogn.cdb in the Aircrafts folder on the SD card.  A recent copy of ogn.cdb is in the software/data/Aircrafts folder.  Also in that folder are instructions how to obtain fresh data from OGN and software to convert it to the CDB format.  An up to date (refreshed daily) ogn.cdb is also available at http://soaringweather.no-ip.info/ADB/data - I don't know who maintains that, not me.  Two of the three data items, e.g., contest ID and registration, are displayed in SkyView, depending on the preference in the settings.  If database data is not available, the first display line shows the device (or ICAO) ID and the second shows the reason: empty data record, not found in the database, or there is no valid database on the SD card.
 
 Note: for USB flashing, use baud rate 115200 - the default speed of 921600 failed in the unit I tested.
