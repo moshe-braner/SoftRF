@@ -115,7 +115,7 @@ void D1090_Export()
 
   if (settings->d1090 != DEST_NONE && isValidFix()) {
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
-      if (Container[i].addr && (this_moment - Container[i].timestamp) <= EXPORT_EXPIRATION_TIME) {
+      if (Container[i].addr && (this_moment - Container[i].timestamp) <= settings->expire) {
 
         distance = Container[i].distance;
 

@@ -62,7 +62,7 @@ void MAVLinkShareTraffic()
     time_t this_moment = OurTime;
 
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
-      if (Container[i].addr && (this_moment - Container[i].timestamp) <= EXPORT_EXPIRATION_TIME) {
+      if (Container[i].addr && (this_moment - Container[i].timestamp) <= settings->expire) {
 
         char hexbuf[8];
         char callsign[8+1];

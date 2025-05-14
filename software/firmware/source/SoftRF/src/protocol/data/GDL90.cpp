@@ -526,7 +526,7 @@ void GDL90_Export()
         // do not echo GDL90 traffic data back to its source
         if (Container[i].addr
          && (Container[i].protocol != RF_PROTOCOL_GDL90 || settings->gdl90 != settings->gdl90_in)
-         && (this_moment - Container[i].timestamp) <= EXPORT_EXPIRATION_TIME) {
+         && (this_moment - Container[i].timestamp) <= settings->expire) {
 
           distance = Container[i].distance;
 

@@ -74,7 +74,7 @@ void JSON_Export()
   JsonArray aircraft_array = root.createNestedArray("aircraft");
 
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
-    if (Container[i].addr && (this_moment - Container[i].timestamp) <= EXPORT_EXPIRATION_TIME) {
+    if (Container[i].addr && (this_moment - Container[i].timestamp) <= settings->expire) {
 
       distance = Container[i].distance;
 

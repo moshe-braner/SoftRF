@@ -34,7 +34,7 @@ float wind_best_ns = 0.0;  /* mps */
 float wind_best_ew = 0.0;
 float wind_speed = 0.0;
 float wind_direction = 0.0;
-time_t AirborneTime = 0;
+// time_t AirborneTime = 0;
 
 static float avg_abs_turnrate = 0.0;  /* absolute - average when circling */
 static float avg_speed = 0.0;     /* average around the circle */
@@ -517,7 +517,7 @@ FlightLogComment(NMEABuffer);
 
 
 /* keep track of whether this aircraft is airborne */
-void this_airborne()
+void this_airborne(bool validfix)
 {
     /* static vars to keep track of 'airborne' status: */
     static int airborne = -4;
@@ -539,7 +539,14 @@ void this_airborne()
       initial_altitude  = ThisAircraft.altitude;
     }
 
-    if (speed < 1.0) {
+    if (! validfix) {
+
+        if (airborne < 2)
+            airborne = -4;
+        else
+            --airborne;        // after 60 calls (30 min) will be forced to "land"
+
+    } else if (speed < 1.0) {
 
       if (airborne > 0) {
         airborne -= 2;
@@ -588,13 +595,13 @@ void this_airborne()
     bool airborne_changed = false;
     if (ThisAircraft.airborne==0 && airborne>0) {
       airborne_changed = true;
-      AirborneTime = RF_time;
+      // AirborneTime = RF_time;
 //#if defined(ESP32)
       startlogs();      // restart alarm log (and flight log) on first takeoff after boot
 //#endif
     } else if (ThisAircraft.airborne==1 && airborne<=0) {
       airborne_changed = true;
-      AirborneTime = 0;
+      // AirborneTime = 0;
       save_range_stats();
 #if defined(ESP32)
       if (settings->rx1090)
@@ -757,7 +764,7 @@ void project_this(container_t *this_aircraft)
         report = true;
     }
 
-    this_airborne();      /* determine the "airborne" flag */
+    this_airborne(true);      /* determine the "airborne" flag */
 
     /* first get heading and turn rate */
 

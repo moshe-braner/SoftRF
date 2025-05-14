@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated March 22, 2025 to fit software version MB157
+This version last updated May 13, 2025 to fit software version MB160
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -33,11 +33,11 @@ vrange - vertical reporting range in hundreds of meters
 pointer - LED ring direction, for display such as "FLARMview". 1=track up, 2=North up
 relay - 0=off, 1=relay landed-out by opt-in, 2=relay ADS-B traffic, 3=relay-only - see section below for details
 pflaa_cs - 1 (default) to include "callsign" after hex ID in PFLAA sentences, 0 to exclude
-power_save - 1 to turn wifi off after 10 minutes if no client connected
-power_ext  - 1 to automatically shut down after a while if external power was disconnected
 
-altprotocol - default=255, set to 1 to transmit in OGNTP protocol once every 16 sec (only possible if main protocol is 7=Latest).  The motivation being: to take advantage of the better Forward Error Correction (more FEC bits & better 
-algorithm) that is incorporated into the OGNTP, to get effective tracking to longer distances.  If relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting in that once-per-16-second opening.
+expire - number of seconds to keep reporting traffic not heard from - 1-30, default=5
+    (note: the display device may keep reporting for longer, e.g., XCsoar for 5 more seconds)
+
+altprotocol - default=255, set to 1 to transmit in OGNTP protocol once every 16 sec (only possible if main protocol is 7=Latest).  The alt protocol transmissions are only done while airborne.  The motivation being: to take advantage of the better Forward Error Correction (more FEC bits & better algorithm) that is incorporated into the OGNTP, to get effective tracking to longer distances.  If relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting in that once-per-16-second opening.
 
 nmea_out and nmea_out2 - NMEA output destination codes are: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=Bluetooth 6=secondary serial.  Some destinations are not available on some devices, e.g., the T-Echo has BT but not UDP nor TCP nor secondary serial.
 
@@ -78,13 +78,13 @@ baudrate2 - baud rate code (0=off 2=9600 3=19200 4=38400 etc) for the secondary 
 
 invert2 - Aux/Secondary Serial Port Logic: "Normal" to connect to TTL serial devices or a chip that converts to RS232. "Inverted" to connect to RS232 devices without a conversion chip (output voltage may not suffice - see section on connecting devices in the user guide).
 
-Power save: leaving the WiFi on shortens the battery runtime.  Select "WiFi OFF (10 min.)" to turn the WiFi off after allowing 10 minutes for connecting to change settings, etc.  Leave Power save "disabled" to keep the WiFi on - e.g., if you are sending data throughout the flight to a connected device via WiFi.
+power_save - 1 to turn wifi off after 10 minutes if no client connected.  Leaving the WiFi on shortens the battery runtime.  Leave as 0 (disabled) to keep the WiFi on - e.g., if you are sending data throughout the flight to a connected device via WiFi.
 
-Shutdown if no external power: select "Yes" if you want automatic shut down some time after external power is disconnected from a device that also has an internal battery - see "How to power the SoftRF device" section in the user guide.  If no internal battery is installed, this setting is irrelevant.  Note: this feature currently supported only on T-Beam v1.0 and v1.1.
+power_ext - 1 to automatically shut down after a while if external power was disconnected, in a device that also has an internal battery - see "How to power the SoftRF device" section in the user guide.  Note: this feature currently supported only on T-Beam v1.x.  This setting also prevents the T-Beam from entering "charging mode" instead of fully booting when both USB and battery power are present.  If no internal battery is installed, this setting is irrelevant.
 
 rx1090 - Internal ADS-B Receiver: here can activate use of a GNS5892 ADS-B receiver module if installed. See the section in the user guide about connecting an ADS-B receiver.
 
-mode_s - The GNS5892 module can also receive Mode S (but not Mode C) transponder messages.  These only report altitude, not position.  A non-directional alarm may be generated based on signal strength.  Use a nonzero value in this setting to activate processing of Mode S messages.  In high traffic areas this may interfere somewhat with the processing of messages from the 868/915 MHz radio, so keep this off ("0") unless your area has a lot of Mode S traffic that lacks ADS-B output capability.  (In the USA there seem to be very few Mode-S-only aircraft, but there are more in Europe.)  From version MB149, the signal strength thresholds for Mode S alarms auto-calibrate over time, based on ADS-B traffic that passes close by.  Until enough data has been collected, default thresholds are used.  To clear the data and restart data collection while using the default thresholds, e.g., after changing to a different antenna, delete the "rssidist.txt" file in the flash memory.  From version MB153 the default thresholds can be adjusted by the value (1 to 9) given in the "mode_s" setting.  A higher value means alarms will be generated for weaker signals.  This does not change the "gain" of any actual circuit, it only changes the interpretation of the RSSI numbers reported by the GNS5892.  Try "1" first unless you have a poor antenna type or location.  The defaults have no effect once enough auto-calibrate data has been collected.
+mode_s - The GNS5892 module can also receive Mode S (but not Mode C) transponder messages.  These only report altitude, not position.  A non-directional alarm may be generated based on signal strength.  Use a nonzero value in this setting to activate processing of Mode S messages.  In high traffic areas this may interfere somewhat with the processing of messages from the 868/915 MHz radio, so keep this off ("0") unless your area has a lot of Mode S traffic that lacks ADS-B output capability.  (In the USA there seem to be very few Mode-S-only aircraft, but there are more in Europe.)  From version MB149, the signal strength thresholds for Mode S alarms auto-calibrate over time, based on ADS-B traffic that passes close by.  Until enough data has been collected, default thresholds are used.  To clear the data and restart data collection while using the default thresholds, e.g., after changing to a different antenna, delete the "rssidist.txt" file in the flash memory.  From version MB153 the default thresholds can be adjusted by the value (1 to 9) given in the "mode_s" setting.  A higher value means alarms will be generated for weaker signals.  This does not change the "gain" of any actual circuit, it only changes the interpretation of the RSSI numbers reported by the GNS5892.  Try "3" first unless you have a very poor antenna type or location.  The defaults have no effect once enough auto-calibrate data has been collected.  "Enough" means 100 ADS-B position samples under 1km distance.  Additional data will be collected later too.
 
 rx1090x - the GNS5892 "comparator offset".  The default is 100.  This value can affect the reception of weak signals.  For awareness of nearby traffic the default is fine.
 
@@ -133,7 +133,7 @@ epd_rotate - display direction (upside down, sideways...)
 epd_orient - track up or North up
 epd_adb - aircraft database type
 epd_idpref - which field(s) in the database to display in the text page: 0=reg 1=tail 2=model 3=type
-epd_vmode - ?
+epd_vmode - default viewmode: 0=status 1=radar 2=text ...
 epd_aghost - automatic anti-ghosting screen-clearing: 0=off 1=auto 2=2min 3=5min
 epd_team - see Linar's T-Echo documentation
 

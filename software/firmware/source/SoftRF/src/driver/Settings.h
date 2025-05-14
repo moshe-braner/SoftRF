@@ -206,6 +206,7 @@ enum stgidx {
     STG_GDL90,
     STG_D1090,
     STG_RELAY,
+    STG_EXPIRE,
     STG_PFLAA_CS,
     STG_STEALTH,
     STG_NO_TRACK,
@@ -386,6 +387,7 @@ typedef struct Settings {
     int8_t   leapsecs;
     int8_t   freq_corr; /* +/-, kHz */   // <<< limited to +-30
     uint8_t  relay;
+    int8_t   expire;
     bool     pflaa_cs;
     bool     logalarms;
     uint32_t debug_flags;   /* each bit activates output of some debug info */
@@ -401,10 +403,10 @@ typedef struct Settings {
     uint8_t  tcpmode;
     uint8_t  tcpport;
     uint8_t  power_save;
-    uint8_t  power_ext;  /* if nonzero, shuts down if battery is not full */
+    uint8_t  power_ext;   /* if nonzero, shuts down if battery is not full */
     uint8_t  rx1090;
-    uint8_t  rx1090x;    // settings for the ADS-B receiver module
-    uint8_t  mode_s;
+    uint8_t  rx1090x;     // settings for the ADS-B receiver module
+    int8_t   mode_s;      // 0=off, 1-9="gain"
     uint8_t  hrange1090;  // km
     uint8_t  vrange1090;  // hundreds of meters
     uint8_t  gdl90_in;    // data from this port will be interpreted as GDL90

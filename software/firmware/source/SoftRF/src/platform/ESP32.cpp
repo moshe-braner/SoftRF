@@ -159,7 +159,7 @@ XPowersLibInterface *PMU = NULL;
 
 uint32_t BlueLEDTimeMarker = 5000;
 
-static bool bt_turned_off = false;
+// static bool bt_turned_off = false;
 
 static int esp32_board = ESP32_DEVKIT; /* default */
 static size_t ESP32_Min_AppPart_Size = 0;
@@ -1460,12 +1460,14 @@ static void ESP32_loop()
     break;
   }
 
+#if 0
   // show a message if long-press middle button turned off Bluetooth
   if (bt_turned_off) {
     OLED_msg("BT", "OFF");
     delay(1000);
     bt_turned_off = false;  // message done, but BT is still off
   }
+#endif
 }
 
 static void ESP32_fini(int reason)
@@ -2720,6 +2722,21 @@ bool ESP32_onExternalPower() {
     }
 }
 
+/* battery Power is available */
+bool ESP32_onBatteryPower() {
+    switch (hw_info.pmu)
+    {
+    case PMU_AXP192:
+    case PMU_AXP2101:
+        return PMU->isBatteryConnect();
+        break;
+    case PMU_NONE:
+    default:
+        return (Battery_voltage() >= 3.0);
+        break;
+    }
+}
+
 static void ESP32_Battery_setup()
 {
   if ((hw_info.model    == SOFTRF_MODEL_PRIME_MK2 &&
@@ -2960,7 +2977,7 @@ void handleEvent(AceButton* button, uint8_t eventType,
       // v1.x shutdown is via PMU interrupt
       // skip v0.7 shutdown, should use slide switch instead
       if (hw_info.model == SOFTRF_MODEL_PRIME_MK2  && hw_info.revision <  8) {
-          if (settings->mode != SOFTRF_MODE_NORMAL && settings->mode != SOFTRF_MODE_MORENMEA) {
+          if (settings->mode != SOFTRF_MODE_NORMAL) {
               settings->mode = SOFTRF_MODE_NORMAL;
               OLED_msg("NORMAL", " MODE");
           } else if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_WINCH) {
@@ -3002,7 +3019,7 @@ void handleEvent2(AceButton* button, uint8_t eventType,
     case AceButton::kEventReleased:
       break;
     case AceButton::kEventClicked:
-      if (settings->mode != SOFTRF_MODE_NORMAL && settings->mode != SOFTRF_MODE_MORENMEA) {
+      if (millis() < 10000 || settings->mode != SOFTRF_MODE_NORMAL) {
           settings->mode = SOFTRF_MODE_NORMAL;
           OLED_msg("NORMAL", " MODE");
       } else if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_WINCH) {
@@ -3010,7 +3027,7 @@ void handleEvent2(AceButton* button, uint8_t eventType,
               settings->txpower = RF_TX_POWER_FULL;
           else
               settings->txpower = RF_TX_POWER_OFF;
-      } else if (millis() > 10000 && !bt_turned_off) {
+      } else /* if (!bt_turned_off) */ {
           SetupTimeMarker = millis();
           do_alarm_demo = true;
           OLED_msg("ALARM", " DEMO");
@@ -3139,6 +3156,38 @@ static void ESP32_Button_fini()
                      SOC_GPIO_PIN_S3_BUTTON;
     while (digitalRead(button_pin) == LOW);
   }
+}
+
+void ESP32_charge_mode()
+{
+    if ((has_axp == false)
+    || (settings->power_ext)
+    || (ESP32_onExternalPower() == false || ESP32_onBatteryPower() == false))
+        return;
+
+    bool normal_boot = false;
+    if (middle_button_pin != SOC_UNUSED_PIN) {
+        if (digitalRead(middle_button_pin) == LOW)
+            normal_boot = true;
+    }
+    if (! normal_boot) {
+        OLED_msg("CHARGE", "MODE");
+        delay(2000);   // during which middle button may be pressed
+    }
+    if (middle_button_pin != SOC_UNUSED_PIN) {
+        if (digitalRead(middle_button_pin) == LOW)
+            normal_boot = true;
+    }
+    if (normal_boot) {
+        OLED_msg("NORMAL", "BOOT...");
+        delay(1000);
+        OLED_no_msg();
+        return;
+    }
+
+    ESP32_Display_fini(SOFTRF_SHUTDOWN_CHARGE);
+    ESP32_Button_fini();
+    ESP32_fini(SOFTRF_SHUTDOWN_CHARGE);  // set blue LED to charge mode & shut down
 }
 
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)

@@ -251,6 +251,10 @@ settings->id_method, settings->aircraft_id, ThisAircraft.addr);
   // do this before Baro_setup - Wire.begin() happens there
   hw_info.display = SoC->Display_setup();
 
+#if defined(ESP32)
+  ESP32_charge_mode();  // if both battery & USB power, shut down and just charge
+#endif
+
 Serial.println(F("calling Baro_setup()..."));
   // do this before Filesys_setup since this tickles pins 13,2
   if (! (settings->debug_flags & DEBUG_SIMULATE))
@@ -521,7 +525,11 @@ void normal()
     }
   }
 
+  static uint32_t badgps=0;
+
   if (validfix) {   // still, after the adjustments above
+
+    badgps = 0;
 
     if (gnss_new_fix) {           // set in GNSS.cpp
 
@@ -649,16 +657,16 @@ if (rx_success) which_rx_try = 1;
 
     }
 
-  } else if (GNSSTimeMarker) {      /* not validfix but had fix before */
+  } else {      /* not validfix */
 
-    static uint32_t badgps=0;
     if (badgps==0) badgps = millis();
-    if (badgps && millis() - badgps > 30000) {
+    if (millis() > badgps + 30000) {
       /* 30 seconds without GPS fix - wipe history */
       badgps = 0;
       initial_time = 0;
       GNSSTimeMarker = 0;
       ThisAircraft.prevtime_ms = 0;
+      this_airborne(false);     // after 60 calls (30 min) forced to "land"
     }
   }
 

@@ -504,7 +504,9 @@ struct rst_info {
 bool ESP32_pin_reserved(uint8_t pin, bool shared, const char *label);
 void ESP32_pin_unreserve(uint8_t pin);
 bool ESP32_onExternalPower();
+bool ESP32_onBatteryPower();
 int  ESP32_VbusVoltage();
+void ESP32_charge_mode();
 void blue_LED_on();
 void blue_LED_off();
 void blue_LED_1hz();
