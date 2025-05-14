@@ -93,21 +93,26 @@ typedef struct NmeaTCP_struct {
 
 #endif
 
-#if !defined(PFLAA_EXT1_FMT)
+/* FTD-012 data port protocol version 8 and 9 */
+//#define PFLAA_EXT1_FMT  ",%d,%d,%d"
+//#define PFLAA_EXT1_ARGS ,Container[i].no_track,data_source,Container[i].rssi
+//#define PFLAA_EXT1_ARGS ,(fop->no_track?1:0),data_source,fop->rssi
+
+//#if !defined(PFLAA_EXT1_FMT)
 #define PFLAA_EXT1_FMT  ""
-#endif /* PFLAA_EXT1_FMT */
+//#endif /* PFLAA_EXT1_FMT */
 
-#if !defined(PFLAA_EXT1_ARGS)
+//#if !defined(PFLAA_EXT1_ARGS)
 #define PFLAA_EXT1_ARGS
-#endif /* PFLAA_EXT1_ARGS */
+//#endif /* PFLAA_EXT1_ARGS */
 
-#if !defined(PFLAU_EXT1_FMT)
+//#if !defined(PFLAU_EXT1_FMT)
 #define PFLAU_EXT1_FMT  ""
-#endif /* PFLAU_EXT1_FMT */
+//#endif /* PFLAU_EXT1_FMT */
 
-#if !defined(PFLAU_EXT1_ARGS)
+//#if !defined(PFLAU_EXT1_ARGS)
 #define PFLAU_EXT1_ARGS
-#endif /* PFLAU_EXT1_ARGS */
+//#endif /* PFLAU_EXT1_ARGS */
 
 #endif /* NMEAHELPER_H */
 
