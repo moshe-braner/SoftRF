@@ -1464,7 +1464,6 @@ void NMEA_Export()
          // data_source should be 1, 3, 4, 6 for ADS-B, ADS-R, TIS-B, Mode-S
          //   (GDL90 should probably be treated as ADS-B)
          // convert tx_type to the code used by FLARM:
-         int data_source = data_source_code[fop->tx_type];
 
          /*
           * When callsign is available - send it to a NMEA client.
@@ -1472,9 +1471,17 @@ void NMEA_Export()
           * based upon a protocol ID and the ICAO address
           */
 
-         const char *prefix = NMEA_CallSign_Prefix[fop->protocol];
-         if (data_source == 6)   // Mode A,C,S
+         int data_source = data_source_code[fop->tx_type];
+         const char *prefix;
+         if (fop->tx_type >= TX_TYPE_ADSB) {
+             prefix = NMEA_CallSign_Prefix[fop->protocol];
+         } else if (fop->tx_type == TX_TYPE_ADSR) {
+             prefix = "ADR";
+         } else if (fop->tx_type == TX_TYPE_TISB) {
+             prefix = "ADT";
+         } else {                         // Mode A,C,S
              prefix = "MDS";
+         }
 
          if (settings->pflaa_cs == false) {         // skip the callsign
 

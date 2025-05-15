@@ -2324,7 +2324,7 @@ void RF_loop()
         && in_family(settings->altprotocol)
         && (rf_chip == &sx1276_ops || rf_chip == &sx1262_ops)*/
         && (RF_time & 0x0F) == 0x0F && RF_current_slot == 1
-        && ThisAircraft.airborne) {
+        /* && ThisAircraft.airborne */ ) {
 
       current_RF_protocol = settings->altprotocol;
       Serial.println("switching to altprotocol for one time slot");

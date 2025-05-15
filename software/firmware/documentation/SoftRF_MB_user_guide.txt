@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated May 14, 2025 to fit software version MB160
+This version last updated May 15, 2025 to fit software version MB161
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -135,7 +135,7 @@ Turning the device on and off
 
 To turn on the T-Beam, press and hold the button closest to the USB jack for about 2 seconds.  Once LEDs and/or the OLED display light up, can let go of the button.  To turn off the T-Beam, press and hold the button closest to the USB jack until the OLED display says "OFF" (and the buzzer, if attached, makes a hi-lo sound).  Shutdown will be complete when the dim red LED turns off.  The middle button is usually not used (but see below), and the third button is a reset button.  (On the old T-Beam v0.7 use the slide switch to turn it on and off.)  After booting, the first button serves to switch between pages on the OLED display.
 
-Alternatively, simply connect to USB power, and the T-Beam will start up.  But, if a battery is installed on the board, connecting to USB power will instead just charge the battery.  To make it operate normally while attached to USB power, first let it boot on battery power, then connect USB power.  Or, press the middle pushbutton before or while the OLED displays "CHARGE MODE" and hold until it says "NORMAL BOOT...".  Or, enable the "external power" setting (mentioned above).
+Alternatively, simply connect to USB power, and the T-Beam will start up.  But, if a battery is installed on the board, connecting to USB power (or (re)booting via a button while USB power is connected) will instead just charge the battery.  To make it operate normally while attached to USB power, first let it boot on battery power, then connect USB power.  Or, press the middle pushbutton before or while the OLED displays "CHARGE MODE" and hold until it says "NORMAL BOOT...".  Or, enable the "external power" setting (mentioned above).
 
 The Power Management Unit (PMU) on the T-Beam (v1.x) is always active.  The first pushbutton just sends instructions to the PMU.  The PMU can turn the power to individual parts of the board (e.g., the CPU, or the GNSS module) on or off.  There are 3 LEDs on the board.  The bright blue LED near the PMU is controlled by the PMU (with indirect instructions from the CPU).  The red LED near it signifies that the CPU is powered.  The red LED near the GNSS module, when blinking, is indicating that the GNSS module has a "fix", i.e., is receiving signals from enough satellites.  If any LED is lit, the board is not as close to "off" as it can be.
 

@@ -783,8 +783,8 @@ void logOneTraffic(container_t *fop, const char *label)
     if (alarm_level < ALARM_LEVEL_NONE)
         alarm_level = ALARM_LEVEL_NONE;
     snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-      PSTR("%s,%d,%d,%06x,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n"),
-      label, alarm_level, fop->aircraft_type, addr,
+      PSTR("%s,%d,%d,%d,%d,%06x,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n"),
+      label, alarm_level, fop->tx_type, fop->protocol, fop->aircraft_type, addr,
       (int)fop->distance, (int)fop->bearing,
       (int)fop->speed, (int)fop->course, (int)fop->turnrate,
       (int)fop->RelativeHeading, (int)fop->alt_diff, (int)(fop->vs - ThisAircraft.vs),
