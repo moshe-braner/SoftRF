@@ -887,6 +887,75 @@ void init_md5()
 //  { 0x67452301,0xefcdab89,0x98badcfe,0x10325476 },
 //  { 0xc8e899e8,0x9321c28a,0x438eba12,0x8cbe0aee },
 
+// if need space, erase oldest flight log
+bool eraseOldestFlightLog()
+{
+    String oldestlog = "~";
+    int found = 0;
+    // find oldest file by alphabetical order of file name
+    File root = FILESYS.open("/");
+    if (! root)
+        return false;
+    File file = root.openNextFile();
+    String file_name;
+    while(file) {
+        file_name = file.name();
+        Serial.println(file_name);
+        if (file_name.endsWith(".IGC") || file_name.endsWith(".igc")
+        ||  file_name.endsWith(".IGZ") || file_name.endsWith(".igz")) {
+            ++found;
+            if (strcmp(oldestlog.c_str(), file.name()) > 0) {
+                oldestlog = file.name();
+                Serial.print(F("Candidate oldest log: "));
+                Serial.println(oldestlog);
+            }
+        }
+        file = root.openNextFile();
+    }
+    file.close();
+    root.close();
+    if (found < 2) {     // do not erase the most recent one
+        Serial.println("Found <= 1 file");
+        return false;
+    }
+    Serial.print("Removing ");
+    Serial.println(oldestlog);
+    oldestlog = "/" + oldestlog;
+    FILESYS.remove(oldestlog.c_str());
+    return true;
+}
+
+bool makeFlightLogSpace()
+{
+#if defined(ESP32)
+    if (PSRAMbuf && settings->compflash) {
+        uint32_t needed_kb = 100 / settings->loginterval;
+        while (FILESYS_free_kb() < needed_kb) {
+            if (eraseOldestFlightLog() == false) {
+                Serial.print("cannot free ");
+                Serial.print(needed_kb);
+                Serial.println(" kb for flight log");
+                return false;
+            }
+        }
+    }
+#elif defined(ARDUINO_ARCH_NRF52)
+    // do not start new log if not enough space for 3 hours of recording
+    uint32_t free_kb = (IGCFS_is_mounted? IGCFS_free_kb() : 0);
+    uint32_t needed_kb = ((settings->compflash)? 100 : 400);
+    needed_kb = 50 + (needed_kb / settings->loginterval);
+    while (free_kb < needed_kb) {
+        if (eraseOldestFlightLog() == false) {
+            Serial.print("cannot free ");
+            Serial.print(needed_kb);
+            Serial.println(" kb for flight log");
+            return false;
+        }
+    }
+#endif
+    return true;   // if using SD card, assumes there is room
+}
+
 void openFlightLog()
 {
     if (FlightLogFail)
@@ -918,64 +987,65 @@ void openFlightLog()
 
     // get here if no PSRAMbuf or first use of PSRAMbuf
 
+#if defined(ESP32)
+    bool have_space = true;
+#endif
+    if (makeFlightLogSpace() == false) {
+#if defined(ESP32)
+        have_space = false;    // but log to PSRAM
+#else
+        failFlightLog();
+        return;
+#endif
+    }
+
     makeFlightLogName();
 
 #if defined(ESP32)
-    if (PSRAMbuf)
-#elif defined(ARDUINO_ARCH_NRF52)
-    uint32_t free_kb = (IGCFS_is_mounted? IGCFS_free_kb() : 0);
-    if (settings->compflash)
+    if (have_space) {
+      if (PSRAMbuf && settings->compflash)
+#else
+      if (settings->compflash)
 #endif
-    {
+      {
+        compfile = FILESYS.open(compfilename, FILE_WRITE);
+        if (compfile) {
+            compfile.close();      // will be reopen()ed later
+            compfileOpen = true;
+            compfilePosition = 0;
+        } else {
 #if defined(ESP32)
-        if (settings->compflash && FILESYS_free_kb() > 25)
-#elif defined(ARDUINO_ARCH_NRF52)
-        if (settings->compflash && free_kb > 50 + (100 / settings->loginterval))
+            Serial.println("File open failed, logging to PSRAM only");
+#else
+            Serial.println("Failed to open flight log for writing");
+            failFlightLog();
 #endif
-        {
-            compfile = FILESYS.open(compfilename, FILE_WRITE);
-            if (compfile) {
-                compfile.close();      // will be reopen()ed later
-                compfileOpen = true;
-                compfilePosition = 0;
-#if defined(ARDUINO_ARCH_NRF52)
-            } else {
-                Serial.println("Failed to open flight log for writing");
-                failFlightLog();
-                return;
-#endif
-            }
-            // the B-record needs to be initialized once for the file,
-            // afterwards it will be preserved between compressblock() calls
-            //strcpy(compbrecord, emptybrecord);
-            memset(compbrecord,0,B_RECORD_SIZE);
-            compbrecord[0] = 'B';
-            compbrecord[35] = '\r';
-            compbrecord[36] = '\n';
-            //compbrecord[37] = '\0';
+            return;
         }
+        // the B-record needs to be initialized once for the file,
+        // afterwards it will be preserved between compressblock() calls
+        //strcpy(compbrecord, emptybrecord);
+        memset(compbrecord,0,B_RECORD_SIZE);
+        compbrecord[0] = 'B';
+        compbrecord[35] = '\r';
+        compbrecord[36] = '\n';
+        //compbrecord[37] = '\0';
 
-    } else {  // ESP32 and (! PSRAMbuf) or NRF52 and not settings->compflash
-#if defined(ARDUINO_ARCH_NRF52)
-      // do not start new log if not enough space for 3 hours of recording
-      uint32_t needed_kb = 50 + (400 / settings->loginterval);
-      Serial.print("igc_file kb needed: ");
-      Serial.print(needed_kb);
-      Serial.print(" free: ");
-      Serial.println(free_kb);
-      if (free_kb < needed_kb) {
-          failFlightLog();
-          return;
+      } else {  // ESP32 and writing to SD, or NRF52 and not compressing
+
+        FlightLog = IGCFILESYS.open(FlightLogPath, FILE_WRITE);
+        if (! FlightLog) {
+            Serial.println("Failed to open flight log for writing");
+            failFlightLog();
+            return;
+        }
+        FlightLog.close();      // will be reopen()ed later
       }
-#endif
-      FlightLog = IGCFILESYS.open(FlightLogPath, FILE_WRITE);
-      if (! FlightLog) {
-          Serial.println("Failed to open flight log for writing");
-          failFlightLog();
-          return;
-      }
-      FlightLog.close();      // will be reopen()ed later
+#if defined(ESP32)
+    } else {
+        Serial.println("Logging to PSRAM only");
     }
+#endif
 
     FlightLogPosition = 0;
     data_block_used = 0;
