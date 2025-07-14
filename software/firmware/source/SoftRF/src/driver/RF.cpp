@@ -630,19 +630,21 @@ static void sx12xx_setup()
 
     if (rf_chip->type == RF_IC_SX1262) {
       /* SX1262 is unable to give more than 22 dBm */
-      if (LMIC.txpow > 22)
-        LMIC.txpow = 22;
+      //if (LMIC.txpow > 22)
+      //  LMIC.txpow = 22;
+      // The sx1262 has internal protection against antenna mismatch.
+      // But keep is a bit lower ayway
+      if (LMIC.txpow > 19)
+        LMIC.txpow = 19;
     } else {
       /* SX1276 is unable to give more than 20 dBm */
-      if (LMIC.txpow > 20)
-        LMIC.txpow = 20;
-    }
-    // Most T-Beams have an sx1276, hope it can survive without an antenna.
-    // The sx1262 has internal protection against antenna mismatch.
+      //if (LMIC.txpow > 20)
+      //  LMIC.txpow = 20;
+    // Most T-Beams have an sx1276, it can give 20 dBm but only safe with a good antenna.
     // And yet the T-Echo instructions warn against using without an antenna.
     // Note that the regional legal limit RF_FreqPlan.MaxTxPower also applies,
     //   it is only 14 dBm in EU, but 30 in Americas, India & Australia.
-    if (hw_info.model != SOFTRF_MODEL_PRIME_MK2) {
+    //if (hw_info.model != SOFTRF_MODEL_PRIME_MK2) {
         /*
          * Enforce Tx power limit until confirmation
          * that RFM95W is doing well
@@ -650,6 +652,7 @@ static void sx12xx_setup()
          */
         if (LMIC.txpow > 17)
             LMIC.txpow = 17;
+    //}
     }
     break;
   case RF_TX_POWER_OFF:
@@ -2375,7 +2378,7 @@ size_t RF_Encode(container_t *fop, bool wait)
     }
 
     /* sanity checks: don't send bad data */
-    char *p = NULL;
+    const char *p = NULL;
     if (ThisAircraft.altitude > 30000.0)
         p = "altitude";
     if (ThisAircraft.speed > (250.0 / _GPS_MPS_PER_KNOT))
