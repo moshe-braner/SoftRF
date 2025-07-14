@@ -1268,7 +1268,12 @@ void handleRoot() {
   dtostrf(ThisAircraft.longitude, 8, 4, str_lon);
   dtostrf(ThisAircraft.altitude-ThisAircraft.geoid_separation, 7, 1, str_alt);   // MSL
   dtostrf(vbat, 4, 2, str_vbat);
-  dtostrf(vusb, 4, 2, str_vusb);
+  if (usbpwr)
+      dtostrf(vusb, 4, 2, str_vusb);
+  else if (ESP32_onBatteryPower())
+      strcpy(str_vusb,"none");
+  else
+      strcpy(str_vusb,"????");
 
   char adsb_s[88];
   if (settings->rx1090 == ADSB_RX_NONE && settings->gdl90_in == DEST_NONE) {

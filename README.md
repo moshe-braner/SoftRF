@@ -9,6 +9,9 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### Latest additions:
 
+* vMB162: overwrite oldest flight log if space tight, 12.5 KHz dev for PilotAware
+* vMB161: special callsign prefixes for ADS-R and TIS-B in the PFLAA
+* vMB160: setting to control the time traffic not-heard from-is reported
 * vMB157: revert approx math, optimize TinyGPS, bug fixes
 * vMB156: GNSS baud rate autodetection, option to log NMEA to SD card
 * vMB155: collect statistics on reception range by relative direction 

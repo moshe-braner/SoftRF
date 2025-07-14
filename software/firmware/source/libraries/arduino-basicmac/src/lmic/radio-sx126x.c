@@ -469,8 +469,11 @@ static void SetModulationParamsFsk (void) {
 //    case RF_FREQUENCY_DEVIATION_9_6KHZ:
 //      Fdev = 0x2752; /* ( 9600 * (0x1 << 25)) / 32000000 */
 //      break;
-    case RF_FREQUENCY_DEVIATION_19_2KHZ:
-      Fdev = 0x4EA4; /* (19200 * (0x1 << 25)) / 32000000 */
+//    case RF_FREQUENCY_DEVIATION_19_2KHZ:
+//      Fdev = 0x4EA4; /* (19200 * (0x1 << 25)) / 32000000 */
+//      break;
+    case RF_FREQUENCY_DEVIATION_12_5KHZ:
+      Fdev = 0x3333; /* (12500 * (0x1 << 25)) / 32000000 */
       break;
     case RF_FREQUENCY_DEVIATION_25KHZ:
       Fdev = 0x6666; /* (25000 * (0x1 << 25)) / 32000000 */
