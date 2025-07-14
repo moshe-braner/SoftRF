@@ -1598,7 +1598,7 @@ void NMEA_Export()
                 PFLAU_EXT1_ARGS );
     } else {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-                PSTR("$PFLAU,0,%d,%d,%d,%d,,0,,,," PFLAU_EXT1_FMT "*"),
+                PSTR("$PFLAU,0,%d,%d,%d,%d,,0,,," PFLAU_EXT1_FMT "*"),  // had extra comma
                 tx_status, gps_status,
                 power_status, ALARM_LEVEL_NONE
                 PFLAU_EXT1_ARGS );
