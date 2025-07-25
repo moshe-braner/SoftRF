@@ -2348,7 +2348,14 @@ void RF_loop()
   RF_current_chan = RF_FreqPlan.getChannel((time_t)RF_time, RF_current_slot, OGN);
   if (rf_chip)
       rf_chip->channel(RF_current_chan);
-
+/*
+  if (settings->debug_flags & DEBUG_DEEPER) {
+      Serial.print("New freq at: ");
+      Serial.print(now_ms - slot_base_ms);                   
+      Serial.print(" ms after PPS, OK until ");
+      Serial.println(RF_OK_until - slot_base_ms);
+  }
+*/
 //Serial.printf("Prot %d, Slot %d set for sec %d at PPS+%d ms, PPS %d, tx ok %d - %d, gd to %d\r\n",
 //OGN, RF_current_slot, (RF_time & 0x0F), ms_since_pps, slot_base_ms, TxTimeMarker, TxEndMarker, RF_OK_until);
 }

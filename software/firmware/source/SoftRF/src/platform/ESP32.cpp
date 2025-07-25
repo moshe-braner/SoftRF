@@ -1419,6 +1419,8 @@ static void ESP32_loop()
       if (down) {
         Serial.println("shutdown()...");
         Serial.flush();
+        blue_LED_off();    // visual indication in case no OLED and no buzzer
+        delay(200);
         shutdown(SOFTRF_SHUTDOWN_BUTTON);
       }
     }

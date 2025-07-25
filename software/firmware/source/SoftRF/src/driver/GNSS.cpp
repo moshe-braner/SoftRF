@@ -66,7 +66,7 @@ uint32_t latest_Commit_Time = 0;   // millis() at first Time-commit after last P
 bool gnss_needs_reset = false;
 
 static bool is_prime_mk2 = false;
-static gnss_id_t gnss_id = GNSS_MODULE_NONE;
+gnss_id_t gnss_id = GNSS_MODULE_NONE;
 
 uint32_t GNSSTimeSyncMarker = 0;
 volatile unsigned long PPS_TimeMarker = 0;
@@ -1710,13 +1710,22 @@ byte GNSS_setup() {
    && ESP32_pin_reserved(pps_pin, false, "GNSS PPS") == false
 #endif
    ) {
+      //bool rising = true;
+      //if (gnss_id == GNSS_MODULE_U7) {
+      //    if (ublox_query(0x06, 0x31, 2000) == true) {       // CFG-TP5
+      //        Serial.printf("U7 time pulse flags: %02X\r\n", GNSSbuf[28]);
+      //        rising = ((GNSSbuf[28] & 0x40) != 0);
+      //    }
+      //}
       pinMode(pps_pin, INPUT_PULLDOWN);
 #if !defined(NOT_AN_INTERRUPT)
       attachInterrupt(digitalPinToInterrupt(pps_pin), SoC->GNSS_PPS_handler, RISING);
+//    attachInterrupt(digitalPinToInterrupt(pps_pin), SoC->GNSS_PPS_handler, (rising ? RISING : FALLING));
 #else
       int interrupt_num = digitalPinToInterrupt(pps_pin);
       if (interrupt_num != NOT_AN_INTERRUPT)
         attachInterrupt(interrupt_num, SoC->GNSS_PPS_handler, RISING);
+//      attachInterrupt(interrupt_num, SoC->GNSS_PPS_handler, (rising ? RISING : FALLING));
 #endif
   } else {
       settings->ppswire = false;

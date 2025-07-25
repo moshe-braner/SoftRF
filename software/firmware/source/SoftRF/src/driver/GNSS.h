@@ -75,6 +75,7 @@ bool leap_seconds_valid(void);
 
 extern const gnss_chip_ops_t *gnss_chip;  // added
 extern TinyGPSPlus gnss;
+extern gnss_id_t gnss_id;
 extern volatile unsigned long PPS_TimeMarker;
 extern const char *GNSS_name[];
 extern int8_t leap_seconds_correction;
