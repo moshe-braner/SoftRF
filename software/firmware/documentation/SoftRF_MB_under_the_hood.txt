@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated May 13, 2025 to fit software version MB160
+This version last updated July 25, 2025 to fit software version MB163
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -115,11 +115,11 @@ alt_udp - UDP Port for NMEA output: can choose 10111 instead of the default 1011
 
 rfc - Radio frequency correction, +- up to 30 KHz, for sx1276 only.  Only accessible via editing the settings.txt file.  Only use this if you have reliable information (e.g., from OGN ground stations) telling you that your device is a bit off-frequency.
 
-gnss_pins - GNSS module connection: the default is the internal GNSS.  If an external one is connected, use this setting to specify which pins it is connected to.  Values: 0=Internal, 1=pins 39 & 4, 2=pins 13 & 2, 3=pins 15 & 14.  See the section about connecting other hardware.
+gnss_pins - GNSS module connection: the default (0) is the internal GNSS.  If an external one is connected, use this setting to specify which pins it is connected to.  Values: 0=Internal, 1=pins 39 & 4, 2=pins 13 & 2, 3=pins 15 & 14.  See the section about connecting other hardware.
 
-ppswire - Added PPS wire: normally leave as "absent".  The "present" option serves two purpose:  If an external GNSS module is connected, including a wire bringing the PPS signal to the T-Beam's VP pin, this setting tells SoftRF to use that connection for more precise timing.  And if the internal GNSS is used on a T-Beam v0.7, which unlike v1.x does not come with the PPS connection built in, this setting tells SoftRF that a modification has been done to add that missing connection.
+ppswire - Added PPS wire: normally leave as 0 ("absent").  The 1 ("present") option serves two purpose:  If an external GNSS module is connected, including a wire bringing the PPS signal to the T-Beam's VP pin, this setting tells SoftRF to use that connection for more precise timing.  And if the internal GNSS is used on a T-Beam v0.7, which unlike v1.x does not come with the PPS connection built in, this setting tells SoftRF that a modification has been done to add that missing connection.
 
-sd_card - SD card adapter: If such an adapter is added to a T-Beam, change this setting from "none" to the code that fits the pins used for the connection.  The choices are:
+sd_card - SD card adapter: If such an adapter is added to a T-Beam, change this setting from 0 to the code that fits the pins used for the connection.  The choices are:
  0 = no SD card
  1 = pins 13,25,2,0
  2 = pins 13,VP,2,0
@@ -140,9 +140,11 @@ epd_team - see Linar's T-Echo documentation
 
 ADD-ONS
 
+Some combinations of external connections are not possible due to the limited number of available I/O pins on the T-Beam board.  See the table Interacting_Options (.xlsx and .pdf) - in the documentation folder https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
+
 Adding an SD card adapter
 
-SD adapters connect via "SPI".  This requires 4 GPIO pins (plus power and ground) and thus is likely get in the way of connecting other devices.  See the "Interacting_Options" file for the matrix of interactions.  The pin choices are: 13,25,2,0 or 13,VP,2,0 or 5,19,27,0 - the latter being the pins used by the radio module (see below).  (Pins are a bit different for the older v0.7 T-Beam.)   The pins for the SD adapter are listed in the order: SCK, MISO, MOSI, SS/CS.
+SD adapters connect via "SPI".  This requires 4 GPIO pins (plus power and ground) and thus is likely to get in the way of connecting other devices.  See the "Interacting_Options" file for the matrix of interactions.  The pin choices are: 13,25,2,0 or 13,VP,2,0 or 5,19,27,0 - the latter being the pins used by the radio module (see below).  (Pins are a bit different for the older v0.7 T-Beam.)   The pins for the SD adapter are listed in the order: SCK, MISO, MOSI, SS/CS.
 
 There are two types of SD card adapters available: buffered and unbuffered.  The unbuffered ones connect the SD card pins directly to the ESP32 pins.  This exposes the ESP32 pins to static electricity and other hazards.  If the SD card and adapter are inside the T-Beam case and the SD card rarely removed (and not while the T-Beam is running) that is reasonably safe.  Here is an example unbuffered card (despite the mention of buffering in the description):
     https://www.amazon.com/UMLIFE-Interface-Conversion-Compatible-Raspberry/dp/B0989SM146
@@ -158,7 +160,18 @@ There is a catch though: the MISO pin of the SD adapter must not interfere with 
 
 Adding a GNSS module
 
-Since the internal GNSS module on the T-Beam is connected via one of the UARTs built into the ESP32, connecting an external one is simply a matter of intializing the UART with different I/O pins.  Same for the PPS wire.  The available pins are limited, so need to compromise on which features are desired.
+An alternative to the built-in GNSS is to add an external one.  That may give better performance, or replace an ailing on-board GNSS module.  Since the internal GNSS module on the T-Beam is connected via one of the UARTs built into the ESP32, connecting an external one is simply a matter of intializing the UART with different I/O pins.  Same for the PPS wire.  The available pins are limited, so need to compromise on which features are desired.
+
+An add-on GNSS module needs to have a TTL-level serial interface.  Ideally it should have a PPS output wire, and be compatible with the Ublox configuration commands.  For example, modules based on the 
+UBX-G7020-KT chip are available, labeled VK2828U7 and similar, such as:
+    https://www.amazon.com/G28U7FTTL-UBX-G7020-KT-Monitoring-Navigation-DIYmall/dp/B015R62YHI
+The module needs two pins on the T-Beam for serial connections.  There are 3 choices (in the "gnss_pins" setting).  All of them preclude some other functionality - there are no more unused pins left!  The choices are:
+* 1 = on pins VN, 4 - blocks other uses of the auxiliary serial port (such as an ADS-B module)
+* 2 = on pins 13, 2 - then cannot attach a BMP or OLED to those pins (use 21, 22 instead)
+* 3 = on pins 15, 14 (25 instead of 15 on T-Beam v0.7) - blocks use of buzzer
+Connect the module's ground wire to a ground pin on the T-Beam, VCC wire to a "3.3V" pin, the module's TX wire to the chosen RX pin ("VN", "13" or "15"), the module's RX wire to the chosen TX pin ("4", "2" or "14").  Optionally, but helpfully, connect the module's PPS wire to the "VP" pin - and in the settings select ppswire=1 ("present") - this precludes use of the "alternative" RX pin for the main serial port.  (Note: on the old T-Beam v0.7 the "VN" pin is not usable, and 15 is not available - connect the GNSS using 13,2 or 25,14 with PPS on VP, or use the "VP" pin for input from GNSS, 4 for output, and optionally connect PPS to pin 25.)  See wiring diagrams for these 3 options, e.g., T-beam_wiring_ext_GNSS_VN_4.jpg - in the documentation folder.  (These diagrams are for the T-Beam v1.x.)
+
+In version mb163, if a Ublox 7 GNSS module is detected, the PPS timing is moved 100 ms earlier.  This is to work around an apparent problem with the "VK2828" modules.  They supposedly are based on a Ublox 7 chip, but may be a fake, with a bug that apparently pulses the PPS pin 100 ms too late, resulting in about 25% of the packets (in either direction) not being received since the time slots are not synchronized.  This PPS shift could be made optional.  But currently it is done automatically for any module identifying itself as Ublox 7.  The LilyGo T-Beam boards use Ublox 6 or 8 modules.  If anybody is using a Ublox 7 module other than the VK2828 type, let me know.  The VK2828 modules are available, cheap, and work well otherwise, with much better GNSS reception than the Ublox 6 built-into most T-Beams.
 
 Adding an ADS-B receiver module
 

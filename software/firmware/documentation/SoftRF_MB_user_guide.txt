@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated May 15, 2025 to fit software version MB161
+This version last updated July 25, 2025 to fit software version MB163
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -133,9 +133,12 @@ After several weeks in the apparently "off" mode, the battery installed in a T-B
 
 Turning the device on and off
 
-To turn on the T-Beam, press and hold the button closest to the USB jack for about 2 seconds.  Once LEDs and/or the OLED display light up, can let go of the button.  To turn off the T-Beam, press and hold the button closest to the USB jack until the OLED display says "OFF" (and the buzzer, if attached, makes a hi-lo sound).  Shutdown will be complete when the dim red LED turns off.  The middle button is usually not used (but see below), and the third button is a reset button.  (On the old T-Beam v0.7 use the slide switch to turn it on and off.)  After booting, the first button serves to switch between pages on the OLED display.
+To turn on the T-Beam, press and hold the button closest to the USB jack for about 2 seconds.  Once LEDs and/or the OLED display light up, can let go of the button.  To turn off the T-Beam, press and hold the button closest to the USB jack until the blue LED turns off, or the OLED display says "OFF", or the buzzer, if attached, makes a high-low sound.  Shutdown takes a few seconds and will be complete when the dim red LED turns off.  The middle button is usually not used (but see below), and the third button is a reset button.  (On the old T-Beam v0.7 use the slide switch to turn it on and off.)  After booting, the first button serves to switch between pages on the OLED display.
 
-Alternatively, simply connect to USB power, and the T-Beam will start up.  But, if a battery is installed on the board, connecting to USB power (or (re)booting via a button while USB power is connected) will instead just charge the battery.  To make it operate normally while attached to USB power, first let it boot on battery power, then connect USB power.  Or, press the middle pushbutton before or while the OLED displays "CHARGE MODE" and hold until it says "NORMAL BOOT...".  Or, enable the "external power" setting (mentioned above).
+Alternatively, simply connect to USB power, and the T-Beam will start up.  But, if a battery is installed on the board, connecting to USB power (or (re)booting via a button while USB power is connected) will instead just charge the battery.  To make it boot normally while attached to USB power, can use any of these three methods:
+* First let it boot on battery power, then connect USB power.  Or,
+* Press the middle pushbutton before or while the OLED displays "CHARGE MODE" and hold it until the OLED says "NORMAL BOOT...".  Or,
+* Enable the "external power" setting (mentioned above).
 
 The Power Management Unit (PMU) on the T-Beam (v1.x) is always active.  The first pushbutton just sends instructions to the PMU.  The PMU can turn the power to individual parts of the board (e.g., the CPU, or the GNSS module) on or off.  There are 3 LEDs on the board.  The bright blue LED near the PMU is controlled by the PMU (with indirect instructions from the CPU).  The red LED near it signifies that the CPU is powered.  The red LED near the GNSS module, when blinking, is indicating that the GNSS module has a "fix", i.e., is receiving signals from enough satellites.  If any LED is lit, the board is not as close to "off" as it can be.
 
@@ -430,17 +433,6 @@ But, these pins operate at TTL voltage levels (0v and about +3V).  Many external
 Once connected, be sure to set the baud rate on the external device to match what SoftRF is using (38400 baud by default), or vice versa (my version of SoftRF allows you to choose the baud rate).  Note that when the T-Beam starts up, it send some data at 115,200 baud, and then switches to the chosen baud rate.  Devices that detect the baud rate automatically (e.g., the Sotecc canopy flasher) may get confused by that, so set the device to use a specific baud rate without auto-detection.
 
 If desired, a barometric sensor of the BMP280 type can be connected to the T-Beam via an I2C connection.  Use pins 21 (SDA) and 22 (SCL).  Or  can connect the barometric sensor to pins 13 (SDA) and 2 (SCL).  (But be sure to connect pin 2 in a way that is easy to disconnect - see the section "Installing firmware for the first time".)  Can use the same pins as the OLED display, they can share them.  (The AXP PMU too is using pins 21,22.)  Data from the barometric sensor will be sent out as NMEA sentences if the "sensors" NMEA output is turned on in the setttings.
-
-An alternative to the built-in GNSS is to add an external one.  That may give better performance, or replace an ailing on-board GNSS module.  It needs to be a module with a TTL-level serial interface.  Ideally it should have a PPS output wire, and be compatible with the Ublox configuration commands.  For example, modules based on the 
-UBX-G7020-KT chip are available, labeled VK2828U7 and similar, such as:
-    https://www.amazon.com/G28U7FTTL-UBX-G7020-KT-Monitoring-Navigation-DIYmall/dp/B015R62YHI
-The module needs two pins on the T-Beam for serial connections.  There are 3 choices (in the "GNSS module" setting).  All of them preclude some other functionality - there are no more unused pins left!  The choices are:
-* "on pins VN, 4" - blocks other uses of the auxiliary serial port (such as an ADS-B module)
-* "on pins 13, 2" - then cannot attach a BMP or OLED to those pins (use 21, 22 instead)
-* "on pins 15, 14" (25 instead of 15 on T-Beam v0.7) - blocks use of buzzer
-Connect the module's ground wire to a ground pin on the T-Beam, VCC wire to a "3.3V" pin, the module's TX wire to the chosen RX pin ("VN", "13" or "15"), the module's RX wire to the chosen TX pin ("4", "2" or "14").  Optionally, but helpfully, connect the module's PPS wire to the "VP" pin - and in the settings select PPS wire "present" - this precludes use of the "alternative" RX pin for the main serial port.  (Note: on the old T-Beam v0.7 the "VN" pin is not usable, and 15 is not available - connect the GNSS using 13,2 or 25,14 with PPS on VP, or use the "VP" pin for input from GNSS, 4 for output, and optionally connect PPS to pin 25.)  See wiring diagrams for these 3 options, e.g., T-beam_wiring_ext_GNSS_VN_4.jpg - in the documentation folder.  (These diagrams are for the T-Beam v1.x.)
-
-Some combinations of external connections are not possible due to the limited number of available I/O pins on the T-Beam board.  See the table Interacting_Options (.xlsx and .pdf) - in the documentation folder https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 
 
 Connecting an SD card adapter
