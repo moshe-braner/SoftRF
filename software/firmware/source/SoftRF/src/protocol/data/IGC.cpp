@@ -678,8 +678,9 @@ void igc_file_append_nonconst(char *data, bool keepcommas=false, bool iscomment=
     if (size == 0)
         return;   // should not happen
     igc_file_append(data, size+2);     // include \r\n
-    if (iscomment)
-        return;                       // skip MD5 calc
+    // it appears that the LK8000 validator does include LPLT lines in the MD5 calc
+    //if (iscomment)
+    //    return;                       // skip MD5 calc
     if (keepcommas) {
         char *q = data;
         for (p=data; *p; ++p) {

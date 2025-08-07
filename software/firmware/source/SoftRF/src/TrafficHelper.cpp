@@ -1156,21 +1156,21 @@ void air_relay(container_t *cip)
 
     bool tryrelay = true;
     bool relayed = false;
-    bool often = false;
     bool landed_out = ((cip->protocol == RF_PROTOCOL_LATEST || cip->protocol == RF_PROTOCOL_LEGACY)
                         && cip->aircraft_type == AIRCRAFT_TYPE_UNKNOWN);
     bool normal_protocol = (current_RF_protocol == settings->rf_protocol);
 
-    if (landed_out) {
-        often = true;
-    } else {
-        // must be ADS-B (since no relay if *our* protocol is not Latest or Legacy)
-        // - unless RELAY_ONLY, then it may be FLARM traffic
+    if (! landed_out) {
         if (settings->relay < RELAY_ALL)     // RELAY_LANDED
             return;
-        if (! normal_protocol)  // do not altprotocol relay non-landed-out
-            return;
-        if (settings->relay == RELAY_ONLY && cip->tx_type < TX_TYPE_FLARM)
+        if (settings->relay == RELAY_ONLY) {
+            if (cip->tx_type < TX_TYPE_FLARM)     // only relay FLARM
+                return;
+        } else {                             // RELAY_ALL - only relay ADS-B (or landed_out)
+            if (cip->tx_type < TX_TYPE_TISB || cip->tx_type > TX_TYPE_ADSB)
+                return;
+        }
+        if (! normal_protocol)  // do not relay non-landed-out in altprotocol
             return;
         if (cip->aircraft_type != AIRCRAFT_TYPE_JET && cip->aircraft_type != AIRCRAFT_TYPE_HELICOPTER) {
             if (cip->distance > 10000)  // only relay gliders and light planes if close
@@ -1180,7 +1180,6 @@ void air_relay(container_t *cip)
             //   Thus if close and another protocol, then no FLARM, and safe to relay,
             //     meaning it won't make FLARM "see itself" and go crazy.
         }
-        often = true;
     }
 
     // if alternated to another protocol (presumably OGNTP) for this time (always slot 1),
@@ -1192,7 +1191,8 @@ void air_relay(container_t *cip)
         //   5 seconds for any, 15 for same aircraft (7 for ADS-B or landed out)
         if (millis() < lastrelay + 1000*ANY_RELAY_TIME)
             return;
-        if (cip->timerelayed + (often? ANY_RELAY_TIME+2 : ENTRY_RELAY_TIME) > cip->timestamp)
+        //if (cip->timerelayed + (often? ANY_RELAY_TIME+2 : ENTRY_RELAY_TIME) > cip->timestamp)
+        if (cip->timerelayed + (ANY_RELAY_TIME+2) > cip->timestamp)
             return;
 
         // only try and relay during first time slot, to maximize chance

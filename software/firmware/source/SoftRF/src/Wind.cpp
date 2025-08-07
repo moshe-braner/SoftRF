@@ -602,12 +602,6 @@ void this_airborne(bool validfix)
     } else if (ThisAircraft.airborne==1 && airborne<=0) {
       airborne_changed = true;
       // AirborneTime = 0;
-      save_range_stats();
-#if defined(ESP32)
-      if (settings->rx1090)
-          save_zone_stats();  // do this first as it will append comments to IGC file
-#endif
-      stoplogs();             // close the alarm log and flight log after landing
     }
 
     ThisAircraft.airborne = (airborne > 0)? 1 : 0;
@@ -617,8 +611,8 @@ void this_airborne(bool validfix)
         sendPFLAJ();
     }
 
-    if ((settings->nmea_d || settings->nmea2_d) && (settings->debug_flags & DEBUG_PROJECTION)) {
-      if (airborne != was_airborne) {
+    if (airborne != was_airborne) {
+      if ((settings->nmea_d || settings->nmea2_d) && (settings->debug_flags & DEBUG_PROJECTION)) {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("$PSTAA,this_airborne: %d, %.1f, %.5f, %.5f, %.0f\r\n"),
             airborne, speed, ThisAircraft.latitude, ThisAircraft.longitude, ThisAircraft.altitude);
@@ -640,6 +634,27 @@ void this_airborne(bool validfix)
         }
 #endif
 #endif
+      }
+    }
+
+    if (airborne_changed) {
+      snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+          PSTR("%s: %d/%02d/%02d %02d:%02d %.5f,%.5f\r\n"),
+          (airborne? "takeoff" : "landing"),
+          gnss.date.year(), gnss.date.month(), gnss.date.day(),
+          gnss.time.hour(), gnss.time.minute(),
+          ThisAircraft.latitude, ThisAircraft.longitude);
+      Serial.print((const char *) NMEABuffer);
+      // also output to alarmlog
+      if (AlarmLogOpen)
+          AlarmLog.print((const char *) NMEABuffer);
+      if (airborne <= 0) {
+          save_range_stats();
+#if defined(ESP32)
+          if (settings->rx1090)
+              save_zone_stats();  // do this first as it will append comments to IGC file
+#endif
+          stoplogs();             // close the alarm log and flight log after landing
       }
     }
 }
