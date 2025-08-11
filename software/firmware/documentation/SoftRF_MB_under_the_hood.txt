@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 25, 2025 to fit software version MB163
+This version last updated Aug 11, 2025 to fit software version MB165
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -165,13 +165,11 @@ An alternative to the built-in GNSS is to add an external one.  That may give be
 An add-on GNSS module needs to have a TTL-level serial interface.  Ideally it should have a PPS output wire, and be compatible with the Ublox configuration commands.  For example, modules based on the 
 UBX-G7020-KT chip are available, labeled VK2828U7 and similar, such as:
     https://www.amazon.com/G28U7FTTL-UBX-G7020-KT-Monitoring-Navigation-DIYmall/dp/B015R62YHI
-The module needs two pins on the T-Beam for serial connections.  There are 3 choices (in the "gnss_pins" setting).  All of them preclude some other functionality - there are no more unused pins left!  The choices are:
+These modules are available, cheap, and work well, with much better GNSS reception than the Ublox NEO6 built-into most T-Beams.  The module needs two pins on the T-Beam for serial connections.  There are 3 choices (in the "gnss_pins" setting).  All of them preclude some other functionality - there are no more unused pins left!  The choices are:
 * 1 = on pins VN, 4 - blocks other uses of the auxiliary serial port (such as an ADS-B module)
 * 2 = on pins 13, 2 - then cannot attach a BMP or OLED to those pins (use 21, 22 instead)
 * 3 = on pins 15, 14 (25 instead of 15 on T-Beam v0.7) - blocks use of buzzer
 Connect the module's ground wire to a ground pin on the T-Beam, VCC wire to a "3.3V" pin, the module's TX wire to the chosen RX pin ("VN", "13" or "15"), the module's RX wire to the chosen TX pin ("4", "2" or "14").  Optionally, but helpfully, connect the module's PPS wire to the "VP" pin - and in the settings select ppswire=1 ("present") - this precludes use of the "alternative" RX pin for the main serial port.  (Note: on the old T-Beam v0.7 the "VN" pin is not usable, and 15 is not available - connect the GNSS using 13,2 or 25,14 with PPS on VP, or use the "VP" pin for input from GNSS, 4 for output, and optionally connect PPS to pin 25.)  See wiring diagrams for these 3 options, e.g., T-beam_wiring_ext_GNSS_VN_4.jpg - in the documentation folder.  (These diagrams are for the T-Beam v1.x.)
-
-In version mb163, if a Ublox 7 GNSS module is detected, the PPS timing is moved 100 ms earlier.  This is to work around an apparent problem with the "VK2828" modules.  They supposedly are based on a Ublox 7 chip, but may be a fake, with a bug that apparently pulses the PPS pin 100 ms too late, resulting in about 25% of the packets (in either direction) not being received since the time slots are not synchronized.  This PPS shift could be made optional.  But currently it is done automatically for any module identifying itself as Ublox 7.  The LilyGo T-Beam boards use Ublox 6 or 8 modules.  If anybody is using a Ublox 7 module other than the VK2828 type, let me know.  The VK2828 modules are available, cheap, and work well otherwise, with much better GNSS reception than the Ublox 6 built-into most T-Beams.
 
 Adding an ADS-B receiver module
 
