@@ -526,18 +526,15 @@ void this_airborne(bool validfix)
     static float initial_longitude = 0;
     static float initial_altitude = 0;
 
-    int was_airborne = airborne;
-    float speed = ThisAircraft.speed;
-
     if (initial_latitude == 0) {
-      /* wait for stable fix */
-      if (! GNSSTimeMarker)
-        return;
       /* set initial location */
       initial_latitude  = ThisAircraft.latitude;
       initial_longitude = ThisAircraft.longitude;
       initial_altitude  = ThisAircraft.altitude;
     }
+
+    int was_airborne = airborne;
+    float speed = ThisAircraft.speed;
 
     if (! validfix) {
 
@@ -545,6 +542,10 @@ void this_airborne(bool validfix)
             airborne = -4;
         else
             --airborne;        // after 60 calls (30 min) will be forced to "land"
+
+    } else if (GNSSTimeMarker == 0 || ThisAircraft.prevtime_ms == 0) {
+
+      return;      /* wait for stable fix */
 
     } else if (speed < 1.0) {
 
@@ -560,8 +561,6 @@ void this_airborne(bool validfix)
       }
 
     } else if (airborne <= 0) {    /* not airborne but moving with speed > 1 knot */
-
-      if (GNSSTimeMarker > 0 && ThisAircraft.prevtime_ms > 0) {  /* had fix for a while */
 
         if ( speed > 20.0                                               /* 20 knots  */
           || fabs(ThisAircraft.latitude - initial_latitude) > 0.0018f   /* about 200 meters */
@@ -584,7 +583,6 @@ void this_airborne(bool validfix)
             if (airborne > 0)    /* consistently good indications */
                  airborne = 60;  /* now really airborne */
         }
-      }
 
     } else if (airborne < 60) {    /* airborne and moving with speed > 1 knot */
 

@@ -528,7 +528,7 @@ void Adjust_Settings()
                   settings->sd_card = SD_CARD_NONE;
                   settings->gnss_pins = EXT_GNSS_NONE;  // don't know what's wired
               }
-              settings->ppswire = false;
+              // settings->ppswire = false;   // why?
           }
           if (settings->sd_card == SD_CARD_13_VP) {    // now uses 4 instead of VP
               if (settings->gnss_pins == EXT_GNSS_39_4 || settings->gnss_pins == EXT_GNSS_13_2) {

@@ -2845,7 +2845,10 @@ static float ESP32_Battery_param(uint8_t param)
 static void IRAM_ATTR ESP32_GNSS_PPS_Interrupt_handler()
 {
   portENTER_CRITICAL_ISR(&GNSS_PPS_mutex);
-  PPS_TimeMarker = millis();    /* millis() has IRAM_ATTR */
+  // PPS_TimeMarker = millis();    /* millis() has IRAM_ATTR */
+  uint32_t now = millis();
+  if (now > PPS_TimeMarker + 200)  // ignore noise spikes on PPS falling edge (for VK2828)
+      PPS_TimeMarker = now;
   portEXIT_CRITICAL_ISR(&GNSS_PPS_mutex);
 }
 

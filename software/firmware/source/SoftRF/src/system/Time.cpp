@@ -26,7 +26,6 @@ uint32_t base_time_ms = 0;     /* this device millis() at last verified PPS */
 uint32_t ref_time_ms = 0;      /* assumed local millis() at last PPS */
 
 #define ADJ_FOR_FLARM_RECEPTION  25   // was 40 - seemed to receive FLARM packets better that way
-#define ADJ_PPS_FOR_U7          100   // The VK2828 PPS seems to come about 100 ms too late
 
 #if defined(ESP32)
 #define EXCLUDE_NTP
@@ -275,11 +274,8 @@ uint32_t no_pps_time;
         pps_btime_ms = SoC->get_PPS_TimeMarker();
         if (pps_btime_ms > 0) {
           if (latest_Commit_Time < pps_btime_ms)
-            pps_btime_ms -= 1000;
-          if (gnss_id == GNSS_MODULE_U7)
-              newtime = pps_btime_ms - ADJ_PPS_FOR_U7;            // ad hoc fix for VK2828 PPS timing
-          else
-              newtime = pps_btime_ms + ADJ_FOR_FLARM_RECEPTION;   // seems to receive FLARM better
+              pps_btime_ms -= 1000;
+          newtime = pps_btime_ms + ADJ_FOR_FLARM_RECEPTION;   // seems to receive FLARM better
           time_corr_neg = latest_Commit_Time - pps_btime_ms;
 /*
           if (settings->debug_flags & DEBUG_DEEPER) {

@@ -527,7 +527,29 @@ void normal()
 
   static uint32_t badgps=0;
 
+  /* allow knowing when there was a good fix for 30 sec */
   if (validfix) {   // still, after the adjustments above
+    if (initial_time == 0) {
+      initial_time = millis();
+Serial.printf("First fix:\r\n\
+    lat/lon: %.5f %.5f\r\n\
+    date: %d %d %d\r\n\
+    time: %d %d %d\r\n",
+gnss.location.lat(), gnss.location.lng(),
+gnss.date.year(), gnss.date.month(), gnss.date.day(),
+gnss.time.hour(), gnss.time.minute(), gnss.time.second());
+      validfix = false;            // wait for next fix
+    } else if (GNSSTimeMarker == 0) {
+      if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
+        /* 30 sec after first fix */
+        GNSSTimeMarker = millis();
+      } else {
+        validfix = false;          // do not transmit yet
+      }
+    }
+  }
+
+  if (validfix) {   // still, after the additional adjustments above
 
     badgps = 0;
 
@@ -566,23 +588,6 @@ void normal()
       if (ThisAircraft.course < 0.0)   ThisAircraft.course += 360.0;
       ThisAircraft.speed = gnss.speed.knots();
       ThisAircraft.hdop = (uint16_t) gnss.hdop.value();
-
-      /* allow knowing when there was a good fix for 30 sec */
-      if (initial_time == 0) {
-        initial_time = millis();
-Serial.printf("First fix:\r\n\
-    lat/lon: %.5f %.5f\r\n\
-    date: %d %d %d\r\n\
-    time: %d %d %d\r\n",
-gnss.location.lat(), gnss.location.lng(),
-gnss.date.year(), gnss.date.month(), gnss.date.day(),
-gnss.time.hour(), gnss.time.minute(), gnss.time.second());
-      } else if (GNSSTimeMarker == 0) {
-        if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
-          /* 30 sec after first fix */
-          GNSSTimeMarker = millis();
-        }
-      }
 
       /* if no baro sensor, fill in ThisAircraft.vs based on GPS data */
       if (baro_chip == NULL) {
