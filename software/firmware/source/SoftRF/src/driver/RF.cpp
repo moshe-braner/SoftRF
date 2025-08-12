@@ -2386,13 +2386,15 @@ size_t RF_Encode(container_t *fop, bool wait)
 
     /* sanity checks: don't send bad data */
     const char *p = NULL;
-    if (ThisAircraft.altitude > 30000.0)
+    if (ThisAircraft.latitude == 0.0)
+        p = "position";
+    else if (ThisAircraft.altitude > 30000.0)
         p = "altitude";
-    if (ThisAircraft.speed > (250.0 / _GPS_MPS_PER_KNOT))
+    else if (ThisAircraft.speed > (250.0 / _GPS_MPS_PER_KNOT))
         p = "speed";
-    if (fabs(ThisAircraft.vs) > (20.0 * (_GPS_FEET_PER_METER * 60.0)))
+    else if (fabs(ThisAircraft.vs) > (20.0 * (_GPS_FEET_PER_METER * 60.0)))
         p = "vs";
-    if (fabs(ThisAircraft.turnrate) > 100.0)
+    else if (fabs(ThisAircraft.turnrate) > 100.0)
         p = "turnrate";
     if (p) {
         Serial.print("skipping sending bad ");
