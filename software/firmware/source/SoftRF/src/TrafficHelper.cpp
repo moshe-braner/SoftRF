@@ -470,13 +470,16 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
     /* save CPU cycles */
   }
 
-  if (fop->tx_type <= TX_TYPE_S)
-    return Alarm_Distance(this_aircraft, fop);    // non-directional target
+  if (fop->tx_type <= TX_TYPE_TISB) {
+      if (fop->tx_type == TX_TYPE_TISB)
+          return ALARM_LEVEL_NONE;         // TIS-B data not accurate enough for alarms
+      return Alarm_Distance(this_aircraft, fop);    // non-directional target
+  }
 
   if (fop->speed == 0)
     return Alarm_Distance(this_aircraft, fop);    // ADS-B target with no velocity message yet
 
-  if (fop->tx_type == TX_TYPE_TISB || fop->relayed)
+  if (fop->tx_type == TX_TYPE_ADSR || fop->relayed)
     return (Alarm_Vector(this_aircraft, fop));    // data not timely enough for this algo
 
   float v2 = fop->speed + this_aircraft->speed;
@@ -1255,7 +1258,8 @@ void air_relay(container_t *cip)
         // - prevent transmission of this aircraft's position during next Slot 0
         // - the hope is that another packet will then arrive from the landed_out aircraft
         Serial.println("try relay landed-out aircraft next slot 0");
-        if (settings->altprotocol != RF_PROTOCOL_NONE) {
+        /* if (settings->altprotocol != RF_PROTOCOL_NONE && settings->altprotocol != RF_PROTOCOL_ADSL) */
+        if (settings->altprotocol == RF_PROTOCOL_OGNTP) {
             alt_relay_waiting = true;
             // - prevent transmission of this aircraft's position during next altprotocol slot
             Serial.println("try relay landed-out aircraft next altprotocol slot");
