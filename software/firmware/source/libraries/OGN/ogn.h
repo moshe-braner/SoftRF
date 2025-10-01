@@ -20,6 +20,8 @@
 
 #include "format.h"
 
+#include "ads-l.h"
+
 /*
 class OGN_SlowPacket       // "slow packet" for transmitting position encoded in packet transmission times
 { public:
@@ -817,8 +819,14 @@ class OGN_TxPacket                                    // OGN packet with FEC cod
 
    // void calcFEC(void)                            { LDPC_Encode(&Packet.HeaderWord, FEC); }       // calculate the 48-bit parity check
    // void calcFEC(const uint32_t ParityGen[48][5]) { LDPC_Encode(&PacketHeaderWord,  FEC, ParityGen); }
+
+#ifndef __AVR__
    void    calcFEC(void)                   { LDPC_Encode(Packet.Word()); }       // calculate the 48-bit parity check
    uint8_t checkFEC(void)    const  { return LDPC_Check(Packet.Word()); }        // returns number of parity checks that fail (0 => no errors, all fine)
+#else
+   void    calcFEC(void)                   { LDPC_Encode(Packet.Byte()); }       // calculate the 48-bit parity check
+   uint8_t checkFEC(void)    const  { return LDPC_Check(Packet.Byte()); }        // returns number of parity checks that fail (0 => no errors, all fine)
+#endif
 
    uint8_t  *Byte(void) const { return (uint8_t  *)&Packet.HeaderWord; } // packet as bytes
    uint32_t *Word(void) const { return (uint32_t *)&Packet.HeaderWord; } // packet as words
@@ -899,8 +907,13 @@ class OGN_RxPacket                                        // OGN packet with FEC
 
    // void calcFEC(void)                            { LDPC_Encode(&Packet.HeaderWord, FEC); }       // calculate the 48-bit parity check
    // void calcFEC(const uint32_t ParityGen[48][5]) { LDPC_Encode(&PacketHeaderWord,  FEC, ParityGen); }
+#ifndef __AVR__
    void    calcFEC(void)                   { LDPC_Encode(Packet.Word()); }       // calculate the 48-bit parity check
    uint8_t checkFEC(void)    const  { return LDPC_Check(Packet.Word()); }        // returns number of parity checks that fail (0 => no errors, all fine)
+#else
+   void    calcFEC(void)                   { LDPC_Encode(Packet.Byte()); }       // calculate the 48-bit parity check
+   uint8_t checkFEC(void)    const  { return LDPC_Check(Packet.Byte()); }        // returns number of parity checks that fail (0 => no errors, all fine)
+#endif
 
    int BitErr(OGN_RxPacket &RefPacket) const // return number of different data bits between this Packet and RefPacket
    { return Count1s(Packet.HeaderWord^RefPacket.Packet.HeaderWord)
@@ -1461,6 +1474,22 @@ class GPS_Position
      { ClimbRate/=TimeDiff;
        TurnRate/=TimeDiff; }
      return TimeDiff; }
+
+   void Encode(ADSL_Packet &Packet) const
+   { Packet.setAlt((Altitude+GeoidSeparation+5)/10);
+     Packet.setLatOGN(Latitude);
+     Packet.setLonOGN(Longitude);
+     Packet.TimeStamp = (Sec*4+FracSec/25)%60;
+     Packet.setSpeed(((uint32_t)Speed*4+5)/10);
+     Packet.setClimb(((int32_t)ClimbRate*8+5)/10);
+     // if(hasClimb) Packet.setClimb(((int32_t)ClimbRate*8+5)/10);
+     //        else  Packet.clrClimb();
+     Packet.setTrack(((uint32_t)Heading*32+112)/225);
+     Packet.Integrity[0]=0; Packet.Integrity[1]=0;
+     if((FixQuality>0)&&(FixMode>=2))
+     { Packet.setHorAccur((HDOP*2+5)/10);
+       Packet.setVerAccur((VDOP*3+5)/10); }
+   }
 
    void Encode(OGN_Packet &Packet) const
    { Packet.Position.FixQuality = FixQuality<3 ? FixQuality:3;

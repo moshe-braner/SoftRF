@@ -16,12 +16,13 @@ enum
   RF_BAND_UK   = 7,  /* 869.52 MHz band. Deprecated - treated as EU */
   RF_BAND_IN   = 8,  /* 866.0 MHz band */
   RF_BAND_IL   = 9,  /* 916.2 MHz band */
-  RF_BAND_KR   = 10  /* 920.9 MHz band */
+  RF_BAND_KR   = 10, /* 920.9 MHz band */
+  RF_BAND_COUNT
 };
 
 class FreqPlan
 { public:
-   uint8_t  Protocol;    // 0=Legacy, 1=OGNTP, 2=P3I, 3=ADS-B (1090ES), 4=UAT, 5=FANET, 6=GDL90, 7=Latest
+   uint8_t  Protocol;    // 0=Legacy, 1=OGNTP, 2=P3I, 3=ADS-B (1090ES), 4=UAT, 5=FANET, 6=GDL90, 7=Latest, 8=ADS-L
    uint8_t  Plan;        // 1=Europe, 2=USA/Canada, 3=Australia/Chile, 4=New Zealand, ...
    uint8_t  Channels;    // number of channels
    uint32_t BaseFreq;    // [Hz] base channel (#0) frequency
@@ -51,6 +52,7 @@ class FreqPlan
         {
           case RF_BAND_US:
           case RF_BAND_AU:
+          case RF_BAND_NZ: /* ISM 915-928 MHz, https://www.rsm.govt.nz/assets/Uploads/documents/pibs/table-of-radio-spectrum-usage-in-new-zealand-pib-21.pdf */
           case RF_BAND_CN: /* ? */
             BaseFreq   = 920800000;
             Bandwidth  = RF_RX_BANDWIDTH_SS_250KHZ; // BW500
@@ -73,7 +75,6 @@ class FreqPlan
             break;
           case RF_BAND_EU:
           case RF_BAND_RU:
-          case RF_BAND_NZ: /* ? */
           default:
             BaseFreq   = 868200000;
             Bandwidth  = RF_RX_BANDWIDTH_SS_125KHZ; // BW250
@@ -83,7 +84,7 @@ class FreqPlan
         break;
       case RF_PROTOCOL_LEGACY:
       case RF_PROTOCOL_OGNTP:
-      //case RF_PROTOCOL_ADSL_860:
+      case RF_PROTOCOL_ADSL:
       default:
         switch (Plan)
         {
@@ -129,7 +130,7 @@ class FreqPlan
    { static const char *Name[11] = { "Default", "Europe/Africa",
        "USA/Canada", "Australia/South America", "New Zealand",
        "Russia", "China", "PilotAware (UK)", "India", "Israel", "South Korea" } ;
-     if(Plan>RF_BAND_KR) return 0;
+     if(Plan >= RF_BAND_COUNT) return 0;
      return Name[Plan]; }
 
    uint8_t getChannel  (uint32_t Time, uint8_t Slot=0, uint8_t OGN=1) const // OGN-tracker or FLARM, UTC time, slot: 0 or 1
