@@ -67,6 +67,7 @@ set_entry protocols[] = {
   {RF_PROTOCOL_OGNTP,     "OGNTP"},
   {RF_PROTOCOL_P3I,       "P3I"},
   {RF_PROTOCOL_FANET,     "FANET"},
+  {RF_PROTOCOL_ADSL,      "ADS-L"},
 //  {RF_PROTOCOL_ADSB_UAT,  "ADSB-UAT"},
 //  {RF_PROTOCOL_ADSB_1090, "ADSB-1090"},
   {-1, NULL}

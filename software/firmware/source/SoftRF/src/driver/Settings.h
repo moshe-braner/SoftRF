@@ -227,6 +227,7 @@ enum stgidx {
     STG_IGC_TYPE,
     STG_IGC_REG,
     STG_IGC_CS,
+    STG_GN_TO_GP,
     STG_GEOID,
     STG_LEAPSECS,
   //STG_JSON,
@@ -383,6 +384,7 @@ typedef struct Settings {
     uint8_t  gdl90;         // output destination
     uint8_t  d1090;
     //uint8_t  json;
+    int8_t   gn_to_gp;
     int8_t   geoid;
     int8_t   leapsecs;
     int8_t   freq_corr; /* +/-, kHz */   // <<< limited to +-30

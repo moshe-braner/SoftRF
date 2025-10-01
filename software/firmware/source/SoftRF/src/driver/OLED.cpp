@@ -182,8 +182,10 @@ static void OLED_settings()
         u8x8->drawString(8, 1, PROTOCOL_text);
 
     char c = Protocol_ID[ThisAircraft.protocol][0];
-    if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)
+    if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Latest
         c = 'T';
+    else if (ThisAircraft.protocol == RF_PROTOCOL_ADSB_1090)  // 'A' for ADS-L
+        c = 'S';
     u8x8->draw2x2Glyph(14, 2, c);
 
     u8x8->drawString( 0, 5, BND_text);

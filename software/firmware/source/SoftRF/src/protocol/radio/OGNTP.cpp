@@ -146,12 +146,7 @@ bool ogntp_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   fop->speed     = (ogn_rx_pkt.Packet.DecodeSpeed() * 0.1) / _GPS_MPS_PER_KNOT;
   fop->vs        = (ogn_rx_pkt.Packet.DecodeClimbRate() * 0.1) * (_GPS_FEET_PER_METER * 60.0);
   fop->hdop      = (ogn_rx_pkt.Packet.DecodeDOP() + 10) * 10;
-/*
-  fop->ns[0] = 0; fop->ns[1] = 0;
-  fop->ns[2] = 0; fop->ns[3] = 0;
-  fop->ew[0] = 0; fop->ew[1] = 0;
-  fop->ew[2] = 0; fop->ew[3] = 0;
-*/
+
   return true;
 }
 
@@ -177,7 +172,7 @@ size_t ogntp_encode(void *pkt, container_t *this_aircraft) {
       pos.StdAltitude = pos.Altitude;
   } else {
       pos.ClimbRate = this_aircraft->stealth ?
-           0 : (int32_t) (this_aircraft->vs / (_GPS_FEET_PER_METER * 6.0));
+           0 : (int32_t) (this_aircraft->vs * (1.0 / (_GPS_FEET_PER_METER * 6.0)));
       if (this_aircraft->pressure_altitude != 0.0)
           pos.StdAltitude = (int32_t) (this_aircraft->pressure_altitude * 10);
       else
@@ -194,15 +189,17 @@ size_t ogntp_encode(void *pkt, container_t *this_aircraft) {
 
   ogn_tx_pkt.Packet.Header.Address  = this_aircraft->addr;
 
-  uint8_t addr_type = settings->id_method;
-  if (this_aircraft != &ThisAircraft)    // relaying another aircraft
-      addr_type = this_aircraft->addr_type;
-  if (addr_type == ADDR_TYPE_ICAO)
-      ogn_tx_pkt.Packet.Header.AddrType = ADDR_TYPE_ICAO;
-  else if (settings->rf_protocol == RF_PROTOCOL_OGNTP)
-      ogn_tx_pkt.Packet.Header.AddrType = ADDR_TYPE_OGN;  
-  else   // altprotocol
-      ogn_tx_pkt.Packet.Header.AddrType = ADDR_TYPE_FLARM;  
+  if (this_aircraft != &ThisAircraft) {   // relaying another aircraft
+      ogn_tx_pkt.Packet.Header.AddrType = this_aircraft->addr_type;
+  } else {
+      uint8_t addr_type = settings->id_method;
+      if (addr_type == ADDR_TYPE_OVERRIDE)
+          addr_type = ADDR_TYPE_FLARM;
+      if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
+          ogn_tx_pkt.Packet.Header.AddrType = ADDR_TYPE_OGN;  
+      else   // OGNTP is altprotocol, or ICAO (or random) ID
+          ogn_tx_pkt.Packet.Header.AddrType = addr_type;  
+  }
 
 #if defined(USE_OGN_ENCRYPTION)
   if (key[0] || key[1] || key[2] || key[3])

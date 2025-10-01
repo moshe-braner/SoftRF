@@ -71,7 +71,8 @@ const char *Protocol_ID[] = {
   [RF_PROTOCOL_ADSB_UAT]  = "UAT",
   [RF_PROTOCOL_FANET]     = "FAN",
   [RF_PROTOCOL_GDL90]     = "GDL",
-  [RF_PROTOCOL_LATEST]    = "LAT"
+  [RF_PROTOCOL_LATEST]    = "LAT",
+  [RF_PROTOCOL_ADSL]      = "ADL"
 };
 
 size_t (*protocol_encode)(void *, container_t *);
@@ -573,6 +574,46 @@ static void sx12xx_channel(uint8_t channel)
   }
 }
 
+static uint8_t sx12xx_txpower()
+{
+  uint8_t power = 2;   /* 2 dBm is minimum for RFM95W on PA_BOOST pin */
+
+  if (settings->txpower == RF_TX_POWER_FULL) {
+
+    /* Load regional max. EIRP at first */
+    power = RF_FreqPlan.MaxTxPower;
+
+    if (rf_chip->type == RF_IC_SX1262) {
+      /* SX1262 is unable to give more than 22 dBm */
+      //if (LMIC.txpow > 22)
+      //  LMIC.txpow = 22;
+      // The sx1262 has internal protection against antenna mismatch.
+      // But keep is a bit lower ayway
+      if (power > 19)
+          power = 19;
+    } else {
+      /* SX1276 is unable to give more than 20 dBm */
+      //if (LMIC.txpow > 20)
+      //  LMIC.txpow = 20;
+    // Most T-Beams have an sx1276, it can give 20 dBm but only safe with a good antenna.
+    // And yet the T-Echo instructions warn against using without an antenna.
+    // Note that the regional legal limit RF_FreqPlan.MaxTxPower also applies,
+    //   it is only 14 dBm in EU, but 30 in Americas, India & Australia.
+    //if (hw_info.model != SOFTRF_MODEL_PRIME_MK2) {
+        /*
+         * Enforce Tx power limit until confirmation
+         * that RFM95W is doing well
+         * when antenna is not connected
+         */
+        if (power > 17)
+            power = 17;
+    //}
+    }
+  }
+
+  return power;
+}
+
 static void sx12xx_setup()
 {
   SoC->SPI_begin();
@@ -585,6 +626,11 @@ static void sx12xx_setup()
 
   switch (current_RF_protocol)
   {
+  case RF_PROTOCOL_ADSL:
+    LMIC.protocol = &adsl_proto_desc;
+    protocol_encode = &adsl_encode;
+    protocol_decode = &adsl_decode;
+    break;
   case RF_PROTOCOL_OGNTP:
     LMIC.protocol = &ogntp_proto_desc;
     protocol_encode = &ogntp_encode;
@@ -621,46 +667,44 @@ static void sx12xx_setup()
   sx12xx_channel_prev = RF_CHANNEL_NONE;
        // force channel setting on next call - even if channel has not changed
 
-  switch(settings->txpower)
+  LMIC.txpow = sx12xx_txpower();
+}
+
+static void sx12xx_resetup()
+{
+  // initialize runtime env
+  os_init (nullptr);
+
+  // Reset the MAC state. Session and pending data transfers will be discarded.
+  LMIC_reset();
+
+  switch (current_RF_protocol)
   {
-  case RF_TX_POWER_FULL:
-
-    /* Load regional max. EIRP at first */
-    LMIC.txpow = RF_FreqPlan.MaxTxPower;
-
-    if (rf_chip->type == RF_IC_SX1262) {
-      /* SX1262 is unable to give more than 22 dBm */
-      //if (LMIC.txpow > 22)
-      //  LMIC.txpow = 22;
-      // The sx1262 has internal protection against antenna mismatch.
-      // But keep is a bit lower ayway
-      if (LMIC.txpow > 19)
-        LMIC.txpow = 19;
-    } else {
-      /* SX1276 is unable to give more than 20 dBm */
-      //if (LMIC.txpow > 20)
-      //  LMIC.txpow = 20;
-    // Most T-Beams have an sx1276, it can give 20 dBm but only safe with a good antenna.
-    // And yet the T-Echo instructions warn against using without an antenna.
-    // Note that the regional legal limit RF_FreqPlan.MaxTxPower also applies,
-    //   it is only 14 dBm in EU, but 30 in Americas, India & Australia.
-    //if (hw_info.model != SOFTRF_MODEL_PRIME_MK2) {
-        /*
-         * Enforce Tx power limit until confirmation
-         * that RFM95W is doing well
-         * when antenna is not connected
-         */
-        if (LMIC.txpow > 17)
-            LMIC.txpow = 17;
-    //}
-    }
+  case RF_PROTOCOL_ADSL:
+    LMIC.protocol = &adsl_proto_desc;
     break;
-  case RF_TX_POWER_OFF:
-  case RF_TX_POWER_LOW:
+  case RF_PROTOCOL_OGNTP:
+    LMIC.protocol = &ogntp_proto_desc;
+    break;
+/*
+  case RF_PROTOCOL_P3I:
+    LMIC.protocol = &p3i_proto_desc;
+    break;
+  case RF_PROTOCOL_FANET:
+    LMIC.protocol = &fanet_proto_desc;
+    break;
+*/
+//  case RF_PROTOCOL_LATEST:     // same packet size, modulation, etc as LEGACY
+//  case RF_PROTOCOL_LEGACY:
   default:
-    LMIC.txpow = 2; /* 2 dBm is minimum for RFM95W on PA_BOOST pin */
+    LMIC.protocol = &legacy_proto_desc;
     break;
   }
+
+  sx12xx_channel_prev = RF_CHANNEL_NONE;
+       // force channel setting on next call - even if channel has not changed
+
+  LMIC.txpow = sx12xx_txpower();
 }
 
 static void sx12xx_setvars()
@@ -837,6 +881,7 @@ static void sx12xx_rx_func (osjob_t* job) {
     break;
   case RF_PROTOCOL_P3I:
   case RF_PROTOCOL_OGNTP:
+  case RF_PROTOCOL_ADSL:
   default:
     break;
   }
@@ -849,6 +894,7 @@ static void sx12xx_rx_func (osjob_t* job) {
     switch (LMIC.protocol->crc_type)
     {
     case RF_CHECKSUM_TYPE_GALLAGER:
+    case RF_CHECKSUM_TYPE_CRC_MODES:
     case RF_CHECKSUM_TYPE_NONE:
       break;
     case RF_CHECKSUM_TYPE_CRC8_107:
@@ -889,6 +935,13 @@ static void sx12xx_rx_func (osjob_t* job) {
         LMIC.frame[i], LMIC.frame[i+1], LMIC.frame[i+2],
         LMIC.frame[i+3], LMIC.frame[i+4], LMIC.frame[i+5]);
 #endif
+      sx12xx_receive_complete = false;
+    } else {
+      sx12xx_receive_complete = true;
+    }
+    break;
+  case RF_CHECKSUM_TYPE_CRC_MODES:
+    if (ADSL_Packet::checkPI((uint8_t  *) &LMIC.frame[0], LMIC.dataLen)) {
       sx12xx_receive_complete = false;
     } else {
       sx12xx_receive_complete = true;
@@ -990,6 +1043,7 @@ static void sx12xx_tx(unsigned char *buf, size_t size, osjobcb_t func) {
 
     break;
   case RF_PROTOCOL_OGNTP:
+  case RF_PROTOCOL_ADSL:
   default:
     break;
   }
@@ -1011,6 +1065,7 @@ static void sx12xx_tx(unsigned char *buf, size_t size, osjobcb_t func) {
     switch (LMIC.protocol->crc_type)
     {
     case RF_CHECKSUM_TYPE_GALLAGER:
+    case RF_CHECKSUM_TYPE_CRC_MODES:
     case RF_CHECKSUM_TYPE_NONE:
       break;
     case RF_CHECKSUM_TYPE_CRC8_107:
@@ -1029,6 +1084,7 @@ static void sx12xx_tx(unsigned char *buf, size_t size, osjobcb_t func) {
   switch (LMIC.protocol->crc_type)
   {
   case RF_CHECKSUM_TYPE_GALLAGER:
+  case RF_CHECKSUM_TYPE_CRC_MODES:
   case RF_CHECKSUM_TYPE_NONE:
     break;
   case RF_CHECKSUM_TYPE_CRC8_107:
@@ -1298,6 +1354,7 @@ void cc13xx_Receive_callback(EasyLink_RxPacket *rxPacket_ptr, EasyLink_Status st
       break;
     case RF_PROTOCOL_P3I:
     case RF_PROTOCOL_OGNTP:
+    case RF_PROTOCOL_ADSL:
     default:
       break;
     }
@@ -1325,9 +1382,10 @@ void cc13xx_Receive_callback(EasyLink_RxPacket *rxPacket_ptr, EasyLink_Status st
         success = true;
       }
       break;
-    case RF_PROTOCOL_OGNTP:
-    case RF_PROTOCOL_LEGACY:
     case RF_PROTOCOL_LATEST:
+    case RF_PROTOCOL_LEGACY:
+    case RF_PROTOCOL_OGNTP:
+    case RF_PROTOCOL_ADSL:
       offset = cc13xx_protocol->syncword_size - 4;
       size =  cc13xx_protocol->payload_offset +
               cc13xx_protocol->payload_size +
@@ -1352,6 +1410,7 @@ void cc13xx_Receive_callback(EasyLink_RxPacket *rxPacket_ptr, EasyLink_Status st
               switch (cc13xx_protocol->crc_type)
               {
               case RF_CHECKSUM_TYPE_GALLAGER:
+              case RF_CHECKSUM_TYPE_CRC_MODES:
               case RF_CHECKSUM_TYPE_NONE:
                 break;
               case RF_CHECKSUM_TYPE_CCITT_FFFF:
@@ -1489,6 +1548,13 @@ static void cc13xx_setup()
   switch (settings->rf_protocol)
   {
 #if !defined(EXCLUDE_OGLEP3)
+  case RF_PROTOCOL_ADSL:
+    cc13xx_protocol = &adsl_proto_desc;
+    protocol_encode = &adsl_encode;
+    protocol_decode = &adsl_decode;
+
+    myLink.begin(EasyLink_Phy_100kbps2gfsk_ogntp);         // <<< needs work
+    break;
   case RF_PROTOCOL_OGNTP:
     cc13xx_protocol = &ogntp_proto_desc;
     protocol_encode = &ogntp_encode;
@@ -1630,6 +1696,7 @@ static void cc13xx_transmit()
 
     break;
   case RF_PROTOCOL_OGNTP:
+  case RF_PROTOCOL_ADSL:
   default:
     break;
   }
@@ -1966,7 +2033,6 @@ static void ognrf_shutdown()
 // The wrapper code common to all the RF chips:
 
 // these protocols share the frequency plan and time slots
-// - ADS-L can be added here?
 bool in_family(uint8_t protocol)
 {
     if (protocol == RF_PROTOCOL_LATEST)
@@ -1975,7 +2041,18 @@ bool in_family(uint8_t protocol)
         return true;
     if (protocol == RF_PROTOCOL_OGNTP)
         return true;
+    if (protocol == RF_PROTOCOL_ADSL)
+        return true;
     return false;
+}
+
+uint8_t useOGNfreq(uint8_t protocol)
+{
+    if (protocol == RF_PROTOCOL_OGNTP)
+        return 1;
+    if (protocol == RF_PROTOCOL_ADSL)
+        return 1;
+    return 0;
 }
 
 byte RF_setup(void)
@@ -2064,6 +2141,7 @@ byte RF_setup(void)
     switch (current_RF_protocol)
     {
       case RF_PROTOCOL_OGNTP:     p = &ogntp_proto_desc;  break;
+      case RF_PROTOCOL_ADSL:      p = &adsl_proto_desc;   break;
       case RF_PROTOCOL_P3I:       p = &p3i_proto_desc;    break;
       case RF_PROTOCOL_FANET:     p = &fanet_proto_desc;  break;
 #if !defined(EXCLUDE_UAT978)
@@ -2091,6 +2169,8 @@ byte RF_setup(void)
 
     if (settings->altprotocol == RF_PROTOCOL_OGNTP)
         altprotocol_encode = ogntp_encode;
+    else if (settings->altprotocol == RF_PROTOCOL_ADSL)
+        altprotocol_encode = adsl_encode;
     else if (settings->altprotocol != RF_PROTOCOL_NONE)
         altprotocol_encode = legacy_encode;
     else
@@ -2189,8 +2269,7 @@ void RF_SetChannel(void)
     break;
   }
 
-  uint8_t OGN = (settings->rf_protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
-
+  uint8_t OGN = useOGNfreq(settings->rf_protocol);
   uint8_t chan = RF_FreqPlan.getChannel(Time, Slot, OGN);
 
 #if DEBUG
@@ -2220,14 +2299,12 @@ void RF_loop()
     }
   }
 
-  /* Experimental code by Moshe Braner, specific to Legacy Protocol */
+  /* Experimental code by Moshe Braner, specific to Legacy Protocol (and related protocols) */
   /* More correct on frequency hopping & time slots, and uses less CPU time */
   /* - requires OurTime to be set to UTC time in seconds - can do in Time_loop() */
   /* - also needs time since PPS, it is stored in ref_time_ms */
 
-  if (settings->rf_protocol != RF_PROTOCOL_LEGACY
-   && settings->rf_protocol != RF_PROTOCOL_LATEST
-   && settings->rf_protocol != RF_PROTOCOL_OGNTP) {
+  if (! in_family(settings->rf_protocol)) {
     RF_SetChannel();    /* use original code */
     return;
   }
@@ -2344,7 +2421,7 @@ void RF_loop()
   }
 
   // do this in the main protocol, for reception
-  uint8_t OGN = (settings->rf_protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
+  uint8_t OGN = useOGNfreq(settings->rf_protocol);
   RF_current_chan = RF_FreqPlan.getChannel((time_t)RF_time, RF_current_slot, OGN);
   if (rf_chip)
       rf_chip->channel(RF_current_chan);
@@ -2377,12 +2454,14 @@ bool RF_Transmit_Happened()
 
 size_t RF_Encode(container_t *fop, bool wait)
 {
-  size_t size = 0;
-  if (RF_ready && protocol_encode) {
+  if (settings->txpower == RF_TX_POWER_OFF)
+      return 0;
 
-    if (settings->txpower == RF_TX_POWER_OFF ) {
-        return 0;
-    }
+  if (! RF_ready)
+      return 0;
+
+  size_t size = 0;
+  if (protocol_encode) {
 
     /* sanity checks: don't send bad data */
     const char *p = NULL;
@@ -2403,9 +2482,7 @@ size_t RF_Encode(container_t *fop, bool wait)
     }
 
     // encode in the current tx protocol (may differ from rx protocol)
-    if (current_RF_protocol == RF_PROTOCOL_LEGACY ||
-        current_RF_protocol == RF_PROTOCOL_LATEST ||
-        current_RF_protocol == RF_PROTOCOL_OGNTP) {
+    if (in_family(current_RF_protocol)) {
       if (RF_Transmit_Ready() || (!wait && !RF_Transmit_Happened())) {
           if (current_RF_protocol != settings->rf_protocol)
               size = (*altprotocol_encode)((void *) &TxBuffer[0], fop);
@@ -2424,8 +2501,8 @@ size_t RF_Encode(container_t *fop, bool wait)
 void RF_chip_reset()
 {
 #if !defined(EXCLUDE_SX12XX)
-    sx12xx_setup();
-    uint8_t OGN = (current_RF_protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
+    sx12xx_resetup();
+    uint8_t OGN = useOGNfreq(current_RF_protocol);
     RF_current_chan = RF_FreqPlan.getChannel((time_t)RF_time, RF_current_slot, OGN);
     sx12xx_channel(RF_current_chan);
 //Serial.printf("reset to Prot %d at millis %d, tx ok %d - %d, gd to %d\r\n",
@@ -2443,9 +2520,7 @@ bool RF_Transmit(size_t size, bool wait)   // only called with no-wait for air-r
     RF_tx_size = size;
 
     /* Experimental code by Moshe Braner, specific to Legacy Protocol */
-    if (settings->rf_protocol == RF_PROTOCOL_LATEST
-     || settings->rf_protocol == RF_PROTOCOL_LEGACY
-     || settings->rf_protocol == RF_PROTOCOL_OGNTP) {
+    if (in_family(settings->rf_protocol)) {
       if (RF_Transmit_Ready() || (!wait && !RF_Transmit_Happened())) {
 
         if (current_RF_protocol != settings->rf_protocol) {
@@ -2556,9 +2631,10 @@ uint8_t RF_Payload_Size(uint8_t protocol)
 {
   switch (protocol)
   {
-    case RF_PROTOCOL_LEGACY:    return legacy_proto_desc.payload_size;
     case RF_PROTOCOL_LATEST:    return legacy_proto_desc.payload_size;
+    case RF_PROTOCOL_LEGACY:    return legacy_proto_desc.payload_size;
     case RF_PROTOCOL_OGNTP:     return ogntp_proto_desc.payload_size;
+    case RF_PROTOCOL_ADSL:      return adsl_proto_desc.payload_size;
     case RF_PROTOCOL_P3I:       return p3i_proto_desc.payload_size;
     case RF_PROTOCOL_FANET:     return fanet_proto_desc.payload_size;
 #if !defined(EXCLUDE_UAT978)

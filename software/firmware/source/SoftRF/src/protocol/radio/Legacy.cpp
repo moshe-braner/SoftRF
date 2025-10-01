@@ -806,10 +806,17 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
            && aircraft->airborne==0 && aircraft->aircraft_type==AIRCRAFT_TYPE_UNKNOWN);
     //      aircraft->landed_out;
 
-    if (relay)
+    if (relay) {
         pkt->addr_type = aircraft->addr_type | 4;  // marks as a relayed packet
-    else
-        pkt->addr_type = (settings->id_method==ADDR_TYPE_OVERRIDE? ADDR_TYPE_FLARM : settings->id_method);
+    } else {
+        uint8_t addr_type = settings->id_method;
+        if (addr_type == ADDR_TYPE_OVERRIDE)
+            addr_type = ADDR_TYPE_FLARM;
+        if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
+            pkt->addr_type = ADDR_TYPE_OGN;  // since main protocol is OGNTP & using device ID
+        else
+            pkt->addr_type = addr_type;      // ICAO or FLARM (or random)
+    }
 
 #if 1
     // relay in old protocol unless relaying landed-out traffic

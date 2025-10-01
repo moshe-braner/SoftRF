@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 25, 2025 to fit software version MB163
+This version last updated Oct 1, 2025 to fit software version MB166
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -30,19 +30,19 @@ Some people call this an "OGN tracker", although that label should be reserved f
 
 What can SoftRF do that FLARM cannot?
 
-On appropriate hardware, SoftRF can send traffic (and position) data out via WiFi or Bluetooth, which older FLARM models cannot do without additional hardware.  (The new "Fusion" versions of FLARM do have wireless connectivity.)  SoftRF can also operate using radio communications protocols other than the one used by FLARM, such as OGNTP, P3I or FANET.  But for the vast majority of glider pilots the FLARM protocol is the important one, as it simultaneously offers both bidirectional air-to-air traffic awareness for collision avoidance and the option to be tracked by OGN ground stations.  SoftRF can run all day on a small internal battery.
+On appropriate hardware, SoftRF can send traffic (and position) data out via WiFi or Bluetooth, which older FLARM models cannot do without additional hardware.  (The new "Fusion" versions of FLARM do have wireless connectivity.)  SoftRF can also operate using radio communications protocols other than the one used by FLARM, such as OGNTP, ADS-L, P3I or FANET.  But for the vast majority of glider pilots the FLARM protocol is the important one, as it simultaneously offers both bidirectional air-to-air traffic awareness for collision avoidance and the option to be tracked by OGN ground stations.  SoftRF can run all day on a small internal battery.
 
 What can FLARM do that SoftRF cannot?
 
-The more advanced PowerFLARM units can listen to FLARM signals via two antennas for more complete coverage.  Additionally, PowerFLARM can also receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers FLARM users awareness of some non-FLARM traffic, although the same is not true in reverse.  (The latest versions of SoftRF also have the option to add an ADS-B receiving module.)  SoftRF is a DIY project requiring construction (other than perhaps the T-Echo), while FLARM is available off the shelf from an established company.  But that comes at a significant monetary price.
+The more advanced PowerFLARM units can listen to FLARM signals via two antennas for more complete coverage.  SoftRF is a DIY project requiring construction (other than perhaps the T-Echo), while FLARM is available off the shelf from an established company.  But that comes at a significant monetary price.
 
 What can my version of SoftRF do that the mainline version cannot?
 
-My version can now receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.
+My version can now receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP or ADS-L) once every 16 seconds.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
 
 What can the mainline version of SoftRF do that my version cannot?
 
-The main branch of SoftRF offers compiled binaries for a wide variety of hardware platforms.  My version has only been compiled for the ESP32-based T-Beam and the NRF52-based T-Echo hardware so far.  It can in theory be compiled for other hardware, but that is not a quick and easy thing to do.  I have concentrated on the "T-Beam" hardware because I believe it is the best choice at this time: is includes all the components one might want, integrated into a single board, including a holder for a 18650 size lithium cell, charger circuit, GNSS module, an ISM-band (900 MHz) radio, and a WiFi- and Bluetooth-capable CPU plus nonvolatile flash memory and additional volatile PSRAM.  The T-Beam is also suitable for connecting other hardware to it, such as an SD card adapter, a pizeo buzzer, audio amplifier for voice warnings, a strobe, an alternative GNSS module, or an ADS-B receiver module.
+The main branch of SoftRF offers compiled binaries for a wide variety of hardware platforms.  So far my version has only been compiled for the ESP32-based T-Beam and the NRF52-based T-Echo hardware.  It can in theory be compiled for other hardware, but that is not a quick and easy thing to do.  I have concentrated on the "T-Beam" hardware because I believe it is the best choice at this time: is includes all the components one might want, integrated into a single board, including a holder for a 18650 size lithium cell, charger circuit, GNSS module, an ISM-band (900 MHz) radio, and a WiFi- and Bluetooth-capable CPU plus nonvolatile flash memory and additional volatile PSRAM.  The T-Beam is also suitable for connecting other hardware to it, such as an SD card adapter, a pizeo buzzer, audio amplifier for voice warnings, a strobe, an alternative GNSS module, or an ADS-B receiver module.  Note: only the plain "T-Beam" is supported, not the "T-Beam Supreme".
 
 
 HISTORY
@@ -96,7 +96,7 @@ https://drive.google.com/drive/folders/1hdEJ-nRVz4D_sYihwv1Re2S-p8_nsYaM?usp=sha
 which is a bit larger and has a gopro mount on the back of the enclosure. It connects with these or anything similar: https://www.amazon.com/GoPro-Grab-Bag-Official-Mount/dp/B01GCKO9IK
 I have adopted a slightly deeper (to the rear) case, my modified version here:
   https://github.com/moshe-braner/SoftRF/blob/master/case/T-Beam_case.zip
-that allows adding small items behind the board, e.g., a 12V to 5V converter, or a TTL to RS232 converter (or both!).  Or this design which is even deeper, to allow adding an ADS-B receiver module:
+that allows adding small items behind the board, e.g., a 12V to 5V converter, or a TTL to RS232 converter (or both!).  Or this design which is even deeper, to facilitate mounting an ADS-B receiver module internally:
   https://github.com/moshe-braner/SoftRF/blob/master/case/T-Beam%20%2B%20ADS-B%20case.zip
 You don't have to have your own 3d printer.  You can order a case via a service that allows you to upload the files, and have people with 3d printers make and ship them to you.  The black ABS material works better than PLA.  Cut out the middleman and go directly here: https://aero3ds.com/3d-printing - very reasonable prices especially if you buy several cases at once.
 
@@ -217,7 +217,7 @@ Aircraft ID: 6 hex digits.  If your aircraft is registered, you can enter its IC
 
 ID type to use: You can choose ICAO (the ID entered above), Device (the fixed device ID), or Anonymous.  The latter is random but is fixed for the flight.  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic transmitted ID will be shown in those viewers.
 
-Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices in either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.
+Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices set to either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.  The P3I and FANET protocols are also available choices, commonly used by light planes in the UK, and by paragliders, respectively.  New in version MB166: can also choose the ADS-L protocol.  Note that you can also choose to transmit in an alternate protocol once every 16 seconds, see the "under the hood" document.
 
 Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.
 
@@ -280,7 +280,7 @@ And so forth.  Note that after each "click" or "touch", it will take about 2 sec
 * press the reset button to reboot without changing the settings.
 The settings accessible via this method are:
 * AIRCRAFT TYPE:Glider, Towplane Helicopter, Powered, Hangglider, Paraglider, Dropplane, Parachute, Balloon, UAV, Static.
-* RF PROTOCOL: LATEST, LEGACY, OGNTP, P3I, FANET.
+* RF PROTOCOL: LATEST, LEGACY, OGNTP, P3I, FANET, ADS-L.
 * RF BAND (REGION): EU, US, UK, AU, NZ, RU, CN, IN, IL, KR.  (UK only for P3I.)
 * Collision prediction algorithm: Latest, Vector, Distance, None.
 * Relay mode: None, Landed.
@@ -306,6 +306,7 @@ protocol
 2	P3I      /* PilotAware */
 5	FANET    /* Skytraxx */
 7	Latest   /* new 2024 V7 protocol */
+8	ADS-L
 
 band
 1	EU     /* 868.2 MHz band */
@@ -519,7 +520,9 @@ https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentati
 Photos of one actual installation:
 https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation/GNS5892_T_Beam_1_.jpg
 https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation/GNS5892_T_Beam_2_.jpg
-The antenna can be a vertical wire, about 65 mm long.  Or can install a short coaxial cable from the module to an added jack on the case (e.g., SMA, see the photos) to which one can then connect a short whip antenna, either tuned to 1090 MHz or even one that is designed for a different frequency in the 800-1200 MHz range.  The ADS-B signals are transmitted by transponders at high power, about 1000 times stronger than FLARM signals, thus are easy to receive at the intended range. (Anything more than 15 nautical miles away - or more than 2000 meters higher - is ignored by the software.)  When installed, the GNS5892 takes up the auxilliary serial port, making it unavailable for any other use.  The auxilliary serial port will appear as "disabled" in its baud-rate setting, but will actually be active at 921600 baud - keep those wires short.
+The antenna can be a vertical wire, about 65 mm long.  Or can install a short coaxial cable from the module to an added jack on the case (e.g., SMA, see the photos) to which one can then connect a short whip antenna, either tuned to 1090 MHz or even one that is designed for a different frequency in the 800-1200 MHz range.  The ADS-B signals are transmitted by transponders at high power, about 1000 times stronger than FLARM signals, thus are easy to receive at the intended range even with a poor antenna. (Anything more than 15 nautical miles away - or more than 2000 meters higher - is ignored by the software.)  When installed, the GNS5892 takes up the auxilliary serial port, making it unavailable for any other use.  The auxilliary serial port will appear as "disabled" in its baud-rate setting, but will actually be active at 921600 baud - keep those wires short.
+
+Note: ADS-B traffic data output is for situational awareness.  Collision alarms are not generated for TIS-B traffic (due to imprecise location), and the vector (rather than the "latest") algorithm is used to predict collisions with ADS-R traffic (due to time delays).
 
 
 Connecting to XCvario

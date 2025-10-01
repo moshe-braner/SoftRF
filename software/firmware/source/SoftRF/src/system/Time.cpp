@@ -218,9 +218,10 @@ void Time_loop()
         return;
     last_loop = now_ms;
 
-    if (settings->rf_protocol != RF_PROTOCOL_LEGACY
-     && settings->rf_protocol != RF_PROTOCOL_LATEST
-     && settings->rf_protocol != RF_PROTOCOL_OGNTP)
+    if (settings->rf_protocol != RF_PROTOCOL_LATEST
+     && settings->rf_protocol != RF_PROTOCOL_LEGACY
+     && settings->rf_protocol != RF_PROTOCOL_OGNTP
+     && settings->rf_protocol != RF_PROTOCOL_ADSL)
         return;       /* time still handled in RF.cpp RF_SetChannel() */
 
     uint32_t gnss_age;

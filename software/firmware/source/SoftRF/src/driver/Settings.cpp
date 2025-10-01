@@ -182,6 +182,7 @@ static void init_stgdesc()
   stgdesc[STG_IGC_TYPE]   = { "igc_type",    settings->igc_type,          sizeof(settings->igc_type) };
   stgdesc[STG_IGC_REG]    = { "igc_reg",     settings->igc_reg,           sizeof(settings->igc_reg) };
   stgdesc[STG_IGC_CS]     = { "igc_cs",      settings->igc_cs,            sizeof(settings->igc_cs) };
+  stgdesc[STG_GN_TO_GP]   = { "gn_to_gp",   (char*)&settings->gn_to_gp,   STG_HIDDEN };
   stgdesc[STG_GEOID]      = { "geoid",      (char*)&settings->geoid,      STG_HIDDEN };
   stgdesc[STG_LEAPSECS]   = { "leapsecs",   (char*)&settings->leapsecs,   STG_HIDDEN };
   stgdesc[STG_EPD_UNITS]  = { "units",      (char*)&settings->units,      epd_only(STG_UINT1) };
@@ -211,8 +212,8 @@ static void init_stgdesc()
   //const char *bauds = "0=default(38) 2=9600 3=19200 4=38400 ...";
 
   stgcomment[STG_MODE]       = "0=Normal ...";
-  stgcomment[STG_PROTOCOL]   = "7=Latest 1=OGNTP 5=FANET 2=P3I";
-  stgcomment[STG_ALTPROTOCOL]= "255=none 1=OGNTP";
+  stgcomment[STG_PROTOCOL]   = "7=Latest 1=OGNTP 2=P3I 5=FANET";
+  stgcomment[STG_ALTPROTOCOL]= "255=none 1=OGNTP 8=ADSL";
   stgcomment[STG_BAND]       = "1=EU 2=US ...";
   stgcomment[STG_ACFT_TYPE]  = "1=GL 2=TOWPL 6=HG 7=PG 0=landed out";
   stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device";
@@ -289,6 +290,7 @@ static void copy_eeprom_settings()
     settings->txpower = 2 - settingb->txpower;  // coding used to be 0=full 2=off
     settings->volume = settingb->volume;
     settings->acft_type = settingb->acft_type;
+    settings->gn_to_gp = 0;
     settings->geoid = 0;
     settings->nmea_g = settingb->nmea_g;
     settings->nmea_p = settingb->nmea_p;
@@ -376,6 +378,11 @@ void Adjust_Settings()
         ) {
       settings->mode = SOFTRF_MODE_NORMAL;
     }
+
+    if (settings->rf_protocol > RF_PROTOCOL_ADSL)
+        settings->rf_protocol = RF_PROTOCOL_LATEST;
+    if (settings->altprotocol > RF_PROTOCOL_ADSL)
+        settings->altprotocol = RF_PROTOCOL_NONE;
 
     if (settings->bluetooth == BLUETOOTH_SPP)
         settings->bluetooth = BLUETOOTH_LE_HM10_SERIAL;
@@ -829,6 +836,7 @@ void Settings_defaults(bool keepsome)
     settings->loginterval = 4;
     settings->rx1090    = ADSB_RX_NONE;
     settings->mode_s    = 0;
+    settings->gn_to_gp  = 0;
     settings->geoid     = 0;
 
     settings->myssid[0] = '\0';

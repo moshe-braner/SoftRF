@@ -685,6 +685,7 @@ void handleSettings() {
 <option %s value='%d'>%s</option>\
 <option %s value='%d'>%s</option>\
 <option %s value='%d'>%s</option>\
+<option %s value='%d'>%s</option>\
 </select>\
 </td>\
 </tr>"),
@@ -697,7 +698,9 @@ void handleSettings() {
     (settings->rf_protocol == RF_PROTOCOL_P3I ? "selected" : ""),
      RF_PROTOCOL_P3I, p3i_proto_desc.name,
     (settings->rf_protocol == RF_PROTOCOL_FANET ? "selected" : ""),
-     RF_PROTOCOL_FANET, fanet_proto_desc.name
+     RF_PROTOCOL_FANET, fanet_proto_desc.name,
+    (settings->rf_protocol == RF_PROTOCOL_ADSL ? "selected" : ""),
+     RF_PROTOCOL_ADSL, adsl_proto_desc.name
     );
   } else {
     snprintf_P ( offset, size,

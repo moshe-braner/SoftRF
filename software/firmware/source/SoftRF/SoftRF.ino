@@ -531,18 +531,19 @@ void normal()
   if (validfix) {   // still, after the adjustments above
     if (initial_time == 0) {
       initial_time = millis();
-Serial.printf("First fix:\r\n\
+Serial.println("Tentative GNSS fix");
+      validfix = false;            // wait for next fix
+    } else if (GNSSTimeMarker == 0) {
+      if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
+        /* 30 sec after first fix */
+        GNSSTimeMarker = millis();
+Serial.printf("Stable GNSS fix:\r\n\
     lat/lon: %.5f %.5f\r\n\
     date: %d %d %d\r\n\
     time: %d %d %d\r\n",
 gnss.location.lat(), gnss.location.lng(),
 gnss.date.year(), gnss.date.month(), gnss.date.day(),
 gnss.time.hour(), gnss.time.minute(), gnss.time.second());
-      validfix = false;            // wait for next fix
-    } else if (GNSSTimeMarker == 0) {
-      if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
-        /* 30 sec after first fix */
-        GNSSTimeMarker = millis();
       } else {
         validfix = false;          // do not transmit yet
       }
