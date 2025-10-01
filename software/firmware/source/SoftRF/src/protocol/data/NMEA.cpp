@@ -182,7 +182,8 @@ const char *NMEA_CallSign_Prefix[] = {
   [RF_PROTOCOL_ADSB_UAT]  = "UAT",
   [RF_PROTOCOL_FANET]     = "FAN",
   [RF_PROTOCOL_GDL90]     = "GDL",   // data from external device
-  [RF_PROTOCOL_LATEST]    = "FLR"
+  [RF_PROTOCOL_LATEST]    = "FLR",
+  [RF_PROTOCOL_ADSL]      = "ADL"
 };
 
 const uint8_t data_source_code[] = {
