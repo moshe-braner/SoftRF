@@ -44,9 +44,17 @@ bool Adafruit_BMP280::setWire(TwoWire *twoWire) {
 bool Adafruit_BMP280::begin(uint8_t a, uint8_t chipid) {
   _i2caddr = a;
 
-  if (_cs == -1) {
-    // i2c
+  if (_cs == -1) {    // i2c
+
+    if (_i2c == NULL) return false;
     _i2c->begin();
+
+// lyusupov added similar code into the Adafruit libraries on May 11, 2023:
+#if defined(ESP32) && defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR>=4
+    _i2c->beginTransmission((uint8_t)_i2caddr);
+    if (_i2c->endTransmission() != 0) return false;
+#endif /* ESP32 && ESP_IDF_VERSION_MAJOR>=4 */
+
   } else {
     digitalWrite(_cs, HIGH);
     pinMode(_cs, OUTPUT);

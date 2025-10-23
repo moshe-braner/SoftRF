@@ -23,9 +23,9 @@
 #include "Battery.h"
 #include "../protocol/data/NMEA.h"
 
-// including BMP180 & MPL3115A2 still hangs at probe() even with ESP32 Core 2.0.3
+// including MPL3115A2 still hangs at probe() even with ESP32 Core 2.0.3
 // #define EXCLUDE_BMP280
-#define EXCLUDE_BMP180
+// #define EXCLUDE_BMP180
 #define EXCLUDE_MPL3115A2
 
 barochip_ops_t *baro_chip = NULL;

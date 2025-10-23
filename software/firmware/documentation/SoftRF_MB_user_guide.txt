@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Oct 1, 2025 to fit software version MB166
+This version last updated Oct 21, 2025 to fit software version MB167
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -292,7 +292,7 @@ Other settings are not adjustable this way.  Edit the settings.txt file SoftRF c
 
 About the settings file
 
-This fork of SoftRF now (from version MB151) stores the settings in a text file within the flash memory of the device, instead of an "EEPROM" binary block.  The first time the new version boots, it reads the existing settings from the "EEPROM" and copies them to the file.  After that, it will get the settings from the file, and ignore the EEPROM, unless the file is invalid or missing.  If the file is invalid it will be automatically deleted. (Check the serial output for which line was invalid.)  It is best to click the "download" button and save a copy of the file in your phone or computer, then you can restore it (or an edited version of it) by clicking "upload".
+This fork of SoftRF (since version MB151) stores the settings in a text file within the flash memory of the device, instead of an "EEPROM" binary block.  The first time the new version boots, it reads the existing settings from the "EEPROM" if any - otherwise the defaults are used.  Check the settings (in the web interface) and click "save".  After that, it will get the settings from the file, and ignore the EEPROM, unless the file is invalid or missing.  If the file is invalid it will be automatically deleted. (Check the serial output for which line was invalid.)  It is best to click the "download" button and save a copy of the file in your phone or computer, then you can restore it (or an edited version of it) by clicking "upload".
 
 The settings file must be named "settings.txt" for upload.  Uploading does not change the settings currently in effect, until SoftRF is rebooted.  So, for example, in the web interface you can click "backup" (which copies settings.txt into settingb.txt), then upload an alternative settings.txt file, then click "swap".  It will reboot with the same settings as before - but another "swap" will reboot with the alternative settings.
 
@@ -433,7 +433,7 @@ But, these pins operate at TTL voltage levels (0v and about +3V).  Many external
 
 Once connected, be sure to set the baud rate on the external device to match what SoftRF is using (38400 baud by default), or vice versa (my version of SoftRF allows you to choose the baud rate).  Note that when the T-Beam starts up, it send some data at 115,200 baud, and then switches to the chosen baud rate.  Devices that detect the baud rate automatically (e.g., the Sotecc canopy flasher) may get confused by that, so set the device to use a specific baud rate without auto-detection.
 
-If desired, a barometric sensor of the BMP280 type can be connected to the T-Beam via an I2C connection.  Use pins 21 (SDA) and 22 (SCL).  Or  can connect the barometric sensor to pins 13 (SDA) and 2 (SCL).  (But be sure to connect pin 2 in a way that is easy to disconnect - see the section "Installing firmware for the first time".)  Can use the same pins as the OLED display, they can share them.  (The AXP PMU too is using pins 21,22.)  Data from the barometric sensor will be sent out as NMEA sentences if the "sensors" NMEA output is turned on in the setttings.
+If desired, a barometric sensor of the BMP280 (or BMP180) type can be connected to the T-Beam via an I2C connection.  Use pins 21 (SDA) and 22 (SCL).  Or can connect the barometric sensor to pins 13 (SDA) and 2 (SCL).  (But be sure to connect pin 2 in a way that is easy to disconnect - see the section "Installing firmware for the first time".)  Can use the same pins as the OLED display, they can share them.  (The AXP PMU too is using pins 21,22.)  Data from the barometric sensor will be sent out as NMEA sentences if the "sensors" NMEA output is turned on in the setttings.
 
 
 Connecting an SD card adapter

@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Oct 1, 2025 to fit software version MB166
+This version last updated Oct 21, 2025 to fit software version MB167
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -363,7 +363,7 @@ If compiled so as to enable the encryption in OGNTP, the key is divided into 4 s
 
 Support "Badge Edition" (T-Echo, nRF52840)
 
-Incorporated mainline v1.2 EPD code.  Baro sensor probing hangs up the booting, even the BMP280, so removed all baro sensor access from the nRF52 version for now.  Created a new display screen that shows most of the settings.  Moved protocol & aircraft ID here from the status screen.  Replaced in the status screen with number of GNSS satellites and current collision alarm level.  Compiled two binaries, one with EU region as default and the other with US region.  All settings can be changed in either version.  Settings not changeable via the SoftRF Tool app can be changed via a USB connection and the "SoftRF settings tool 2.html" file.  The "SoftRF settings tool 1.html" offers the choice of "Latest" alarm method, which is also now the default.  New file: Conf_EPD.cpp.
+Incorporated mainline v1.2 EPD code.  Created a new display screen that shows some of the settings.  Moved protocol & aircraft ID here from the status screen.  Replaced in the status screen with number of GNSS satellites and current collision alarm level.  Settings not changeable via the SoftRF Tool app can be changed via a USB connection and the "SoftRF settings tool 2.html" file.  The "SoftRF settings tool 1.html" offers the choice of "Latest" alarm method, which is also now the default.  Or better: change settings by editing the settings.txt file.  New file: Conf_EPD.cpp.
 
 T-Echo settings via e-paper screen
 
@@ -461,13 +461,11 @@ KNOWN ISSUES
 
 Packets-transmitted count on OLED sometimes increments by dozens or hundreds at once - reason unknown.
 
-Packets-received occasionally increments on the T-Echo while there is not traffic within range.  The code reports "RF loopback", meaning an exact replica of the last transmitted packet appears as if it was received.  Probably a bug in programming the sx1262 registers.  This is apparently harmless.  (The sx1276 bug which caused some received packets to be actually retransmitted has been fixed.)
+Packets-received occasionally increments on the T-Echo while there is no traffic within range.  The code reports "RF loopback", meaning an exact replica of the last transmitted packet appears as if it was received.  Probably a bug in programming the sx1262 registers.  This is apparently harmless.  (The sx1276 bug which caused some received packets to be actually retransmitted has been fixed.)
 
 Reception of FLARM signals can be further improved by shifting our clock (for frequency hopping) by about 50 ms.  Not clear why.
 
-Baro sensor support and turn-off issues (both related to I2C library?) seem mostly resolved by switching from ESP32 Core library 2.0.2 to 2.0.3.  But inclusion of code for detection of baro sensors other than BMP280 still causes booting to fail.  For now only the BMP280 is probed for.
-
-Should switch (from the version used in SoftRF v1.0) to a later version of the basicmac library.  Or the new RadioLib.
+Should switch (from the version used in SoftRF v1.0) to a later version of the basicmac library?  Use the new RadioLib?
 
 
 COMPILING SOFTRF

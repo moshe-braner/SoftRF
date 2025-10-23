@@ -32,7 +32,14 @@ boolean Adafruit_BMP085::begin(uint8_t mode) {
 
   _i2c->begin();
 
+// lyusupov added into the Adafruit libraries on May 11, 2023:
+#if defined(ESP32) && defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR>=4
+  _i2c->beginTransmission(BMP085_I2CADDR);
+  if (_i2c->endTransmission() != 0) return false;
+#endif /* ESP32 && ESP_IDF_VERSION_MAJOR>=4 */
+
   if (read8(0xD0) != 0x55) return false;
+  Serial.println("BMP180 chip ID OK");
 
   /* read calibration data */
   ac1 = read16(BMP085_CAL_AC1);
@@ -62,6 +69,8 @@ boolean Adafruit_BMP085::begin(uint8_t mode) {
   Serial.print("mb = "); Serial.println(mb, DEC);
   Serial.print("mc = "); Serial.println(mc, DEC);
   Serial.print("md = "); Serial.println(md, DEC);
+#else
+  Serial.println("BMP180.begin() done");
 #endif
 
   return true;
@@ -247,16 +256,18 @@ uint8_t Adafruit_BMP085::read8(uint8_t a) {
 #else
   _i2c->send(a); // sends register address to read from
 #endif
-  _i2c->endTransmission(); // end transmission
-  
-  _i2c->beginTransmission(BMP085_I2CADDR); // start transmission to device 
+  //_i2c->endTransmission(); // end transmission
+  if (_i2c->endTransmission() != 0) return 0;
+
+
+  //_i2c->beginTransmission(BMP085_I2CADDR); // start transmission to device 
   _i2c->requestFrom(BMP085_I2CADDR, 1);// send data n-bytes read
 #if (ARDUINO >= 100)
   ret = _i2c->read(); // receive DATA
 #else
   ret = _i2c->receive(); // receive DATA
 #endif
-  _i2c->endTransmission(); // end transmission
+  //_i2c->endTransmission(); // end transmission
 
   return ret;
 }
@@ -270,9 +281,10 @@ uint16_t Adafruit_BMP085::read16(uint8_t a) {
 #else
   _i2c->send(a); // sends register address to read from
 #endif
-  _i2c->endTransmission(); // end transmission
+  //_i2c->endTransmission(); // end transmission
+  if (_i2c->endTransmission() != 0) return 0;
   
-  _i2c->beginTransmission(BMP085_I2CADDR); // start transmission to device 
+  //_i2c->beginTransmission(BMP085_I2CADDR); // start transmission to device 
   _i2c->requestFrom(BMP085_I2CADDR, 2);// send data n-bytes read
 #if (ARDUINO >= 100)
   ret = _i2c->read(); // receive DATA
@@ -283,7 +295,7 @@ uint16_t Adafruit_BMP085::read16(uint8_t a) {
   ret <<= 8;
   ret |= _i2c->receive(); // receive DATA
 #endif
-  _i2c->endTransmission(); // end transmission
+  //_i2c->endTransmission(); // end transmission
 
   return ret;
 }
