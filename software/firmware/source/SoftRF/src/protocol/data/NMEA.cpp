@@ -1728,13 +1728,14 @@ void NMEA_GGA()
 
   info.hdop = gnss.hdop.hdop();
 
-  info.elevation = gnss.altitude.meters(); /* above MSL */
-  info.height = gnss.separation.meters();
+  info.height = ThisAircraft.geoid_separation;   // may be from setting or EGM
+  info.elevation = ThisAircraft.altitude;        // above ellipsoid
+  info.elevation -= info.height;                 // above MSL
 
-  if (info.height == 0.0 && info.sig != (NmeaSignal) Invalid) {
-    info.height = EGM96GeoidSeparation();
-    info.elevation -= info.height;
-  }
+  //if (info.height == 0.0 && info.sig != (NmeaSignal) Invalid) {
+  //  info.height = EGM96GeoidSeparation();
+  //  info.elevation -= info.height;
+  //}
 
   nmeaInfoSetPresent(&info.present, NMEALIB_PRESENT_UTCTIME);
   nmeaInfoSetPresent(&info.present, NMEALIB_PRESENT_LAT);

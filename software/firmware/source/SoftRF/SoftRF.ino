@@ -492,7 +492,6 @@ void normal()
             Serial.print(F("GNSS reported geoid separation: "));
             Serial.println(gnss.separation.meters());
         }
-        (void) leap_seconds_valid();    // computes leap_seconds_correction
         SetupTimeMarker = millis();
         prev_lat = gnss.location.lat();
         prev_lon = gnss.location.lng();
@@ -544,6 +543,7 @@ Serial.printf("Stable GNSS fix:\r\n\
 gnss.location.lat(), gnss.location.lng(),
 gnss.date.year(), gnss.date.month(), gnss.date.day(),
 gnss.time.hour(), gnss.time.minute(), gnss.time.second());
+        (void) leap_seconds_valid();    // computes leap_seconds_correction
       } else {
         validfix = false;          // do not transmit yet
       }
@@ -578,9 +578,23 @@ gnss.time.hour(), gnss.time.minute(), gnss.time.second());
       ThisAircraft.gnsstime_ms = ref_time_ms;          /* last PPS, real or assumed */
       ThisAircraft.latitude = gnss.location.lat();
       ThisAircraft.longitude = gnss.location.lng();
+      ThisAircraft.altitude = gnss.altitude.meters();
       ThisAircraft.geoid_separation = gnss.separation.meters();
-      ThisAircraft.altitude = gnss.altitude.meters() + ThisAircraft.geoid_separation;
+// excluding the EGM96 lookup means the altitude reported to external devices in GGA sentences
+// will be ellipsoid rather than MSL - but only in the rare cases of "fake" GPS units
+// and this has no effect on the internal SoftRF calculations nor what it transmits.
+      /*
+       * When geoidal separation is zero or not available - use approx. EGM96 value
+       */
+      if (ThisAircraft.geoid_separation == 0.0) {
+        ThisAircraft.geoid_separation = EGM96GeoidSeparation();
+        /* we can assume the GPS unit is giving ellipsoid height */
+        /* we now store ellipsoid altitude - so leave it alone */
+        //ThisAircraft.altitude -= ThisAircraft.geoid_separation;
+      } else {
+        ThisAircraft.altitude += ThisAircraft.geoid_separation;
              // - converts MSL altitude in GGA to altitude above ellipsoid
+      }
       if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_WINCH) {
         /* for "winch" aircraft type, elevate above ground */
         ThisAircraft.altitude += (float) (((ThisAircraft.timestamp & 0x03) * 100) + 100);
@@ -616,20 +630,6 @@ gnss.time.hour(), gnss.time.minute(), gnss.time.second());
         }
       }
 #endif
-
-// excluding the EGM96 lookup means the altitude reported to external devices in GGA sentences
-// will be ellipsoid rather than MSL - but only in the rare cases of "fake" GPS units
-// and this has no effect on the internal SoftRF calculations nor what it transmits.
-
-      /*
-       * When geoidal separation is zero or not available - use approx. EGM96 value
-       */
-      if (ThisAircraft.geoid_separation == 0.0) {
-        ThisAircraft.geoid_separation = EGM96GeoidSeparation();
-        /* we can assume the GPS unit is giving ellipsoid height */
-        /* we now store ellipsoid altitude - so leave it alone */
-        //ThisAircraft.altitude -= ThisAircraft.geoid_separation;
-      }
 
       Estimate_Wind();      // estimate wind from present and past GNSS data
 
