@@ -363,7 +363,6 @@ static void SetTxContinuousWave (void) {
 // set radio in receive mode (abort after timeout [1/64ms], or with timeout=0 after frame received, or continuous with timeout=FFFFFF)
 static void SetRx (uint32_t timeout64ms) {
     uint8_t timeout[3] = { timeout64ms >> 16, timeout64ms >> 8, timeout64ms };
-
     WriteReg(REG_RXGAIN, 0x96); // max LNA gain, increase current by ~2mA for around ~3dB in sensitivity
     writecmd(CMD_SETRX, timeout, 3);
 }
@@ -506,9 +505,15 @@ static void SetPacketParamsLora (u2_t rps, int len, int inv) {
 static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     uint8_t param[9];
 
-    uint16_t PreambleLength = LMIC.protocol->preamble_size * 8;
+    // copied idea from radio-sx127x.c:
+    /* add extra preamble symbol at Tx to ease reception on partner's side */
+    uint16_t PreambleLength = LMIC.protocol->preamble_size;
+    if (PreambleLength <= 2)  ++PreambleLength;
+
+    PreambleLength <<= 3;
     param[0] = (PreambleLength >> 8 ) & 0xFF;
     param[1] = (PreambleLength      ) & 0xFF;
+
     uint8_t PreambleDetectorLength;
     switch (LMIC.protocol->preamble_size)
     {
