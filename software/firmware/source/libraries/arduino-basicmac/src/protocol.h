@@ -120,6 +120,7 @@ typedef struct RF_PROTOCOL {
     uint8_t    preamble_size;
     uint8_t    syncword[RF_MAX_SYNC_WORD_SIZE];
     uint8_t    syncword_size;
+    uint8_t    syncword_skip;   // ignore these many leading bytes when receiving
     uint32_t   net_id;
     uint8_t    payload_type;
     uint8_t    payload_size;

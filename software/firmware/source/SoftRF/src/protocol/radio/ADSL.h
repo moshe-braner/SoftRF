@@ -25,10 +25,9 @@
 #define ADSL_PREAMBLE_SIZE   1
 
 /* IEEE  Manchester(F5724B18) = 55 99 95 A6 9A 65 A9 6A */
-//#define ADSL_SYNCWORD        {0x55, 0x99, 0x95, 0xA6, 0x9A, 0x65, 0xA9, 0x6A}
-//#define ADSL_SYNCWORD_SIZE   8
-#define ADSL_SYNCWORD        {0x99, 0x95, 0xA6, 0x9A, 0x65, 0xA9, 0x6A}
-#define ADSL_SYNCWORD_SIZE   7
+#define ADSL_SYNCWORD        {0x55, 0x99, 0x95, 0xA6, 0x9A, 0x65, 0xA9, 0x6A}
+#define ADSL_SYNCWORD_SIZE   8
+#define ADSL_SYNCWORD_SKIP   2     // ignore this many bytes when receiving
 #define ADSL_PAYLOAD_SIZE    21
 #define ADSL_CRC_TYPE        RF_CHECKSUM_TYPE_CRC_MODES
 #define ADSL_CRC_SIZE        3

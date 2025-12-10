@@ -505,7 +505,7 @@ static void SetPacketParamsLora (u2_t rps, int len, int inv) {
 static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     uint8_t param[9];
 
-    // copied idea from radio-sx127x.c:
+    // >>> copied idea from radio-sx127x.c:
     /* add extra preamble symbol at Tx to ease reception on partner's side */
     uint16_t PreambleLength = LMIC.protocol->preamble_size;
     if (PreambleLength <= 2)  ++PreambleLength;
@@ -515,13 +515,14 @@ static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     param[1] = (PreambleLength      ) & 0xFF;
 
     uint8_t PreambleDetectorLength;
+#if 0
     switch (LMIC.protocol->preamble_size)
     {
     case 0:
       PreambleDetectorLength = 0x00;
       break;
     case 1:
-      PreambleDetectorLength = 0x04;
+      PreambleDetectorLength = 0x04;   // 8 bits
       break;
     case 2:
       PreambleDetectorLength = 0x05;
@@ -533,13 +534,19 @@ static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     default:
       PreambleDetectorLength = 0x07;
       break;
-    }    
+    }
+#else    
+    PreambleDetectorLength = 0x00;
+#endif
     param[2] = PreambleDetectorLength; // RX preamble detector length
 
     uint8_t SyncWordLength = LMIC.protocol->syncword_size << 3;
     if (quirks == RX_QUIRKS) {
-      /* Work around premature P3I syncword detection */
-      if (LMIC.protocol->syncword_size == 2) {
+      if (LMIC.protocol->syncword_skip != 0) {
+          // when receiving, ignore this many sync bytes
+          SyncWordLength -= (LMIC.protocol->syncword_skip << 3);
+      } else if (LMIC.protocol->syncword_size == 2) {
+          /* Work around premature P3I syncword detection */
           SyncWordLength += SyncWordLength;
       }
     }
@@ -651,12 +658,19 @@ static void SetSyncWordFsk (uint8_t quirks) {
 //    uint8_t buf[3] = { syncword >> 16, syncword >> 8, syncword & 0xFF };
 //    WriteRegs(REG_SYNCWORD0, buf, 3);
     if (quirks == RX_QUIRKS) {
-      /* Work around premature P3I syncword detection */
       if (LMIC.protocol->syncword_size == 2) {
+        /* Work around premature P3I syncword detection */
         uint8_t preamble = LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_AA ? 0xAA : 0x55;
         WriteReg (REG_SYNCWORD0, preamble);
         WriteReg (REG_SYNCWORD1, preamble);
         WriteRegs(REG_SYNCWORD2, LMIC.protocol->syncword, LMIC.protocol->syncword_size);
+        return;
+      }
+      uint8_t syncskip = LMIC.protocol->syncword_skip;
+      if (syncskip != 0) {
+        // when receiving, ignore this many sync bytes
+        uint8_t *syncword = LMIC.protocol->syncword;
+        WriteRegs(REG_SYNCWORD0, syncword + syncskip, LMIC.protocol->syncword_size - syncskip);
         return;
       }
     }

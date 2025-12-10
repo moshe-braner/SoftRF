@@ -34,6 +34,7 @@ const rf_proto_desc_t p3i_proto_desc = {
   .preamble_size    = P3I_PREAMBLE_SIZE,
   .syncword         = P3I_SYNCWORD,
   .syncword_size    = P3I_SYNCWORD_SIZE,
+  .syncword_skip    = 0,
   .net_id           = P3I_NET_ID,
   .payload_type     = RF_PAYLOAD_DIRECT,
   .payload_size     = P3I_PAYLOAD_SIZE,

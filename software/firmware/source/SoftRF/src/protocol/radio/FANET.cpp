@@ -43,6 +43,7 @@ const rf_proto_desc_t fanet_proto_desc = {
   .syncword         = { 0xF1 },  // FANET+
 #endif
   .syncword_size    = 1,
+  .syncword_skip    = 0,
   .net_id           = 0x0000, /* not in use */
   .payload_type     = RF_PAYLOAD_DIRECT,
   .payload_size     = FANET_PAYLOAD_SIZE,

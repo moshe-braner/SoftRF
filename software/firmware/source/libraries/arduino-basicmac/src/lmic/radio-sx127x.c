@@ -680,7 +680,7 @@ static void txfsk (void) {
     writeReg(FSKRegPacketConfig2, 0x40);
 
     // set syncword
-    int i=0;
+    int i;
     for (i=0; i < LMIC.protocol->syncword_size; i++) {
       writeReg((FSKRegSyncValue1 + i), LMIC.protocol->syncword[i]);
     }
@@ -976,8 +976,17 @@ static void rxfsk (bool rxcontinuous) {
       break;
     }
 
+    int syncsize = LMIC.protocol->syncword_size;
+    int syncskip = LMIC.protocol->syncword_skip;
+    uint8_t *syncword = LMIC.protocol->syncword;
+    if (syncskip != 0) {
+        // when receiving, ignore this many sync bytes
+        syncword = &syncword[syncskip];
+        syncsize -= syncskip;
+    }
+
     // set sync config
-    uint8_t SyncConfig = (LMIC.protocol->syncword_size - 1);
+    uint8_t SyncConfig = (syncsize - 1);
     switch (LMIC.protocol->preamble_type)
     {
     case RF_PREAMBLE_TYPE_AA:
@@ -990,9 +999,9 @@ static void rxfsk (bool rxcontinuous) {
     }
 
     // set sync value
-    int i=0;
-    for (i=0; i < LMIC.protocol->syncword_size; i++) {
-      writeReg((FSKRegSyncValue1 + i), LMIC.protocol->syncword[i]);
+    int i;
+    for (i=0; i < syncsize; i++) {
+      writeReg((FSKRegSyncValue1 + i), syncword[i]);
     }
 
     // set packet config

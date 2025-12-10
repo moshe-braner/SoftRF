@@ -42,6 +42,7 @@ const rf_proto_desc_t adsl_proto_desc = {
   .preamble_size   = ADSL_PREAMBLE_SIZE,
   .syncword        = ADSL_SYNCWORD,
   .syncword_size   = ADSL_SYNCWORD_SIZE,
+  .syncword_skip   = ADSL_SYNCWORD_SKIP,
   .net_id          = 0x0000, /* not in use */
   .payload_type    = RF_PAYLOAD_INVERTED,
   .payload_size    = ADSL_PAYLOAD_SIZE,

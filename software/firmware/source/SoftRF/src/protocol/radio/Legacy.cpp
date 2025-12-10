@@ -42,6 +42,7 @@ const rf_proto_desc_t legacy_proto_desc = {
   .preamble_size   = LEGACY_PREAMBLE_SIZE,
   .syncword        = LEGACY_SYNCWORD,
   .syncword_size   = LEGACY_SYNCWORD_SIZE,
+  .syncword_skip   = LEGACY_SYNCWORD_SKIP,     // ignore this many bytes when receiving
   .net_id          = 0x0000, /* not in use */
   .payload_type    = RF_PAYLOAD_INVERTED,
   .payload_size    = LEGACY_PAYLOAD_SIZE,
