@@ -528,6 +528,7 @@ void normal()
 
   /* allow knowing when there was a good fix for 30 sec */
   if (validfix) {   // still, after the adjustments above
+    badgps = 0;
     if (initial_time == 0) {
       initial_time = millis();
 Serial.println("Tentative GNSS fix");
@@ -548,11 +549,12 @@ gnss.time.hour(), gnss.time.minute(), gnss.time.second());
         validfix = false;          // do not transmit yet
       }
     }
+  } else { /* !validfix */
+      if (GNSSTimeMarker == 0)
+        initial_time = 0;       // want to see 30 consecutive seconds with valid fix
   }
 
   if (validfix) {   // still, after the additional adjustments above
-
-    badgps = 0;
 
     if (gnss_new_fix) {           // set in GNSS.cpp
 
@@ -663,16 +665,17 @@ if (rx_success) which_rx_try = 1;
 
     }
 
-  } else {      /* not validfix */
-
-    if (badgps==0) badgps = millis();
-    if (millis() > badgps + 30000) {
-      /* 30 seconds without GPS fix - wipe history */
-      badgps = 0;
-      initial_time = 0;
-      GNSSTimeMarker = 0;
-      ThisAircraft.prevtime_ms = 0;
-      this_airborne(false);     // after 60 calls (30 min) forced to "land"
+  } else /* !validfix */ {
+    if (GNSSTimeMarker != 0) {   // not validfix now but had it before
+      if (badgps==0) badgps = millis();
+      if (millis() > badgps + 30000) {
+        /* 30 consecutive seconds without GPS fix - wipe history */
+        badgps = 0;
+        initial_time = 0;
+        GNSSTimeMarker = 0;
+        ThisAircraft.prevtime_ms = 0;
+        this_airborne(false);     // after 60 calls (30 min) forced to "land"
+      }
     }
   }
 

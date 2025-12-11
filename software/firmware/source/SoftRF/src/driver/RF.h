@@ -121,6 +121,7 @@ bool    RF_Transmit(size_t size, bool wait=true);
 bool    RF_Receive(void);
 void    RF_Shutdown(void);
 uint8_t RF_Payload_Size(uint8_t);
+bool    in_family(uint8_t protocol);
 
 extern byte TxBuffer[MAX_PKT_SIZE], RxBuffer[MAX_PKT_SIZE];
 extern uint32_t TxTimeMarker;

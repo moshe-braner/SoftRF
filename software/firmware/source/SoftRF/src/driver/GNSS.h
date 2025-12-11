@@ -71,7 +71,7 @@ void PickGNSSFix     (void);
 void LookupSeparation (float, float);
 float EGM96GeoidSeparation();
 #endif
-bool leap_seconds_valid(void);
+uint8_t leap_seconds_valid(void);
 
 extern const gnss_chip_ops_t *gnss_chip;  // added
 extern TinyGPSPlus gnss;

@@ -1424,8 +1424,8 @@ void handleRoot() {
     (landed_out_mode? "Stop" : "Activate"),
     ((hw_info.model == SOFTRF_MODEL_PRIME_MK2) ?
  "<input type=button onClick=\"location.href='/gps_reset'\" value='Reset GNSS'>" : ""),
-    (isValidGNSSFix() ? (leap_seconds_valid()? "green" : "black") : "red"),
-    (isValidGNSSFix() ? (leap_seconds_valid()? "valid fix" : "leap seconds assumed") : "no valid fix"),
+    (isValidGNSSFix() ? (leap_seconds_valid()==1? "green" : "black") : "red"),
+    (isValidGNSSFix() ? (leap_seconds_valid()==2? "leap seconds assumed" : "valid fix") : "no valid fix"),
     hour, minute, sats, str_lat, str_lon,
     (isValidGNSSFix() ?
           (ThisAircraft.geoid_separation==0 ? "(above ellipsoid - MSL n.a.)"

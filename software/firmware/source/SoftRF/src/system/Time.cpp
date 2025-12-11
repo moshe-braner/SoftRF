@@ -181,7 +181,7 @@ void Time_setup()
 #endif /* EXCLUDE_NTP */
 
 
-/* Experimental code by Moshe Braner, specific to Legacy Protocol */
+/* Experimental code by Moshe Braner, specific to Legacy and related protocols */
 void Time_loop()
 {
     uint32_t now_ms = millis();
@@ -218,10 +218,11 @@ void Time_loop()
         return;
     last_loop = now_ms;
 
-    if (settings->rf_protocol != RF_PROTOCOL_LATEST
-     && settings->rf_protocol != RF_PROTOCOL_LEGACY
-     && settings->rf_protocol != RF_PROTOCOL_OGNTP
-     && settings->rf_protocol != RF_PROTOCOL_ADSL)
+    //if (settings->rf_protocol != RF_PROTOCOL_LATEST
+    // && settings->rf_protocol != RF_PROTOCOL_LEGACY
+    // && settings->rf_protocol != RF_PROTOCOL_OGNTP
+    // && settings->rf_protocol != RF_PROTOCOL_ADSL)
+    if (in_family(settings->rf_protocol) == false)
         return;       /* time still handled in RF.cpp RF_SetChannel() */
 
     uint32_t gnss_age;

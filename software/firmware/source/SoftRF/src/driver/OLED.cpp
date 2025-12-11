@@ -323,7 +323,7 @@ static void OLED_radio()
 
   uint32_t acrfts_counter = Traffic_Count();
   uint32_t sats_counter   = gnss.satellites.value();
-  char fix = (isValidGNSSFix()? (leap_seconds_valid()? '+' : '!') : '-');
+  char fix = (isValidGNSSFix()? (leap_seconds_valid()==2? '!' : '+') : '-');
 
   if (prev_acrfts_counter != acrfts_counter) {
     disp_value = acrfts_counter > 99 ? 99 : acrfts_counter;

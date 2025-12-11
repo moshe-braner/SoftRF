@@ -1436,16 +1436,18 @@ static bool badGGA = true;
 
 int8_t leap_seconds_correction = 0;
 
-static uint8_t leap_valid = 2;  // means not known whether valid
-
-bool leap_seconds_valid()
-{
+// 0 means known invalid (no longer happens)
+// 1 means known valid
+// 2 means using assumed leap_seconds_correction
+// 3 means not known whether valid
+static uint8_t leap_valid = 3;
     // could start = 0 but risk 13 minutes of no-transmit if no response
-    // - usually gets set to 0 in first check below (if no leap seconds)
-    //    - before even the first fix, so no bad transmissions happen
+    // - with leap_seconds_correction no bad transmissions happen
 
+uint8_t leap_seconds_valid()
+{
     if (leap_valid == 1)
-        return true;
+        return 1;
 
     // this is only called if GNSS_fix_cache == true
     switch (hw_info.gnss) {
@@ -1464,12 +1466,13 @@ bool leap_seconds_valid()
                     Serial.print("UBX leap seconds = ");
                     Serial.println(leap_seconds_from_gnss);
                     if ((GNSSbuf[11] & 0x04) == 0) {
-                        leap_valid = 0;    // known invalid
                         Serial.println(F("UBX says leap seconds unknown, is using default"));
                         // U6 defaults to 15, 2025 correct value is 18:
                         leap_seconds_correction = settings->leapsecs - leap_seconds_from_gnss;
                         Serial.print(F("SoftRF using leap_seconds_correction = "));
                         Serial.println(leap_seconds_correction);
+                        //leap_valid = 0;    // invalid
+                        leap_valid = 2;    // using leap_seconds_correction
                     } else {
                         leap_valid = 1;    // known valid, no need to ask again
                         Serial.println("UBX says leap seconds known valid");
@@ -1487,7 +1490,7 @@ bool leap_seconds_valid()
                 next_check = millis() + 43000;
                 ++checks_count;
                 if (checks_count >= 18) {
-                    leap_valid = 2;     // in case it never works
+                    leap_valid = 3;     // in case it never works
                     max_checks = 36;    // keep trying for up to 13 more minutes
                 }
             }
@@ -1495,10 +1498,10 @@ bool leap_seconds_valid()
 #endif
         case GNSS_MODULE_AT65:
         default:
-            return true;    // on other models assume valid
+            return 3;    // on other models not known whether valid
             break;
     }
-    return (leap_valid != 0);   // if not known invalid, assume valid
+    return (leap_valid);
 }
 
 bool isValidGNSSFix()
