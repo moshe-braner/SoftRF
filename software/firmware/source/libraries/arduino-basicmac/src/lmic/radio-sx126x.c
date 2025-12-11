@@ -505,39 +505,43 @@ static void SetPacketParamsLora (u2_t rps, int len, int inv) {
 static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     uint8_t param[9];
 
-    // >>> copied idea from radio-sx127x.c:
-    /* add extra preamble symbol at Tx to ease reception on partner's side */
     uint16_t PreambleLength = LMIC.protocol->preamble_size;
+#if 0
+    // copied idea from radio-sx127x.c:
+    /* add extra preamble symbol at Tx to ease reception on partner's side */
     if (PreambleLength <= 2)  ++PreambleLength;
+    // - instead set it explicitly to 2 bytes in the protocol definition
+#endif
 
-    PreambleLength <<= 3;
+    PreambleLength <<= 3;      // convert bytes to bits
+    // to end with 0x55 use an odd number of bits
+    if (LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_55)
+        ++PreambleLength;
+
     param[0] = (PreambleLength >> 8 ) & 0xFF;
     param[1] = (PreambleLength      ) & 0xFF;
 
     uint8_t PreambleDetectorLength;
-#if 0
     switch (LMIC.protocol->preamble_size)
     {
     case 0:
-      PreambleDetectorLength = 0x00;
-      break;
     case 1:
-      PreambleDetectorLength = 0x04;   // 8 bits
+      PreambleDetectorLength = 0x00;   // disable
       break;
     case 2:
-      PreambleDetectorLength = 0x05;
+      // Legacy, OGNTP
+      PreambleDetectorLength = 0x04;   // 8 bits
       break;
     case 3:
-      PreambleDetectorLength = 0x06;
+      PreambleDetectorLength = 0x05;
       break;
     case 4:
+      PreambleDetectorLength = 0x06;
+      break;
     default:
       PreambleDetectorLength = 0x07;
       break;
     }
-#else    
-    PreambleDetectorLength = 0x00;
-#endif
     param[2] = PreambleDetectorLength; // RX preamble detector length
 
     uint8_t SyncWordLength = LMIC.protocol->syncword_size << 3;

@@ -25,7 +25,7 @@
 /*  to support devices that include this extension in their SYNC definition, thus:
 /*  IEEE Manchester(F531FAB6) = 55 99 A5 A9 55 66 65 96 */
 #define LEGACY_PREAMBLE_TYPE   RF_PREAMBLE_TYPE_55
-#define LEGACY_PREAMBLE_SIZE   1
+#define LEGACY_PREAMBLE_SIZE   2     // no longer adding an extra byte inside the BASICMAC library
 #define LEGACY_SYNCWORD        {0x55, 0x99, 0xA5, 0xA9, 0x55, 0x66, 0x65, 0x96}
 #define LEGACY_SYNCWORD_SIZE   8
 #define LEGACY_SYNCWORD_SKIP   2     // ignore this many leading SYNC bytes when receiving

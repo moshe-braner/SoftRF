@@ -21,8 +21,9 @@
 #ifndef PROTOCOL_OGNTP_H
 #define PROTOCOL_OGNTP_H
 
+/* Warmup: 6 bits, preamble: 8 bits, value:  0xAA */
 #define OGNTP_PREAMBLE_TYPE   RF_PREAMBLE_TYPE_AA
-#define OGNTP_PREAMBLE_SIZE   1 /* Warmup: 6 bits, preamble: 8 bits, value:  0xAA */
+#define OGNTP_PREAMBLE_SIZE   2     // no longer adding an extra byte inside the BASICMAC library
 /* IEEE  Manchester(0AF3656C) = AA 66 55 A5 96 99 96 5A */
 #define OGNTP_SYNCWORD        {0xAA, 0x66, 0x55, 0xA5, 0x96, 0x99, 0x96, 0x5A}
 #define OGNTP_SYNCWORD_SIZE   8

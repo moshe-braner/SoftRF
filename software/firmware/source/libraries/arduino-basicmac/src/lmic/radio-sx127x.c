@@ -648,9 +648,14 @@ static void txfsk (void) {
 
     // frame and packet handler settings
     writeReg(FSKRegPreambleMsb, 0x00);
+#if 0
     /* add extra preamble symbol at Tx to ease reception on partner's side */
     writeReg(FSKRegPreambleLsb, LMIC.protocol->preamble_size > 2 ?
       LMIC.protocol->preamble_size : LMIC.protocol->preamble_size + 1);
+#else
+    // instead set it explicitly to 2 bytes in the protocol definition
+    writeReg(FSKRegPreambleLsb, LMIC.protocol->preamble_size);
+#endif
 
     // set preamble
     uint8_t SyncConfig = (LMIC.protocol->syncword_size - 1);
@@ -959,13 +964,13 @@ static void rxfsk (bool rxcontinuous) {
     switch (LMIC.protocol->preamble_size)
     {
     case 0:
-      //writeReg(FSKRegPreambleDetect, 0x05); // disable, 5 chip errors
     case 1:
-      // Legacy, OGNTP
-      writeReg(FSKRegPreambleDetect, 0x85); // enable, 1 bytes, 5 chip errors
+      writeReg(FSKRegPreambleDetect, 0x05); // disable, 5 chip errors
       break;
     case 2:
-      writeReg(FSKRegPreambleDetect, 0xAA); // enable, 2 bytes, 10 chip errors
+      // Legacy, OGNTP
+      writeReg(FSKRegPreambleDetect, 0x85); // enable, 1 bytes, 5 chip errors
+      //writeReg(FSKRegPreambleDetect, 0xAA); // enable, 2 bytes, 10 chip errors
       break;
     case 3:
     case 4:

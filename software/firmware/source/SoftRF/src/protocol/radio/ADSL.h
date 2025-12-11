@@ -22,7 +22,7 @@
 #define PROTOCOL_ADSL_H
 
 #define ADSL_PREAMBLE_TYPE   RF_PREAMBLE_TYPE_55
-#define ADSL_PREAMBLE_SIZE   1
+#define ADSL_PREAMBLE_SIZE   2     // no longer adding an extra byte inside the BASICMAC library
 
 /* IEEE  Manchester(F5724B18) = 55 99 95 A6 9A 65 A9 6A */
 #define ADSL_SYNCWORD        {0x55, 0x99, 0x95, 0xA6, 0x9A, 0x65, 0xA9, 0x6A}
