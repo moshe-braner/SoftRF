@@ -1465,6 +1465,7 @@ void NMEA_Export()
          // data_source should be 1, 3, 4, 6 for ADS-B, ADS-R, TIS-B, Mode-S
          //   (GDL90 should probably be treated as ADS-B)
          // convert tx_type to the code used by FLARM:
+         int data_source = data_source_code[fop->tx_type];
 
          /*
           * When callsign is available - send it to a NMEA client.
@@ -1472,30 +1473,29 @@ void NMEA_Export()
           * based upon a protocol ID and the ICAO address
           */
 
-         int data_source = data_source_code[fop->tx_type];
-         const char *prefix;
-         if (fop->tx_type >= TX_TYPE_ADSB) {
-             prefix = NMEA_CallSign_Prefix[fop->protocol];
-         } else if (fop->tx_type == TX_TYPE_ADSR) {
-             prefix = "ADR";
-         } else if (fop->tx_type == TX_TYPE_TISB) {
-             prefix = "ADT";
-         } else {                         // Mode A,C,S
-             prefix = "MDS";
-         }
+         if (settings->pflaa_cs) {
 
-         if (settings->pflaa_cs == false) {         // skip the callsign
+           const char *prefix;
+           if (fop->tx_type > TX_TYPE_ADSB) {
+             bool landed_out = (fop->aircraft_type == AIRCRAFT_TYPE_UNKNOWN
+                                && fop->airborne == 0 && fop->protocol == RF_PROTOCOL_LATEST);
+             if (landed_out)
+               prefix = "LND";
+             else
+               prefix = NMEA_CallSign_Prefix[fop->protocol];   // FLR, FLO, OGN, ADL
+           } else if (fop->tx_type == TX_TYPE_ADSB) {
+               prefix = "ADS";
+           } else if (fop->tx_type == TX_TYPE_ADSR) {
+               prefix = "ADR";
+           } else if (fop->tx_type == TX_TYPE_TISB) {
+               prefix = "ADT";
+           } else {                         // Mode A,C,S
+               prefix = "MDS";
+           }
 
-           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-              PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
-              alarm_level, dy, str_dx,
-              alt_diff, addr_type, id,
-              ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
-              (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
+           if (fop->callsign[0] == '\0') {     // no callsign, substitute ID
 
-         } else if (fop->callsign[0] == '\0') {     // no callsign, substitute ID
-
-           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+             snprintf_P(NMEABuffer, sizeof(NMEABuffer),
 //            PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X!%s_%06X,%d,,%d,%s,%d,%d,%d,%d" PFLAA_EXT1_FMT "*"),
 // aircraft type is supposed to be hex:
               PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X!%s_%06X,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
@@ -1504,15 +1504,25 @@ void NMEA_Export()
               ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
               (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
 
-         } else {   /* there is a callsign from incoming data */
+           } else {   /* there is a callsign from incoming data */
 
-           if (fop->callsign[sizeof(fop->callsign)-1] != '?')   // not set up by icao_to_n()
-               fop->callsign[sizeof(fop->callsign)-1] = '\0';   // ensure termination
+             if (fop->callsign[sizeof(fop->callsign)-1] != '?')   // not set up by icao_to_n()
+                 fop->callsign[sizeof(fop->callsign)-1] = '\0';   // ensure termination
 
-           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+             snprintf_P(NMEABuffer, sizeof(NMEABuffer),
               PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X!%s_%s,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
               alarm_level, dy, str_dx,
               alt_diff, addr_type, id, prefix, fop->callsign,
+              ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
+              (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
+           }
+
+         } else {    // skip the callsign
+
+           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+              PSTR("$PFLAA,%d,%d,%s,%d,%d,%06X,%s,,%s,%s,%X,%d,%d,%d" PFLAA_EXT1_FMT "*"),
+              alarm_level, dy, str_dx,
+              alt_diff, addr_type, id,
               ltrim(str_course), ltrim(str_speed), ltrim(str_climb_rate), fop->aircraft_type,
               (fop->no_track? 1 : 0), data_source, fop->rssi  PFLAA_EXT1_ARGS );
          }

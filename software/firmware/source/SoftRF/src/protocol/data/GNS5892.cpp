@@ -835,21 +835,21 @@ static void update_traffic_position(int index)
     Traffic_Update(cip);
 
 /* also send data out via NMEA */
-if (settings->debug_flags & DEBUG_DEEPER) {
+if (settings->debug_flags & DEBUG_DEEPER2) {
   if (settings->nmea_d || settings->nmea2_d) {
     snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-      PSTR("$PSADS,%06X,%d,%d,%d,%d\r\n"),
-      cip->addr, cip->tx_type, (int)cip->alt_diff, (int)cip->distance, mm.rssi);
+      PSTR("$PSADS,%06X,%d,%d,%d,%d,%d\r\n"),
+      cip->addr, cip->tx_type, (int)cip->alt_diff, (int)cip->distance, mm.rssi, millis()-ref_time_ms);
     NMEAOutD();
   }
 }
 
-    // relay some traffic - only if we are airborne (or in "relay only" mode)
-    if (settings->rf_protocol == RF_PROTOCOL_LEGACY || settings->rf_protocol == RF_PROTOCOL_LATEST) {
-        if (settings->relay > RELAY_LANDED)
-               // && (ThisAircraft.airborne || settings->relay == RELAY_ONLY))
+    // relay some traffic - only if we are airborne
+    if ((settings->rf_protocol == RF_PROTOCOL_LATEST || settings->rf_protocol == RF_PROTOCOL_LEGACY)
+        && settings->relay > RELAY_LANDED
+        // && fop->tx_type > TX_TYPE_S      // not a non-directional target
+        && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode))
             air_relay(cip);
-    }
 }
 
 
@@ -1773,10 +1773,12 @@ void gns5892_setup()
 
 void gns5892_test_mode()
 {
+/*
     settings->mode_s = test_mode;
     pause5892();
     delay(200);
     play5892();
+*/
 }
 
 // called from NMEA.cpp NMEA_loop() when appropriate

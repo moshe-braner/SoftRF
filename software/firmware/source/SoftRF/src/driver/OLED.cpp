@@ -138,6 +138,7 @@ const char *aircraft_type_lbl[] = {
 const char ID_text[]       = "ID";
 const char PROTOCOL_text[] = "PROTOCOL";
 const char TX_text[]       = "TX";
+const char TX_low_text[]   = "tx";
 const char RX_text[]       = "RX";
 const char ACFTS_text[]    = "ACFTS";
 const char SATS_text[]     = "SATS";
@@ -182,7 +183,9 @@ static void OLED_settings()
         u8x8->drawString(8, 1, PROTOCOL_text);
 
     char c = Protocol_ID[ThisAircraft.protocol][0];
-    if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Latest
+    if (settings->relay >= RELAY_ONLY)
+        c = 'R';
+    else if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Latest
         c = 'T';
     else if (ThisAircraft.protocol == RF_PROTOCOL_ADSB_1090)  // 'A' for ADS-L
         c = 'S';
@@ -282,7 +285,10 @@ static void OLED_radio()
         u8x8->drawString(12, 0, "SIM");
     else
         u8x8->drawString(12, 0, FIX_text);
-    u8x8->drawString(0, 4, TX_text);
+    if (settings->txpower == RF_TX_POWER_LOW)
+        u8x8->drawString(0, 4, TX_low_text);
+    else
+        u8x8->drawString(0, 4, TX_text);
     if (settings->rx1090) {
         u8x8->drawString(8, 4, RX_text);
         u8x8->drawString(7, 6, "ADS");
@@ -627,7 +633,11 @@ static void OLED_acft()
   snprintf (buf, sizeof(buf), "%06X", Container[i].addr);
   u8x8->drawString(7, 1, buf);
   u8x8->drawString(7, 3, aircraft_type_lbl[Container[i].aircraft_type]);
-  u8x8->drawString(7, 5, Protocol_ID[Container[i].protocol]);
+  if (Container[i].tx_type == TX_TYPE_ADSB
+      && Container[i].protocol != RF_PROTOCOL_ADSB_1090 && Container[i].protocol != RF_PROTOCOL_GDL90)
+      u8x8->drawString(7, 5, "REL");    // relayed
+  else
+      u8x8->drawString(7, 5, Protocol_ID[Container[i].protocol]);
 }
 #endif /* EXCLUDE_OLED_ACFT_PAGE */
 
@@ -882,6 +892,14 @@ void OLED_loop()
 #endif /* EXCLUDE_OLED_ACFT_PAGE */
         case OLED_PAGE_SETTINGS:
         default:
+          static uint8_t initial_count = 0;
+          if (initial_count < 16) {
+              ++initial_count;
+              if (initial_count == 16) {     // 8 seconds
+                  OLED_Next_Page();          // will display next time around the loop
+                  break;
+              }
+          }
           OLED_settings();
           break;
         }

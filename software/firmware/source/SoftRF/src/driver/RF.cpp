@@ -41,6 +41,7 @@ byte RxBuffer[MAX_PKT_SIZE] __attribute__((aligned(sizeof(uint32_t))));
 time_t RF_time;
 uint8_t RF_current_slot = 0;
 uint8_t RF_current_chan = 0;
+uint32_t RF_OK_from   = 0;
 uint32_t RF_OK_until  = 0;
 uint32_t TxTimeMarker = 0;
 uint32_t TxEndMarker  = 0;
@@ -545,7 +546,6 @@ static void sx12xx_channel(uint8_t channel)
   if (channel != sx12xx_channel_prev) {
 
     uint32_t frequency = RF_FreqPlan.getChanFrequency(channel);
-    int8_t fc = settings->freq_corr;
 
     //Serial.print("frequency: "); Serial.println(frequency);
 
@@ -554,21 +554,22 @@ static void sx12xx_channel(uint8_t channel)
       sx12xx_receive_active = false;
     }
 
-    if (rf_chip->type == RF_IC_SX1276) {
-      /* correction of not more than 30 kHz is allowed */
+    /* correction of not more than 30 kHz is allowed */
+    int8_t fc = settings->freq_corr;
+    //if (rf_chip->type == RF_IC_SX1276) {
+      /* Most of SX1262 designs use TCXO */
+      // but allow frequency correction on it anyway
+    if (fc != 0) {
       if (fc > 30) {
         fc = 30;
       } else if (fc < -30) {
         fc = -30;
       };
+      LMIC.freq = frequency + (fc * 1000);
     } else {
-      /* Most of SX1262 designs use TCXO */
-      fc = 0;
+      LMIC.freq = frequency;
     }
-
     /* Actual RF chip's channel registers will be updated before each Tx or Rx session */
-    LMIC.freq = frequency + (fc * 1000);
-    //LMIC.freq = 868200000UL;
 
     sx12xx_channel_prev = channel;
   }
@@ -609,6 +610,8 @@ static uint8_t sx12xx_txpower()
             power = 17;
     //}
     }
+    if (settings->relay >= RELAY_ONLY)
+        power = 8;
   }
 
   return power;
@@ -2304,7 +2307,7 @@ void RF_loop()
   /* - requires OurTime to be set to UTC time in seconds - can do in Time_loop() */
   /* - also needs time since PPS, it is stored in ref_time_ms */
 
-  if (! in_family(settings->rf_protocol)) {
+  if (in_family(settings->rf_protocol) == false) {
     RF_SetChannel();    /* use original code */
     return;
   }
@@ -2352,11 +2355,12 @@ void RF_loop()
   if (ms_since_pps >= 300 && ms_since_pps < 800) {
 
     RF_current_slot = 0;
+    RF_OK_from  = slot_base_ms + 405;
     RF_OK_until = slot_base_ms + 800;
     TxEndMarker = slot_base_ms + 795;
-    if (relay_waiting) {
+    if (relay_next) {
         TxTimeMarker = TxEndMarker;     // prevent transmission (relay bypasses this)
-        relay_waiting = false;
+        relay_next = false;
     } else {
         TxTimeMarker = slot_base_ms + 405 + SoC->random(0, 385);
     }
@@ -2365,6 +2369,7 @@ void RF_loop()
 
     RF_current_slot = 1;
     /* channel does _NOT_ change at PPS rollover in middle of slot 1 */
+    RF_OK_from  = slot_base_ms + 805;
     RF_OK_until = slot_base_ms + 1300;
     if ((RF_time & 0x0F) == 0x0F
            && settings->rf_protocol == RF_PROTOCOL_LATEST
@@ -2376,9 +2381,9 @@ void RF_loop()
     } else {
         TxEndMarker = slot_base_ms + 1195;
         if ((RF_time & 0x0F) == 0x0F) {
-            if (alt_relay_waiting) {
+            if (alt_relay_next) {
                 TxTimeMarker = TxEndMarker;     // prevent transmission (relay bypasses this)
-                alt_relay_waiting = false;
+                alt_relay_next = false;
             } else {
                 TxTimeMarker = slot_base_ms + 805 + SoC->random(0, 385);
             }
@@ -2391,6 +2396,7 @@ void RF_loop()
 
     //RF_current_slot = 1;
     RF_OK_until = slot_base_ms + 1300;
+    RF_OK_from   = RF_OK_until;
     TxTimeMarker = RF_OK_until;          /* do not transmit for now */
     TxEndMarker  = RF_OK_until;
     return;
@@ -2437,19 +2443,21 @@ void RF_loop()
 //OGN, RF_current_slot, (RF_time & 0x0F), ms_since_pps, slot_base_ms, TxTimeMarker, TxEndMarker, RF_OK_until);
 }
 
-bool RF_Transmit_Ready()
-{
-    uint32_t now_ms = millis();
-    if (! TxEndMarker)                     // for other protocols
-        return (now_ms > TxTimeMarker);
-    return (now_ms >= TxTimeMarker && now_ms < TxEndMarker);
-}
-
 bool RF_Transmit_Happened()
 {
     if (! TxEndMarker)
         return (TxTimeMarker > millis());   // for other protocols
     return (TxTimeMarker == RF_OK_until);
+}
+
+bool RF_Transmit_Ready(bool wait)
+{
+    if (TxTimeMarker == RF_OK_until)  // if RF_Transmit_Happened()
+        return false;
+    uint32_t now_ms = millis();
+    if (! TxEndMarker)                     // for other protocols
+        return (now_ms > TxTimeMarker);
+    return (now_ms >= (wait? TxTimeMarker : RF_OK_from) && now_ms < TxEndMarker);
 }
 
 size_t RF_Encode(container_t *fop, bool wait)
@@ -2465,15 +2473,16 @@ size_t RF_Encode(container_t *fop, bool wait)
 
     /* sanity checks: don't send bad data */
     const char *p = NULL;
-    if (ThisAircraft.latitude == 0.0)
+    if (fop->latitude == 0.0)
         p = "position";
-    else if (ThisAircraft.altitude > 30000.0)
+    else if (fop->altitude > 30000.0)   // meters
         p = "altitude";
-    else if (ThisAircraft.speed > (250.0 / _GPS_MPS_PER_KNOT))
+    else if (fop->speed > (300.0 / _GPS_MPS_PER_KNOT))   // 300 m/s or about 600 knots
         p = "speed";
-    else if (fabs(ThisAircraft.vs) > (20.0 * (_GPS_FEET_PER_METER * 60.0)))
+    else if (fabs(fop->vs) > (20.0 * (_GPS_FEET_PER_METER * 60.0))
+             && fop->aircraft_type != AIRCRAFT_TYPE_JET && fop->aircraft_type != AIRCRAFT_TYPE_UFO)
         p = "vs";
-    else if (fabs(ThisAircraft.turnrate) > 100.0)
+    else if (fabs(fop->turnrate) > 100.0)
         p = "turnrate";
     if (p) {
         Serial.print("skipping sending bad ");
@@ -2483,7 +2492,7 @@ size_t RF_Encode(container_t *fop, bool wait)
 
     // encode in the current tx protocol (may differ from rx protocol)
     if (in_family(current_RF_protocol)) {
-      if (RF_Transmit_Ready() || (!wait && !RF_Transmit_Happened())) {
+      if (RF_Transmit_Ready(wait)) {
           if (current_RF_protocol != settings->rf_protocol)
               size = (*altprotocol_encode)((void *) &TxBuffer[0], fop);
           else
@@ -2521,7 +2530,7 @@ bool RF_Transmit(size_t size, bool wait)   // only called with no-wait for air-r
 
     /* Experimental code by Moshe Braner, specific to Legacy Protocol */
     if (in_family(settings->rf_protocol)) {
-      if (RF_Transmit_Ready() || (!wait && !RF_Transmit_Happened())) {
+      if (RF_Transmit_Ready(wait)) {
 
         if (current_RF_protocol != settings->rf_protocol) {
             // need to actually switch to the alt protocol

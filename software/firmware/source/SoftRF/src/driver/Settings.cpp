@@ -277,7 +277,7 @@ static void init_stgdesc()
   stgminmax[1] = { STG_GEOID,    -104, 84 };
   stgminmax[2] = { STG_LEAPSECS,   17, 19 };  // 18 is correct for 2025
   stgminmax[3] = { STG_TXPOWER,     0,  2 };
-  stgminmax[4] = { STG_EXPIRE,      1, 30 };
+  stgminmax[4] = { STG_EXPIRE,      1, ENTRY_EXPIRATION_TIME };
   stgminmax[5] = { STG_MODE_S,      0,  9 };
 }
 

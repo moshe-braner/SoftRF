@@ -35,16 +35,17 @@
 #include <raspi/raspi.h>
 #endif /* RASPBERRY_PI */
 
-#define SOFTRF_FIRMWARE_VERSION "MB170"
+#define SOFTRF_FIRMWARE_VERSION "MB171"
 #define SOFTRF_IDENT            "SoftRF"
 #define SOFTRF_USB_FW_VERSION   0x0101
 
-#define ENTRY_EXPIRATION_TIME  17 /* seconds */
+#define ENTRY_EXPIRATION_TIME  30 /* seconds - was 17 - NMEA export limited further by 'expire' setting */
 #define NONDIR_EXPIRATION       5 /* seconds */
-#define ENTRY_RELAY_TIME       15 /* seconds */
-#define ANY_RELAY_TIME          5 /* seconds */
+#define EXPORT_EXPIRATION_TIME  5 /* seconds - PFLAA export cutoff - default value for 'expire' setting */
+#define ENTRY_RELAY_TIME       15 /* seconds - in normal mode, how often to relay same aircraft */
+#define RELAY_ONLY_TIME         2 /* seconds - in relay-only mode, how often to relay same aircraft */
+#define ANY_RELAY_TIME          5 /* seconds - in normal mode, how often to relay any aircraft */
 #define LED_EXPIRATION_TIME     5 /* seconds */
-#define EXPORT_EXPIRATION_TIME  5 /* seconds */
 
 /*
  * If you need for SoftRF to operate in wireless

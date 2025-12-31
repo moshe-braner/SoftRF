@@ -224,6 +224,7 @@ void Time_loop()
     // && settings->rf_protocol != RF_PROTOCOL_ADSL)
     if (in_family(settings->rf_protocol) == false)
         return;       /* time still handled in RF.cpp RF_SetChannel() */
+    // RF_SetChannel() is called from RF_loop()
 
     uint32_t gnss_age;
     uint32_t pps_btime_ms;

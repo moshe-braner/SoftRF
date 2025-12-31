@@ -651,11 +651,13 @@ gnss.time.hour(), gnss.time.minute(), gnss.time.second());
 if (rx_success) which_rx_try = 1;
       // if received a packet, postpone transmission until next time around the loop().
 
-      if (!rx_success && RF_Transmit_Ready() && settings->relay != RELAY_ONLY) {
+      if (!rx_success && RF_Transmit_Ready(true)
+          && (relay_waiting == NULL || RF_current_slot == 0)
+          && settings->relay < RELAY_ONLY) {
           // Don't bother with the encode() if can't transmit right now
-          size_t s = RF_Encode(&ThisAircraft);  // returns 0 if implausible data
+          size_t s = RF_Encode(&ThisAircraft, true);  // returns 0 if implausible data
           if (s != 0) {
-              RF_Transmit(s);
+              RF_Transmit(s, true);
               // if actually transmitted, time-slot is then locked out
               if (RF_Transmit_Happened())
                 tx_success = true;
@@ -700,7 +702,9 @@ if (rx_success) which_rx_try = 2;
 #endif
 
     /* process received data - only if we know where we are */
-    if (rx_success && validfix)  ParseData();
+    if (rx_success && validfix) {
+        ParseData();
+    }
 
   }
 
@@ -796,7 +800,7 @@ void uav()
     ThisAircraft.pressure_altitude = the_aircraft.location.baro_alt;
     ThisAircraft.hdop = the_aircraft.location.gps_hdop;
 
-    RF_Transmit(RF_Encode(&ThisAircraft));
+    RF_Transmit(RF_Encode(&ThisAircraft,true),true);
   }
 
   success = RF_Receive();
@@ -820,7 +824,7 @@ void bridge()
   size_t tx_size = WiFi_Receive_UDP(&TxBuffer[0], MAX_PKT_SIZE);
 
   if (tx_size > 0) {
-    RF_Transmit(tx_size);
+    RF_Transmit(tx_size,true);
   }
 
   success = RF_Receive();
@@ -922,7 +926,7 @@ void txrx_test()
 #if DEBUG_TIMING
   tx_start_ms = millis();
 #endif
-  RF_Transmit(RF_Encode(&ThisAircraft));
+  RF_Transmit(RF_Encode(&ThisAircraft,true),true);
 #if DEBUG_TIMING
   tx_end_ms = millis();
   rx_start_ms = millis();

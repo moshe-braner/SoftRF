@@ -116,7 +116,7 @@ void btea(uint32_t *v, int8_t n, const uint32_t key[4]) {
 // first stage of decrypting
 void btea2(uint32_t *data, bool encode)
 {
-    // for new protocol, ths btea() stage uses fixed keys
+    // for new protocol, this btea() stage uses fixed keys
     static const uint32_t keys[4] = { 0xa5f9b21c, 0xab3f9d12, 0xc6f34e34, 0xd72fa378 };
     btea(data+2, (encode? 4 : -4), keys);
 }
@@ -315,10 +315,12 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
         } else {
             Serial.printf("decrypt time error > 1  - not at roll over %d %d\r\n", localbits, timebits);
         }
+        Serial.print("- at time: ");  Serial.println(OurTime);
         return false;
     }
     if (pkt->lastbyte != 0 || pkt->needs3 != 3) {
-        Serial.println("rejecting bad decrypt with OK timebits");
+        Serial.print("rejecting bad decrypt with OK timebits at time ");
+        Serial.println(OurTime);
         return false;
     }
 
@@ -326,9 +328,8 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
     //fop->gnsstime_ms = millis();
 
     fop->airborne = (pkt->airborne > 1);
-    // no real need to do this here since airborne only relayed in old protocol:
-    //if (fop->relayed && fop->airborne)
-    //    fop->tx_type  = TX_TYPE_ADSB;    // assumption
+    if (fop->relayed && fop->airborne)
+        fop->tx_type  = TX_TYPE_ADSB;    // assumption
     fop->protocol = RF_PROTOCOL_LATEST;
 
     fop->stealth   = pkt->stealth;
@@ -395,7 +396,7 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
     //int32_t unk8 = pkt->unk8;
 //Serial.printf("unk8: %d  %x\n", unk8, unk8);
 
-#if 1
+#if 0
     /* send received radio packet data out via NMEA for debugging */
     if (settings->nmea_d || settings->nmea2_d) {
       if (settings->debug_flags & DEBUG_LEGACY) {
@@ -471,22 +472,20 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     }
     fop->last_crc = RF_last_crc;
 
-    //uint32_t timestamp = (uint32_t) this_aircraft->timestamp;
-    uint32_t timestamp = (uint32_t) OurTime;
-    //uint32_t timestamp = (uint32_t) RF_time;   // incremented in RF.cpp 300 ms after PPS
-    fop->timestamp = timestamp;
-    fop->gnsstime_ms = millis();
-
     fop->relayed = false;
     if (pkt->addr_type > 3) {
         // probably air-relayed packet
         //   but do some sanity checks below
         fop->relayed = true;
-        pkt->addr_type &= 3;
     }
-    fop->addr_type = pkt->addr_type;
-    // fop->landed_out = pkt->_unk1;
-        // - if we switch to this instead of using aircraft_type==0 to mark landed-out
+    fop->addr_type = pkt->addr_type & 3;
+    // but leave pkt->addr_type as is, or decryption will fail
+
+    //uint32_t timestamp = (uint32_t) this_aircraft->timestamp;
+    //uint32_t timestamp = (uint32_t) OurTime;
+    uint32_t timestamp = (uint32_t) RF_time;   // incremented in RF.cpp 300 ms after PPS
+    fop->timestamp = timestamp;
+    fop->gnsstime_ms = millis();
 
     if (pkt->msg_type == 2)
         return latest_decode(buffer, this_aircraft, fop);
@@ -516,15 +515,14 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     int ndx;
     uint8_t pkt_parity=0;
 
-    //make_key(key, timestamp, (pkt->addr << 8) & 0xffffff);
-    make_key(key, (uint32_t) RF_time, (pkt->addr << 8) & 0xffffff);
+    make_key(key, timestamp, (pkt->addr << 8) & 0xffffff);
     btea((uint32_t *) pkt + 1, -5, key);
 
     for (ndx = 0; ndx < sizeof (legacy_packet_t); ndx++) {
       pkt_parity += parity(*(((unsigned char *) pkt) + ndx));
     }
     if (pkt_parity & 0x01) {
-        if (settings->nmea_p)
+        //if (settings->nmea_p)
           Serial.println(F("$PSRFE,bad parity of decrypted packet"));
         return false;
     }
@@ -555,7 +553,7 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     if (fabs(lat - this_aircraft->latitude) > 1.0
      || fabs(lon - this_aircraft->longitude) > InvCosLat())
     {
-        Serial.println("implausible data - rejecting packet");
+        Serial.println("too far away - rejecting packet");
         return false;
     }
 
@@ -614,15 +612,20 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     fop->protocol = RF_PROTOCOL_LEGACY;
 
     /* FLARM sometimes sends packets with implausible data */
+    bool implausible = false;
     if (fop->airborne == 0 && (vs10 > 150 || vs10 < -150))
-        return false;
+        implausible = true;
     if (unk2 == 2)   // appears with implausible data in speed fields
-        return false;
+        implausible = true;
     /* if (fop->relayed) */ {   // additional sanity checks
         if (speed4 > 600.0)
-            return false;
+            implausible = true;
         if (fabs(turnrate) > 100.0)
-            return false;
+            implausible = true;
+    }
+    if (implausible) {
+        Serial.println("implausible data - rejecting packet");
+        return false;
     }
 
     if (unk2 == 0)
@@ -690,6 +693,7 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
 size_t latest_encode(void *pkt_buffer, container_t *aircraft)
 {
     latest_packet_t *pkt = (latest_packet_t *) pkt_buffer;
+    // addr & addr_type already pre-filled from legacy_encode()
 
     uint32_t timestamp = (uint32_t) RF_time;   // incremented in RF.cpp 300 ms after PPS
 
@@ -713,18 +717,23 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
     pkt->msg_type = 2;
 
     pkt->stealth = aircraft->stealth;
-    pkt->no_track = aircraft->no_track;
+    //if (aircraft->tx_type < TX_TYPE_FLARM)     // if relaying ADS-B
+    //    pkt->no_track = 1;                     // then hide from OGN - alas then also rarely reported by FLARM
+    //else
+        pkt->no_track = aircraft->no_track;
 
     uint8_t aircraft_type = aircraft->aircraft_type;
     if (aircraft == &ThisAircraft) {                    // not relaying some other aircraft
-      if (landed_out_mode)
+      if (landed_out_mode) {
           aircraft_type = AIRCRAFT_TYPE_UNKNOWN;        // mark this aircraft as landed-out
+          if (test_mode)
+              pkt->addr_type |= 4;   // >>> as if relayed - for testing how FLARM reacts
+      }
     } else {
-      if ((aircraft->protocol == RF_PROTOCOL_LATEST || aircraft->protocol == RF_PROTOCOL_LEGACY)
-           && aircraft->airborne==0
-           && aircraft_type == AIRCRAFT_TYPE_UNKNOWN) { // relaying landed-out traffic
-        // && aircraft->landed_out)
-        //aircraft_type = AIRCRAFT_TYPE_GLIDER;         // leave as "unknown" to signal landed-out
+      if (aircraft_type == AIRCRAFT_TYPE_UNKNOWN && aircraft->airborne == 0) {
+           // relaying a landed-out SoftRF device
+           if (settings->relay > RELAY_ONLY + 2)          // testing with relay,6
+               aircraft_type = AIRCRAFT_TYPE_GLIDER;      // maybe more FLARM-compatible
       }
     }
     if (aircraft_type == AIRCRAFT_TYPE_WINCH) {
@@ -737,6 +746,8 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
     } else {
         pkt->airborne = 2;
     }
+    if (do_alarm_demo)
+        pkt->airborne = 2;
     pkt->aircraft_type = aircraft_type;
 
     float lat = aircraft->latitude;
@@ -786,10 +797,38 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
     pkt->lastbyte = 0;
     pkt->_unk1 = 0;
 
+#if 0
+    if (settings->nmea_d || settings->nmea2_d) {
+      if (settings->debug_flags & DEBUG_LEGACY) {
+        if (settings->debug_flags & DEBUG_DEEPER) {
+          /* output the un-ecrypted packet as a whole, in hex */
+          snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+            PSTR("$PSRRB,%ld,%06X,%s\r\n"),
+            timestamp, aircraft->addr,
+            bytes2Hex((byte *)pkt_buffer, sizeof (latest_packet_t)));
+          NMEAOutD();
+        }
+      }
+    }
+#endif
+
     /* encrypt packet */
     uint32_t *wp = (uint32_t *) pkt_buffer;
     scramble(wp, timestamp);
     btea2(wp, true);
+
+#if 0
+    if (settings->nmea_d || settings->nmea2_d) {
+      if (settings->debug_flags & DEBUG_LEGACY) {
+        /* output the encrypted packet as a whole, in hex */
+        snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+          PSTR("$PSRRR,%ld,%06X,%s\r\n"),
+          timestamp, aircraft->addr,
+          bytes2Hex((byte *)pkt_buffer, sizeof (latest_packet_t)));
+        NMEAOutD();
+      }
+    }
+#endif
 
     return (sizeof(latest_packet_t));
 }
@@ -802,32 +841,35 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     pkt->addr = id & 0x00FFFFFF;
 
     bool relay = (aircraft != &ThisAircraft);  // aircraft is some other aircraft
-    bool relay_landed_out = (relay &&
-           (aircraft->protocol == RF_PROTOCOL_LATEST || aircraft->protocol == RF_PROTOCOL_LEGACY)
-           && aircraft->airborne==0 && aircraft->aircraft_type==AIRCRAFT_TYPE_UNKNOWN);
-    //      aircraft->landed_out;
+    bool relay_landed_out = (relay && aircraft->aircraft_type == AIRCRAFT_TYPE_UNKNOWN);
 
+    uint8_t addr_type;
     if (relay) {
-        pkt->addr_type = aircraft->addr_type | 4;  // marks as a relayed packet
+        addr_type = aircraft->addr_type;
+        // relayed ADS-B will not be relayed again even without the mark
+        // but marking it for SoftRF reception will show callsign as ADS_xxxxxx
+        if (relay_landed_out) {
+            if (settings->relay < RELAY_ONLY + 2)
+                addr_type |= 4;                     // this marks it as a relayed packet
+        } else if (settings->relay < RELAY_ONLY) {
+             addr_type |= 4;
+        }
+        // for RELAY_ONLY don't mark, intended for reception by Classic FLARMs
     } else {
-        uint8_t addr_type = settings->id_method;
+        addr_type = settings->id_method;
         if (addr_type == ADDR_TYPE_OVERRIDE)
             addr_type = ADDR_TYPE_FLARM;
         if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
-            pkt->addr_type = ADDR_TYPE_OGN;  // since main protocol is OGNTP & using device ID
-        else
-            pkt->addr_type = addr_type;      // ICAO or FLARM (or random)
+            addr_type = ADDR_TYPE_OGN;  // since main protocol is OGNTP & using device ID
     }
+    pkt->addr_type = addr_type;      // ICAO or FLARM (or random)
 
-#if 1
-    // relay in old protocol unless relaying landed-out traffic
-    if (current_RF_protocol == RF_PROTOCOL_LATEST && (!relay || relay_landed_out))
+    // relay in old protocol unless relaying landed-out traffic or in relay-only mode
+    // - IOW, relay ADS-B traffic in old protocol for relay-all (visible to SoftRF),
+    //   but in new protocol for relay-only (visible to Classic FLARM)
+    if (current_RF_protocol == RF_PROTOCOL_LATEST &&
+            (!relay || relay_landed_out || (settings->relay >= RELAY_ONLY)))
         return latest_encode(pkt_buffer, aircraft);
-#else
-    // always relay in old protocol
-    if (current_RF_protocol == RF_PROTOCOL_LATEST && !relay)
-        return latest_encode(pkt_buffer, aircraft);
-#endif
 
     int ndx;
     uint8_t pkt_parity;
@@ -854,19 +896,15 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     }
     pkt->smult = smult;
 
-//    if (aircraft->prevtime_ms != 0) {
       /* Compute NS & EW speed components for future time points. */
       if (relay)
           project_that(aircraft);
       else
           project_this(aircraft);       /* which also calls airborne() */
-    //if (do_alarm_demo && !relay) {
-    //    pkt->airborne = 1;
-    //} else if (millis() - SetupTimeMarker < 60000 && !relay) {
-    //    pkt->airborne = 1;    /* post-boot testing */
-    //} else {
+      if (do_alarm_demo)
+          pkt->airborne = 1;
+      else
           pkt->airborne = aircraft->airborne;
-    //}
       int16_t vs10;
       if (aircraft->airborne) {
          for (int i=0; i<4; i++) {
@@ -889,9 +927,9 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     pkt->vs = vs10 >> smult;
 
     pkt->stealth = aircraft->stealth;
-    if (aircraft->tx_type < TX_TYPE_FLARM)     // if relaying ADS-B
-        pkt->no_track = 1;                     // then hide from OGN
-    else
+    //if (aircraft->tx_type < TX_TYPE_FLARM)     // if relaying ADS-B
+    //    pkt->no_track = 1;                     // then hide from OGN - alas then also rarely reported by FLARM
+    //else
         pkt->no_track = aircraft->no_track;
 
     uint8_t aircraft_type = aircraft->aircraft_type;
@@ -960,11 +998,13 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     //pkt->parity = (pkt_parity % 2);
     pkt->parity = (pkt_parity & 0x01);
 
+    /* encrypt packet */
+
     //uint32_t timestamp = (uint32_t) aircraft->timestamp;
     uint32_t timestamp = (uint32_t) RF_time;   // incremented in RF.cpp 300 ms after PPS
-
     make_key(key, timestamp , (pkt->addr << 8) & 0xffffff);
-    btea((uint32_t *) pkt + 1, 5, key);
+    uint32_t *wp = (uint32_t *) pkt_buffer;
+    btea(wp+1, 5, key);
 
     return (sizeof(legacy_packet_t));
 }

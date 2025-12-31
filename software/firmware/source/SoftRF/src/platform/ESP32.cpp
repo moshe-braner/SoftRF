@@ -3051,7 +3051,11 @@ void handleEvent2(AceButton* button, uint8_t eventType,
       break;
     case AceButton::kEventLongPressed:
 #if 1
-      if (landed_out_mode) {
+      if (settings->mode != SOFTRF_MODE_NORMAL) {
+          settings->mode = SOFTRF_MODE_NORMAL;
+          OLED_msg("NORMAL", "MODE");
+          Serial.println("normal mode");
+      } else if (landed_out_mode) {
           landed_out_mode = false;
           OLED_msg("NORMAL", "MODE");
           Serial.println("landed_out_mode off");
