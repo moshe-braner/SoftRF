@@ -35,7 +35,7 @@
 #include <raspi/raspi.h>
 #endif /* RASPBERRY_PI */
 
-#define SOFTRF_FIRMWARE_VERSION "MB171"
+#define SOFTRF_FIRMWARE_VERSION "MB172"
 #define SOFTRF_IDENT            "SoftRF"
 #define SOFTRF_USB_FW_VERSION   0x0101
 
@@ -185,7 +185,7 @@ typedef struct CONTAINER {
     int16_t   RelativeHeading;    // for voice and strobe
 
     uint16_t  hdop; /* cm */
-    uint16_t  last_crc;
+    uint32_t  last_crc;
     int8_t    rssi;
     int8_t    mindistrssi;
     int8_t    maxrssi;
@@ -217,7 +217,7 @@ typedef struct UFO {
     float     turnrate;
     float     vs;
     uint16_t  hdop;
-    uint16_t  last_crc;
+    uint32_t  last_crc;         // was 16 bits, but allow for 24 bits in ADS-L
     // those below can be bit-packed into a smaller space:
     uint8_t   protocol;         // needs 4 bits
     uint8_t   tx_type;          // needs 3+ bits

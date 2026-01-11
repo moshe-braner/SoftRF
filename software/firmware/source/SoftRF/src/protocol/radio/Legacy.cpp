@@ -68,6 +68,40 @@ const rf_proto_desc_t legacy_proto_desc = {
   .slot1           = {800, 1200}
 };
 
+const rf_proto_desc_t flr_adsl_proto_desc = {
+  "FLR_ADSL",
+  .type            = RF_PROTOCOL_LEGACY,
+  .modulation_type = RF_MODULATION_TYPE_2FSK,
+  .preamble_type   = LEGACY_PREAMBLE_TYPE,
+  .preamble_size   = LEGACY_PREAMBLE_SIZE,
+  .syncword        = FLR_ADSL_SYNCWORD,
+  .syncword_size   = FLR_ADSL_SYNCWORD_SIZE,
+  .syncword_skip   = FLR_ADSL_SYNCWORD_SKIP,
+  .net_id          = 0x0000, /* not in use */
+  .payload_type    = RF_PAYLOAD_INVERTED,
+  .payload_size    = FLR_ADSL_PAYLOAD_SIZE,
+  .payload_offset  = 0,
+  .crc_type        = LEGACY_CRC_TYPE,
+  .crc_size        = LEGACY_CRC_SIZE,
+
+  .bitrate         = RF_BITRATE_100KBPS,
+  .deviation       = RF_FREQUENCY_DEVIATION_50KHZ,
+  .whitening       = RF_WHITENING_MANCHESTER,
+  .bandwidth       = RF_RX_BANDWIDTH_SS_125KHZ,
+
+  .air_time        = LEGACY_AIR_TIME,
+
+#if defined(USE_TIME_SLOTS)
+  .tm_type         = RF_TIMING_2SLOTS_PPS_SYNC,
+#else
+  .tm_type         = RF_TIMING_INTERVAL,
+#endif
+  .tx_interval_min = LEGACY_TX_INTERVAL_MIN,
+  .tx_interval_max = LEGACY_TX_INTERVAL_MAX,
+  .slot0           = {400,  800},
+  .slot1           = {800, 1200}
+};
+
 /* http://en.wikipedia.org/wiki/XXTEA */
 void btea(uint32_t *v, int8_t n, const uint32_t key[4]) {
     uint32_t y, z, sum;
@@ -315,12 +349,12 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
         } else {
             Serial.printf("decrypt time error > 1  - not at roll over %d %d\r\n", localbits, timebits);
         }
-        Serial.print("- at time: ");  Serial.println(OurTime);
+        Serial.print("- at time: ");  Serial.println((uint32_t) OurTime);
         return false;
     }
     if (pkt->lastbyte != 0 || pkt->needs3 != 3) {
         Serial.print("rejecting bad decrypt with OK timebits at time ");
-        Serial.println(OurTime);
+        Serial.println((uint32_t) OurTime);
         return false;
     }
 
@@ -491,7 +525,7 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
         return latest_decode(buffer, this_aircraft, fop);
 
     if (pkt->msg_type != 0) {
-        Serial.println("skipping packet msg_type != 0");
+        Serial.println("skipping packet msg_type neither 2 nor 0");
         return false;
     }
 
@@ -687,6 +721,17 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
 #endif
 
     return true;
+}
+
+bool flr_adsl_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
+
+    if (dual_protocol==RF_FLR_ADSL) {
+        if (RF_last_protocol==RF_PROTOCOL_LEGACY)
+            return legacy_decode(buffer, this_aircraft, fop);
+        else
+            return adsl_decode(buffer, this_aircraft, fop);
+    }
+    return false;
 }
 
 // fill in the data fields in the new 2024 protocol packet

@@ -51,11 +51,11 @@
 //#define MAX_PKT_SIZE  32 /* 48 = UAT LONG_FRAME_DATA_BYTES */
 
 #if !defined(EXCLUDE_UAT978)
-#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE, OGNTP_PAYLOAD_SIZE, \
+#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
                              P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE, \
                              UAT978_PAYLOAD_SIZE)
 #else
-#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE, OGNTP_PAYLOAD_SIZE, \
+#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
                              P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE)
 #endif
 
@@ -78,6 +78,12 @@ enum
   RF_TX_POWER_OFF,
   RF_TX_POWER_LOW,
   RF_TX_POWER_FULL
+};
+
+enum
+{
+  RF_SINGLE_PROTOCOL,
+  RF_FLR_ADSL
 };
 
 typedef struct rfchip_ops_struct {
@@ -129,6 +135,7 @@ extern uint32_t TxEndMarker;
 extern time_t RF_time;
 extern uint8_t RF_current_slot;
 extern uint8_t current_RF_protocol;
+extern uint8_t dual_protocol;
 
 extern const rfchip_ops_t *rf_chip;
 extern bool RF_SX12XX_RST_is_connected;
@@ -136,11 +143,10 @@ extern size_t (*protocol_encode)(void *, container_t *);
 extern bool (*protocol_decode)(void *, container_t *, ufo_t *);
 
 extern const char *Protocol_ID[];
-extern uint16_t RF_last_crc;
+extern uint32_t RF_last_crc;
 extern int8_t RF_last_rssi;
 extern int8_t which_rx_try;
-
-extern const rf_proto_desc_t legacy_proto_desc;
+extern uint8_t RF_last_protocol;
 
 extern uint32_t rx_packets_counter, tx_packets_counter;
 

@@ -10,7 +10,7 @@ enum
   RF_BAND_EU   = 1,  /* 868.2 MHz band */
   RF_BAND_US   = 2,  /* 915 MHz band */
   RF_BAND_AU   = 3,  /* 921 MHz band */
-  RF_BAND_NZ   = 4,  /* 869.250 MHz band */
+  RF_BAND_NZ   = 4,  /* 869.2x MHz band */
   RF_BAND_RU   = 5,  /* 868.8 MHz band */
   RF_BAND_CN   = 6,  /* 470 MHz band */
   RF_BAND_UK   = 7,  /* 869.52 MHz band. Deprecated - treated as EU */
@@ -95,7 +95,8 @@ class FreqPlan
             { BaseFreq=917000000; ChanSepar=400000; Channels=24; MaxTxPower = 30; } // Australia and South America
             break;
           case RF_BAND_NZ:
-            { BaseFreq=869250000; ChanSepar=200000; Channels= 1; MaxTxPower = 10; } // New Zealand
+            //{ BaseFreq=869250000; ChanSepar=200000; Channels= 1; MaxTxPower = 10; } // New Zealand
+            { BaseFreq=869200000; ChanSepar=200000; Channels= 1; MaxTxPower = 10; } // New Zealand
             break;
           case RF_BAND_RU:
             { BaseFreq=868800000; ChanSepar=200000; Channels= 1; MaxTxPower = 20; } // Russia

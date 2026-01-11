@@ -29,9 +29,11 @@
 #include <TimeLib.h>
 
 #include "../../../SoftRF.h"
+#include "../../TrafficHelper.h"
 #include "../../driver/RF.h"
 #include "../../driver/GNSS.h"
 #include "../../driver/Settings.h"
+#include "../../system/Time.h"
 #include "Legacy.h"
 
 const rf_proto_desc_t adsl_proto_desc = {
@@ -101,9 +103,37 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   fop->addr      = r.getAddress();
 
   if (fop->addr == settings->ignore_id)
-         return true;                  /* ID told in settings to ignore */
-  if (fop->addr == ThisAircraft.addr)
-         return true;                  /* same ID as this aircraft - ignore */
+         return false;                  /* ID told in settings to ignore */
+
+  if (fop->addr == ThisAircraft.addr) {
+      if (landed_out_mode) {
+          // if "seeing itself" is via requested relay, show it
+          // Serial.println("Received own ID - relayed as landed out");
+      } else {
+          Serial.println("warning: received same ID as this aircraft");
+          return false;
+      }
+  }
+
+  for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+    container_t *cip = &Container[i];
+    if (cip->addr == fop->addr) {
+      if (cip->protocol == RF_PROTOCOL_LATEST
+          && OurTime <= cip->timestamp + EXPORT_EXPIRATION_TIME) {
+                    // 5s - not ENTRY_EXPIRATION_TIME (30s)
+                    // since that takes too long after FLARM reception drops out
+          // already tracked via other means
+          //Serial.println("ADSL traffic also seen via Latest, ignore");
+          return false;
+      }
+      if (RF_last_crc != 0 && RF_last_crc == cip->last_crc) {
+          //Serial.println("duplicate packet");
+          return false;
+      }
+      break;
+    }
+  }
+  fop->last_crc = RF_last_crc;
 
   fop->latitude  = r.FNTtoFloat(r.getLat());
   fop->longitude = r.FNTtoFloat(r.getLon());
@@ -116,27 +146,34 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   fop->hdop      = r.getHorAccur();
 
   fop->addr_type = r.getAddrTypeOGN();
-  fop->timestamp = this_aircraft->timestamp;
+  fop->timestamp = (uint32_t) RF_time;      // this_aircraft->timestamp;
   fop->gnsstime_ms = millis();
+
+  fop->airborne = (r.FlightState != 1);    // >>> ads-l.h lacks a method to read the "flight status" field?
 
   fop->stealth   = 0;
   fop->no_track  = 0;
+  fop->relayed   = r.getRelay();
 
   return true;
 }
 
-size_t adsl_encode(void *pkt, container_t *this_aircraft) {
+size_t adsl_encode(void *pkt, container_t *aircraft) {
 
-  pos.Latitude  = (int32_t) (this_aircraft->latitude * 600000);
-  pos.Longitude = (int32_t) (this_aircraft->longitude * 600000);
-  pos.Altitude  = (int32_t) (this_aircraft->altitude * 10);        // height above ellipsoid
-  if (this_aircraft->pressure_altitude != 0.0)
-    pos.StdAltitude = (int32_t) (this_aircraft->pressure_altitude * 10);
-  pos.ClimbRate = this_aircraft->stealth ?
-                    0 : (int32_t) (this_aircraft->vs * (1.0 / (_GPS_FEET_PER_METER * 6.0)));
-  pos.Heading = (int16_t) (this_aircraft->course * 10);
-  pos.Speed   = (int16_t) (this_aircraft->speed * (10.0 * _GPS_MPS_PER_KNOT));
-  pos.HDOP    = (uint8_t) (this_aircraft->hdop / 10);
+  // if not airborne, transmit only once in 8 seconds
+  if (aircraft->airborne == 0 && (RF_time & 0x07 != 0x07))
+      return 0;
+
+  pos.Latitude  = (int32_t) (aircraft->latitude * 600000);
+  pos.Longitude = (int32_t) (aircraft->longitude * 600000);
+  pos.Altitude  = (int32_t) (aircraft->altitude * 10);        // height above ellipsoid
+  if (aircraft->pressure_altitude != 0.0)
+    pos.StdAltitude = (int32_t) (aircraft->pressure_altitude * 10);
+  pos.ClimbRate = aircraft->stealth ?
+                    0 : (int32_t) (aircraft->vs * (1.0 / (_GPS_FEET_PER_METER * 6.0)));
+  pos.Heading = (int16_t) (aircraft->course * 10);
+  pos.Speed   = (int16_t) (aircraft->speed * (10.0 * _GPS_MPS_PER_KNOT));
+  pos.HDOP    = (uint8_t) (aircraft->hdop / 10);
 
   int second = gnss.time.second();
   if (leap_seconds_correction != 0) {
@@ -149,24 +186,30 @@ size_t adsl_encode(void *pkt, container_t *this_aircraft) {
 
   t.Init();
 
-  if (this_aircraft != &ThisAircraft) {   // relaying another aircraft
-      t.setAddrTypeOGN(this_aircraft->addr_type);
+  t.setAddress(aircraft->addr);
+
+  uint8_t aircraft_type = aircraft->aircraft_type;
+
+  if (aircraft != &ThisAircraft) {   // relaying another aircraft
+      t.setAddrTypeOGN(aircraft->addr_type);
+      t.setRelay(1);
   } else {
       uint8_t addr_type = settings->id_method;
       if (addr_type == ADDR_TYPE_OVERRIDE)
           addr_type = ADDR_TYPE_FLARM;
-      if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
-          t.setAddrTypeOGN(ADDR_TYPE_OGN);
-      else   // main protocol is not OGNTP, or ICAO (or random) ID
-          t.setAddrTypeOGN(addr_type);
+      t.setAddrTypeOGN(addr_type);
+      t.setRelay(0);
+      if (landed_out_mode)
+          aircraft_type = AIRCRAFT_TYPE_UNKNOWN;        // mark this aircraft as landed-out
   }
 
-  t.setAddress(this_aircraft->addr);
-  t.setRelay(0);
-
-  uint8_t aircraft_type = this_aircraft->aircraft_type;
-  if (aircraft_type == AIRCRAFT_TYPE_WINCH)
+  if (aircraft_type == AIRCRAFT_TYPE_WINCH) {
       aircraft_type = AIRCRAFT_TYPE_STATIC;
+      t.FlightState = 2;   // pretend to be airborne (with variable altitude)
+  } else {
+      t.FlightState = (aircraft->airborne? 2 : 1);   // >>> t.Meta.FlightState ?
+  }
+
   t.setAcftTypeOGN((int16_t) aircraft_type);
 
   pos.Encode(t);

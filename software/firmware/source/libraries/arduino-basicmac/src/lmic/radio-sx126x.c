@@ -518,6 +518,9 @@ static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     if (LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_55)
         ++PreambleLength;
 
+// test: PreambleLength = 5;
+// that was received both by PowerFLARM and by SoftRF in dual FLR_ADSL reception mode
+
     param[0] = (PreambleLength >> 8 ) & 0xFF;
     param[1] = (PreambleLength      ) & 0xFF;
 
@@ -549,8 +552,8 @@ static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
       if (LMIC.protocol->syncword_skip != 0) {
           // when receiving, ignore this many sync bytes
           SyncWordLength -= (LMIC.protocol->syncword_skip << 3);
-      } else if (LMIC.protocol->syncword_size == 2) {
-          /* Work around premature P3I syncword detection */
+      } else if (LMIC.protocol->syncword_size == 2 && LMIC.protocol->syncword[0] == 0xB4) {
+          /* Work around premature P3I (but not FLR_ADSL) syncword detection */
           SyncWordLength += SyncWordLength;
       }
     }
@@ -662,8 +665,8 @@ static void SetSyncWordFsk (uint8_t quirks) {
 //    uint8_t buf[3] = { syncword >> 16, syncword >> 8, syncword & 0xFF };
 //    WriteRegs(REG_SYNCWORD0, buf, 3);
     if (quirks == RX_QUIRKS) {
-      if (LMIC.protocol->syncword_size == 2) {
-        /* Work around premature P3I syncword detection */
+      if (LMIC.protocol->syncword_size == 2 && LMIC.protocol->syncword[0] == 0xB4) {
+        /* Work around premature P3I (but not FLR_ADSL) syncword detection */
         uint8_t preamble = LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_AA ? 0xAA : 0x55;
         WriteReg (REG_SYNCWORD0, preamble);
         WriteReg (REG_SYNCWORD1, preamble);
@@ -673,7 +676,7 @@ static void SetSyncWordFsk (uint8_t quirks) {
       uint8_t syncskip = LMIC.protocol->syncword_skip;
       if (syncskip != 0) {
         // when receiving, ignore this many sync bytes
-        uint8_t *syncword = LMIC.protocol->syncword;
+        const uint8_t *syncword = LMIC.protocol->syncword;
         WriteRegs(REG_SYNCWORD0, syncword + syncskip, LMIC.protocol->syncword_size - syncskip);
         return;
       }

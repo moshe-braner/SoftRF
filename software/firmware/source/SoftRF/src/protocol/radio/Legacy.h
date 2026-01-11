@@ -20,6 +20,8 @@
 #ifndef PROTOCOL_LEGACY_H
 #define PROTOCOL_LEGACY_H
 
+#include <protocol.h>
+
 // 24 bit SYNC word: 31FAB6
 //  add F5 prefix extension to match last 8 bits of the legacy nRF905 device preamble
 /*  to support devices that include this extension in their SYNC definition, thus:
@@ -32,6 +34,21 @@
 #define LEGACY_PAYLOAD_SIZE    24
 #define LEGACY_CRC_TYPE        RF_CHECKSUM_TYPE_CCITT_FFFF
 #define LEGACY_CRC_SIZE        2
+
+// Dual-protocol reception using a short sync word embdded within the long one
+// - idea copied from Pawel Jalocha's OGN Tracker ("develop" branch as of January 2025)
+// The sync is 2 bits into the "0x55 0x99" so just 2 bits at the end are protocol-specific
+// (4 more bytes - 2 bytes after Manchester decoding - are checked later in software)
+// The payload size includes the longer Legacy packet plus the unused part of the long sync
+// The CRC size specified here is the longer ADS-L CRC, not actually used
+#define FLR_ADSL_SYNCWORD      {0x56, 0x66}
+#define FLR_ADSL_SYNCWORD_SIZE 2
+#define FLR_ADSL_SYNCWORD_SKIP 0
+#define FLR_ADSL_PAYLOAD_SIZE  (LEGACY_PAYLOAD_SIZE+3)
+#define FLR_ID_BYTE_1    0x63
+#define FLR_ID_BYTE_2    0xF5
+#define ADSL_ID_BYTE_1   0xE4
+#define ADSL_ID_BYTE_2   0x96
 
 #define LEGACY_AIR_TIME        5 /* in ms */
 
@@ -179,10 +196,14 @@ typedef struct latest_packet
 
 bool legacy_decode(void *, container_t *, ufo_t *);
 bool latest_decode(void *, container_t *, ufo_t *);
+bool flr_adsl_decode(void *, container_t *, ufo_t *);
 size_t legacy_encode(void *, container_t *);
 size_t latest_encode(void *, container_t *);
 
 unsigned int enscale( int value, unsigned int mbits, unsigned int ebits, unsigned int sbits);
 int descale( unsigned int value, unsigned int mbits, unsigned int ebits, unsigned int sbits);
+
+extern const rf_proto_desc_t legacy_proto_desc;
+extern const rf_proto_desc_t flr_adsl_proto_desc;
 
 #endif /* PROTOCOL_LEGACY_H */

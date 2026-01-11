@@ -185,6 +185,8 @@ static void OLED_settings()
     char c = Protocol_ID[ThisAircraft.protocol][0];
     if (settings->relay >= RELAY_ONLY)
         c = 'R';
+    else if (dual_protocol == RF_FLR_ADSL)
+        c = 'D';
     else if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Latest
         c = 'T';
     else if (ThisAircraft.protocol == RF_PROTOCOL_ADSB_1090)  // 'A' for ADS-L

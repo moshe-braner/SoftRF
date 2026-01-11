@@ -195,35 +195,31 @@ void setup()
     SerialBaud = SERIAL_OUT_BR;
   //if (settings->mode == SOFTRF_MODE_GPSBRIDGE)
   //  SerialBaud = 9600;
+  if (SerialBaud != SERIAL_OUT_BR) {
+    Serial.print("Switching baud rate to ");
+    Serial.println(SerialBaud);
+  }
 #if defined(ESP32)
   if (SerialBaud != SERIAL_OUT_BR || settings->altpin0) {
-    if (settings->altpin0) {
-      if (ESP32_pin_reserved(Serial0AltRxPin, false, "Alt RX")) {
-          settings->altpin0 = false;
+    if (settings->altpin0 > 1) {
+      if (ESP32_pin_reserved(settings->altpin0, false, "Alt RX")) {
+          settings->altpin0 = 0;
       } else {
           Serial.print("Switching RX pin to ");
-          Serial.println(Serial0AltRxPin);
+          Serial.println(settings->altpin0);
       }
-    }
-    if (SerialBaud != SERIAL_OUT_BR) {
-      Serial.print("Switching baud rate to ");
-      Serial.println(SerialBaud);
     }
     delay(500);
     Serial.end();
     delay(1500);
     if (settings->altpin0)
-      Serial.begin(SerialBaud, SERIAL_OUT_BITS, Serial0AltRxPin);
+      Serial.begin(SerialBaud, SERIAL_OUT_BITS, settings->altpin0);
     else
       Serial.begin(SerialBaud, SERIAL_OUT_BITS);
   }
   Serial.setRxBufferSize(SerialBufSize);
 #else
   if (SerialBaud != SERIAL_OUT_BR) {
-    if (SerialBaud != SERIAL_OUT_BR) {
-      Serial.print("Switching baud rate to ");
-      Serial.println(SerialBaud);
-    }
     delay(500);
     Serial.end();
     delay(1500);
@@ -461,7 +457,7 @@ static uint32_t lastsuccess = 0;
 
 void normal()
 {
-  static bool firstfix = true;
+  static uint8_t firstfix = 1;
 
   bool rx_tried   = false;
   bool rx_success = false;
@@ -485,7 +481,7 @@ void normal()
 
     static float prev_lat = 0;
     static float prev_lon = 0;
-    if (firstfix) {
+    if (firstfix == 1) {                      // but not 2
         if (gnss.separation.meters()==0) {
             Serial.println(F("Warning: GNSS gives ellipsoid altitude and no geoid & MSL"));
         } else {
@@ -495,7 +491,7 @@ void normal()
         SetupTimeMarker = millis();
         prev_lat = gnss.location.lat();
         prev_lon = gnss.location.lng();
-        firstfix = false;
+        firstfix = 0;
         validfix = false;            // wait for next fix
     } else if (gnss_new_fix) {
         if (fabs(gnss.location.lat()-prev_lat) > 0.15)   // looks like bad data
@@ -534,8 +530,9 @@ void normal()
 Serial.println("Tentative GNSS fix");
       validfix = false;            // wait for next fix
     } else if (GNSSTimeMarker == 0) {
-      if (millis() > initial_time + 30000 || (settings->debug_flags & DEBUG_SIMULATE)) {
-        /* 30 sec after first fix */
+      if (millis() > initial_time + (firstfix==1? 20000 : 5000)
+          || (settings->debug_flags & DEBUG_SIMULATE)) {
+        /* 20 sec after first fix, or 5 sec after re-fix (but no wait if simulating) */
         GNSSTimeMarker = millis();
 Serial.printf("Stable GNSS fix:\r\n\
     lat/lon: %.5f %.5f\r\n\
@@ -551,7 +548,7 @@ gnss.time.hour(), gnss.time.minute(), gnss.time.second());
     }
   } else { /* !validfix */
       if (GNSSTimeMarker == 0)
-        initial_time = 0;       // want to see 30 consecutive seconds with valid fix
+        initial_time = 0;       // want to see 20 consecutive seconds with valid fix
   }
 
   if (validfix) {   // still, after the additional adjustments above
@@ -670,9 +667,10 @@ if (rx_success) which_rx_try = 1;
   } else /* !validfix */ {
     if (GNSSTimeMarker != 0) {   // not validfix now but had it before
       if (badgps==0) badgps = millis();
-      if (millis() > badgps + 30000) {
-        /* 30 consecutive seconds without GPS fix - wipe history */
+      if (millis() > badgps + 40000) {
+        /* 40 consecutive seconds without GPS fix - wipe history */
         badgps = 0;
+        firstfix = 2;         // marks not-first wait for a fix
         initial_time = 0;
         GNSSTimeMarker = 0;
         ThisAircraft.prevtime_ms = 0;

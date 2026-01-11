@@ -80,7 +80,8 @@ static uint8_t get_pps_pin()
         if (settings->gnss_pins == EXT_GNSS_NONE) {
             if (hw_info.revision >= 8 || settings->ppswire)
                 return SOC_GPIO_PIN_TBEAM_V08_PPS;
-        } else if (settings->ppswire) {
+        } else if (settings->ppswire == 1) {
+            // does not happen since settings.cpp Adjust_Settings() converts that to VP
             if (hw_info.revision < 8) {
                 if (settings->gnss_pins == EXT_GNSS_39_4)
                     return SOC_GPIO_PIN_VOICE;   // pin 25 for PPS - VP is used for rx
@@ -98,6 +99,8 @@ static uint8_t get_pps_pin()
                 }
             }
             return Serial0AltRxPin;     // "VP" pin used for external GNSS PPS
+        } else if (settings->ppswire) {
+            return settings->ppswire;   // specifies actual GPIO number
         }
     }
     return SOC_UNUSED_PIN;
@@ -1731,7 +1734,7 @@ byte GNSS_setup() {
 //      attachInterrupt(interrupt_num, SoC->GNSS_PPS_handler, (rising ? RISING : FALLING));
 #endif
   } else {
-      settings->ppswire = false;
+      settings->ppswire = 0;
   }
 
 #if defined(USE_NMEALIB)

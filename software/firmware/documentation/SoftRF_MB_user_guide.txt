@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Oct 21, 2025 to fit software version MB167
+This version last updated Jan 11, 2026 to fit software version MB172
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -38,7 +38,12 @@ The more advanced PowerFLARM units can listen to FLARM signals via two antennas 
 
 What can my version of SoftRF do that the mainline version cannot?
 
-My version can now receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP or ADS-L) once every 16 seconds.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
+My version can now receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP or ADS-L) once every 4 seconds.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
+
+And starting with version MB172, SoftRF can also be configured to:
+* Receive ADS-L signals simultaneously with FLARM signals
+* Relay selected other FLARM traffic, for increased range - in ADS-L format invisible to FLARMs
+* Or, relay selected ADS-B traffic, if so equipped, for the benefit of nearby SoftRF that is not
 
 What can the mainline version of SoftRF do that my version cannot?
 
@@ -231,7 +236,7 @@ Built-in Bluetooth: leave Off, unless you want to connect to an external device 
 
 NMEA output: this selects the port through which the data is sent out: Off (no data sent out), Serial (via the on-board serial interface, which also appears on the USB port), the auxiliary serial interface (T-Beam only), UDP (WiFi), TCP (another WiFi method), or Bluetooth.
 
-NMEA sentences: Data is sent to connected devices via text "sentences" in the NMEA format.  You can turn on or off each of the following types of sentences:  GNSS (position data), Sensors (e.g., barometric sensor, if you attach such to the board), Traffic (traffic data, reported to attached devices in the same format used by FLARM), and (in the advanced settings) External, meaning data arriving from external devices via other ports will be forwarded to this output port (see "data bridging").  Note that from version MB153 some of these settings are not simply on/off, but can control individual sentence subtype.  E.g., enabling GNSS sentences in the basic settings only activates the RMC and GGA sentences.  In the advanced settings you can enter the value "3" (instead of "1") for this ("nmea_g") setting to also get GSA sentences.  Similarly enter "3" in nmea_s to get LK8EX1 sentences in addition to PGRMZ.
+NMEA sentences: Data is sent to connected devices via text "sentences" in the NMEA format.  You can turn on or off each of the following types of sentences:  GNSS (position data), Sensors (e.g., barometric sensor, if you attach such to the board), Traffic (traffic data, reported to attached devices in the same format used by FLARM), and (in the advanced settings) External, meaning data arriving from external devices via other ports will be forwarded to this output port (see "data bridging").  Note that from version MB153 some of these settings are not simply on/off, but can control individual sentence subtype.  E.g., enabling GNSS sentences in the basic settings only activates the RMC and GGA sentences.  In the advanced settings (or via editing the settings.txt file) you can enter the value "3" (instead of "1") for this ("nmea_g") setting to also get GSA sentences (which are needed by Skydemon, for example).  Similarly enter "3" in nmea_s to get LK8EX1 sentences in addition to PGRMZ.
 
 NMEA secondary output: two output ports are allowed simultaneously, e.g., Bluetooth and USB.  Or, UDP and TCP.  Note: Bluetooth at the same time as another wireless option (UDP or TCP) is not a good idea, because they both use the same radio hardware and would thus be in contention.
 
@@ -253,7 +258,7 @@ The settings displayed, and adjusted, within the T-Echo
 In the last display screen in the cycle of screens on the T-Echo, you will see something like this:
 
 Normal  Glider  _      < normal mode, aircraft type glider, relay landed-out aircraft
-US TX P:LAT A:LAT      < US region, full power, Latest protocol, Latest alarm method
+US TX P:T+A A:LAT      < US region, full power, Latest protocol + ADS-L alt-protocol, Latest alarm method
 Device: 60ABCD         < device ID (internal, cannot be changed)
 Aircft: A23456 >>      < aircraft ID - and this is transmitted (">>")         
 --A34567 ++A45678      < ignore ID and follow ID
@@ -281,9 +286,10 @@ And so forth.  Note that after each "click" or "touch", it will take about 2 sec
 The settings accessible via this method are:
 * AIRCRAFT TYPE:Glider, Towplane Helicopter, Powered, Hangglider, Paraglider, Dropplane, Parachute, Balloon, UAV, Static.
 * RF PROTOCOL: LATEST, LEGACY, OGNTP, P3I, FANET, ADS-L.
+* ALTERNATE PROTOCOL: LATEST, LEGACY, OGNTP, ADS-L.  (P3I and FANET listed but are not valid as alternates)
 * RF BAND (REGION): EU, US, UK, AU, NZ, RU, CN, IN, IL, KR.  (UK only for P3I.)
 * Collision prediction algorithm: Latest, Vector, Distance, None.
-* Relay mode: None, Landed.
+* Relay mode: None, Landed, All.
 * Display units: Metric, Imperial, Mixed.
 * Display orientation: Track Up, North Up.
 * Aircraft ID (tedious) and ID type.
@@ -300,7 +306,7 @@ The settings file is plain text, label,value pairs, one per line.  The labels mu
 
 Many of the lines in the settings file have comments added at the end of the line (following "#"), which explain the coding.  That is handy when you are editing the file and want to know what code to enter after the comma.  Here are the codes used for a few important settings:
 
-protocol
+protocol (and altprotocol - P3I and FANET not valid as alternates)
 0	Legacy   /* Air V6 */
 1	OGNTP
 2	P3I      /* PilotAware */

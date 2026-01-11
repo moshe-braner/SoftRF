@@ -64,12 +64,22 @@ set_entry actypes[] = {
 set_entry protocols[] = {
   {RF_PROTOCOL_LEGACY,    "LEGACY"},
   {RF_PROTOCOL_LATEST,    "LATEST"},
+  {RF_PROTOCOL_ADSL,      "ADS-L"},
   {RF_PROTOCOL_OGNTP,     "OGNTP"},
   {RF_PROTOCOL_P3I,       "P3I"},
   {RF_PROTOCOL_FANET,     "FANET"},
-  {RF_PROTOCOL_ADSL,      "ADS-L"},
+  {RF_PROTOCOL_NONE,      "NONE"},
 //  {RF_PROTOCOL_ADSB_UAT,  "ADSB-UAT"},
 //  {RF_PROTOCOL_ADSB_1090, "ADSB-1090"},
+  {-1, NULL}
+};
+
+set_entry altprotos[] = {
+  {RF_PROTOCOL_LEGACY,    "LEGACY"},
+  {RF_PROTOCOL_LATEST,    "LATEST"},
+  {RF_PROTOCOL_ADSL,      "ADS-L"},
+  {RF_PROTOCOL_OGNTP,     "OGNTP"},
+  {RF_PROTOCOL_NONE,      "NONE"},
   {-1, NULL}
 };
 
@@ -111,7 +121,7 @@ set_entry directions[] = {
 set_entry relays[] = {
   {RELAY_OFF, "None"},
   {RELAY_LANDED, "Landed"},
-//{RELAY_ALL, "ADS-B"},
+  {RELAY_ALL, "All"},
 //{RELAY_ONLY, "Only"},
   {-1, NULL}
 };
@@ -161,6 +171,7 @@ set_entry decisions[] = {
 static int decision = 0;
 static int actype = 0;
 static int protocol = 0;
+static int altproto = 0;
 static int region = 0;
 static int alarm = 0;
 static int unit = 0;
@@ -198,6 +209,7 @@ page pages[] = {
   {&decision, decisions, NULL, "what to", "do next:"},
   {&actype, actypes, NULL, "Aircraft", "Type:"},
   {&protocol, protocols, NULL, "RF", "Protocol:"},
+  {&altproto, altprotos, NULL, "Alt", "Protocol:"},
   {&region, regions, NULL, "Frequency", "Band:"},
   {&alarm, alarms, "Collision", "Prediction", "Algorithm:"},
   {&relay, relays, NULL, "Air", "Relay:"},
@@ -224,6 +236,7 @@ void get_settings()
         return;
     actype    = get_one_setting((int) settings->acft_type, actypes);
     protocol  = get_one_setting((int) settings->rf_protocol, protocols);
+    altproto  = get_one_setting((int) settings->altprotocol, altprotos);
     region    = get_one_setting((int) settings->band, regions);
     alarm     = get_one_setting((int) settings->alarm, alarms);
     relay     = get_one_setting((int) settings->relay, relays);
@@ -247,6 +260,7 @@ void EPD_chgconf_save()
 {
     settings->acft_type   = actypes[actype].code;
     settings->rf_protocol = protocols[protocol].code;
+    settings->altprotocol = altprotos[altproto].code;
     settings->band        = regions[region].code;
     settings->alarm       = alarms[alarm].code;
     settings->relay       = relays[relay].code;

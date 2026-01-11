@@ -248,7 +248,7 @@ static void init_stgdesc()
 //stgcomment[STG_GDL90_IN]   = destinations;
 //stgcomment[STG_GDL90]      = destinations;
 //stgcomment[STG_D1090]      = destinations;
-  stgcomment[STG_RELAY]      = "0=off 1=landed 2=ADS-B 3=only";
+  stgcomment[STG_RELAY]      = "0=off 1=landed 2=all 3=only";
   stgcomment[STG_EXPIRE]     = "secs no-rx report 1-30";
   stgcomment[STG_PFLAA_CS]   = yesno;
   stgcomment[STG_STEALTH]    = yesno;
@@ -497,24 +497,35 @@ void Adjust_Settings()
   /* enforce some hardware limitations (not enough GPIO pins) */
   if (hw_info.model == SOFTRF_MODEL_PRIME_MK2) {
 
+      if (settings->altpin0 == 1)
+          settings->altpin0 = Serial0AltRxPin;   // VP, 36
+      if (settings->ppswire == 1)
+          settings->ppswire = Serial0AltRxPin;   // VP, 36
+
       if (hw_info.revision < 8) {
           if (settings->voice == VOICE_EXT) {
               // pin 14 not available, cannot do external I2S
               settings->voice = VOICE_OFF;
           }
           if (settings->baudrate2 != BAUD_DEFAULT) {
-              // aux serial uses VP, cannot use it for main serial rx
-              settings->altpin0 = false;
-              if (settings->gnss_pins == EXT_GNSS_15_14)
-                  settings->ppswire = false;
+              // aux serial on v0.7 uses VP, cannot use it for main serial RX nor for PPS
+              if (settings->altpin0 == Serial0AltRxPin)
+                  settings->altpin0 = 0;
+              if (settings->ppswire == Serial0AltRxPin) {
+                  if (settings->gnss_pins == EXT_GNSS_13_2
+                  && (settings->voice == VOICE_OFF && settings->strobe == STROBE_OFF))
+                      settings->ppswire = SOC_GPIO_PIN_VOICE;   // pin 25 for PPS
+                  else
+                      settings->ppswire = 0;
+              }
           }
           if (settings->gnss_pins == EXT_GNSS_39_4) {
               // GNSS uses VP, cannot use it for main serial rx
-              settings->altpin0 = false;
-              if (settings->voice != VOICE_OFF || settings->strobe != STROBE_OFF)
-                  settings->ppswire = false;
-              if (settings->sd_card == SD_CARD_13_25) {
-                  settings->ppswire = false;
+              if (settings->altpin0 == Serial0AltRxPin)
+                  settings->altpin0 = SOC_GPIO_PIN_VOICE;   // pin 25 for PPS
+              if (settings->ppswire == Serial0AltRxPin) {
+                  if (settings->sd_card == SD_CARD_13_25)
+                      settings->ppswire = 0;
               }
           }
           if (settings->gnss_pins == EXT_GNSS_15_14) {
@@ -527,7 +538,7 @@ void Adjust_Settings()
               if (settings->sd_card == SD_CARD_13_25) {
                   settings->sd_card = SD_CARD_NONE;
                   settings->gnss_pins = EXT_GNSS_NONE;  // don't know what's wired
-                  settings->ppswire = false;
+                  settings->ppswire = 0;
               }
           }
           if (settings->gnss_pins == EXT_GNSS_13_2) {
@@ -545,25 +556,35 @@ void Adjust_Settings()
               //if (settings->gnss_pins != EXT_GNSS_NONE)
               //    settings->ppswire = false;
           }
-          if (settings->ppswire && settings->gnss_pins == EXT_GNSS_15_14)
-              settings->altpin0 = false;
+          //if (settings->ppswire && settings->gnss_pins == EXT_GNSS_15_14)
+          //    settings->altpin0 = false;
           //if (settings->gnss_pins == EXT_GNSS_39_4)   // already done above
           //    settings->altpin0 = false;
-          if (settings->rx1090 != ADSB_RX_NONE)
-              settings->altpin0 = false;
+          if (settings->altpin0 == Serial0AltRxPin && settings->rx1090 != ADSB_RX_NONE)
+              settings->altpin0 = 0;
       } else {    // T-Beam v1.x
           //if (settings->gnss_pins == EXT_GNSS_NONE || settings->sd_card == SD_CARD_13_VP)
           if (settings->gnss_pins == EXT_GNSS_NONE)
-              settings->ppswire = false;
-          if (settings->ppswire)
-              settings->altpin0 = false;
+              settings->ppswire = 0;     // PPS is hardwired on the board
+          //if (settings->ppswire)
+          //    settings->altpin0 = false;
           if (settings->gnss_pins == EXT_GNSS_13_2) {
               if (settings->sd_card == SD_CARD_13_25 || settings->sd_card == SD_CARD_13_VP) {
                   settings->sd_card = SD_CARD_NONE;
                   settings->gnss_pins = EXT_GNSS_NONE;  // don't know what's wired
               }
           }
+          if (settings->ppswire == Serial0AltRxPin) {
+              if (settings->sd_card == SD_CARD_13_VP) {
+                  if (settings->voice == VOICE_OFF && settings->strobe == STROBE_OFF)
+                      settings->ppswire = SOC_GPIO_PIN_VOICE;   // pin 25 for PPS
+                  else
+                      settings->ppswire = 0;
+              }
+          }
       }
+      if (settings->altpin0 == settings->ppswire)
+          settings->altpin0 == 0;
       if (settings->gnss_pins == EXT_GNSS_39_4) {
           settings->baudrate2 = BAUD_DEFAULT;       // meaning disabled
           settings->rx1090    = ADSB_RX_NONE;
@@ -830,7 +851,7 @@ void Settings_defaults(bool keepsome)
     }
 
     settings->gnss_pins = EXT_GNSS_NONE;   // whether an external GNSS module was added to a T-Beam
-    settings->ppswire   = false;       // whether T-Beam v0.7 or external GNSS has PPS wire connected
+    settings->ppswire   = 0;               // whether T-Beam v0.7 or external GNSS has PPS wire connected
     settings->sd_card   = SD_CARD_NONE;
     settings->logflight = FLIGHT_LOG_NONE;
     settings->loginterval = 4;
@@ -853,7 +874,7 @@ void Settings_defaults(bool keepsome)
 //settings->json        = JSON_OFF;
   settings->power_save  = (hw_info.model == SOFTRF_MODEL_BRACELET ? POWER_SAVE_NORECEIVE : POWER_SAVE_NONE);
   settings->power_ext   = 0;
-  settings->altpin0     = false;
+  settings->altpin0     = 0;
   settings->debug_flags = 0;      // if and when debug output will be turned on - 0x3F for all
 
   settings->igc_key[0] = 0;

@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Dec 28, 2025 to fit software version MB171
+This version last updated Jan 10, 2026 to fit software version MB172
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -26,18 +26,18 @@ ignore_id - Aircraft ID to ignore: You can enter an aircraft (or device) ID that
 
 follow_id - Aircraft ID to follow: You can enter an aircraft (or device) ID to prioritize in traffic reports.  E.g., your flying buddy in another aircraft.  Leave as 000000 to not use this feature.  SoftRF tracks up to 8 aircraft, and reports up to 6, normally selecting the closest ones.  If an ID to follow is specified, it will be shown even if it is not one of the closest.  (An aircraft that is a collision danger will always take priority though.)
 
-tx_power - Only accessible via editing the settings.txt file.  2 for full transmission power (default), 1 for low power, 0 for receive-only.  Normally use "2" (which is 100 mW or less, depending on the regional legal limit, and only 8 mW for relay-only mode).  Use "1" (2 mW) for short-range testing, and "0" (no transmissions) when running SoftRF as a ground station, or when carrying a second device in the same aircraft.  If you want to limit visibility to other aircraft while retaining collision avoidance (it takes two to tango), use full power, and activate "Stealth mode".  To avoid being tracked by ground stations, activate "no_track".  Both of these are in the basic settings web page on the T-Beam.  (Note: old settings.txt files may have the (still valid) setting "txpower" (not same as "tx_power") with the obsolete coding 2=off, 0=full power.)
+tx_power - Only accessible via editing the settings.txt file.  2 for full transmission power (default), 1 for low power, 0 for receive-only.  Normally use "2" (which is 100 mW or less, depending on the regional legal limit and what is safe for the radio chip, and only 8 mW for relay-only mode).  Use "1" (2 mW) for short-range testing, and "0" (no transmissions) when running SoftRF as a ground station, or when carrying a second device in the same aircraft.  If you want to limit visibility to other aircraft while retaining collision avoidance (it takes two to tango), use full power, and activate "Stealth mode".  To avoid being tracked by ground stations, activate "no_track".  Both of these are in the basic settings web page on the T-Beam.  (Note: old settings.txt files may have the (still valid) setting "txpower" (not same as "tx_power") with the obsolete coding 2=off, 0=full power.)
 
 hrange - horizontal reporting range in km
 vrange - vertical reporting range in hundreds of meters
 pointer - LED ring direction, for display such as "FLARMview". 1=track up, 2=North up
-relay - 0=off, 1=relay landed-out by opt-in, 2=relay ADS-B traffic, 3=relay-only - see section below for details
+relay - 0=off, 1=relay landed-out by opt-in, 2=relay "all" traffic, 3=relay-only - see section below for details
 pflaa_cs - 1 (default) to include "callsign" after hex ID in PFLAA sentences, 0 to exclude
 
 expire - number of seconds to keep reporting traffic not heard from - 1-30, default=5
     (note: the display device may keep reporting for longer, e.g., XCsoar for 5 more seconds)
 
-altprotocol - default=255, meaning none.  Set to 0 (Legacy), 1 (OGNTP), 7 (Latest) or 8 (ADS-L) to transmit in an alternative protocol once every 16 sec.  Only possible if the main protocol is also 0, 1, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP, to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting in that once-per-16-second opening.  (ADS-B traffic is not relayed in alt-protocol.)
+altprotocol - default=255, meaning none.  Set to 0 (Legacy), 1 (OGNTP), 7 (Latest) or 8 (ADS-L) to transmit in an alternative protocol once every 4 seconds.  This is only possible if the main protocol is also 0, 1, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP, to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting once per 16 seconds.  New in version mb172: if the main protocol is "Latest" and the altprotocol is ADS-L, or vice versa, then reception is dual-protocol, both FLARM (Latest or Legacy) and ADS-L are received simultaneously.  If altprotocol is OGNTP, the same FLARM+ADS-L dual mode reception happens, and the altprotocol transmissions alternate between ADS-L and OGNTP - call it "two and a half protocols".  But there is no OGNTP reception, unless it is the main protocol, in which case there is no FLARM nor ADS-L reception.
 
 nmea_out and nmea_out2 - NMEA output destination codes are: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=Bluetooth 6=secondary serial.  Some destinations are not available on some devices, e.g., the T-Echo has BT but not UDP nor TCP nor secondary serial.
 
@@ -74,7 +74,7 @@ geoid - Geoid Separation.  Only accessible via editing the settings.txt file.  M
 
 On the T-Beam only:
 
-altpin0 - Serial Port input pin: the default is the "RX" pin on the T-Beam, which is connected to the USB interface and thus not available for input from a TTL serial device.  You can choose to use the "VP" pin instead, dis-associating serial input from the USB port.  Or use the secondary serial port instead.
+altpin0 - Serial Port input pin: the default (altpin0,0) is the "RX" pin on the T-Beam, which is connected to the USB interface and thus not available for input from a TTL serial device.  You can choose (altpin0,1) to use the "VP" pin instead, dis-associating serial input from the USB port.  Or specify any pin (altpin0,36).  Or use the secondary serial port instead.
 
 baudrate2 - baud rate code (0=off 2=9600 3=19200 4=38400 etc) for the secondary serial port (pins 39 ("VN") & 4)
 
@@ -119,7 +119,7 @@ rfc - Radio frequency correction, +- up to 30 KHz, for sx1276 only.  Only access
 
 gnss_pins - GNSS module connection: the default (0) is the internal GNSS.  If an external one is connected, use this setting to specify which pins it is connected to.  Values: 0=Internal, 1=pins 39 & 4, 2=pins 13 & 2, 3=pins 15 & 14.  See the section about connecting other hardware.
 
-ppswire - Added PPS wire: normally leave as 0 ("absent").  The 1 ("present") option serves two purpose:  If an external GNSS module is connected, including a wire bringing the PPS signal to the T-Beam's VP pin, this setting tells SoftRF to use that connection for more precise timing.  And if the internal GNSS is used on a T-Beam v0.7, which unlike v1.x does not come with the PPS connection built in, this setting tells SoftRF that a modification has been done to add that missing connection.
+ppswire - Added PPS wire: normally leave as 0 (none).  This option serves two purpose:  If an external GNSS module is connected, including a wire bringing the PPS signal to the T-Beam's "VP" pin (if ppswire,1 - or specify some other pin, e.g., ppswire,25), this setting tells SoftRF to use that connection for more precise timing.  And if the internal GNSS is used on a T-Beam v0.7, which unlike v1.x does not come with the PPS connection built in, ppswire,1 tells SoftRF that a hardware modification has been done to add that missing connection.
 
 sd_card - SD card adapter: If such an adapter is added to a T-Beam, change this setting from 0 to the code that fits the pins used for the connection.  The choices are:
  0 = no SD card
@@ -181,7 +181,7 @@ The additional code to process the ADS-B messages only added about 20 KB to the 
 
 Mode-S messages only convey altitude, not position.  The aircraft ID is overlaid on the CRC bits but is recovered on the assumption that there are no bit errors.  A very rough estimate of the distance is computed based on the signal strength (RSSI), which is an integer in the range 22-42.  This estimate, taylored for the specific installation, is based on data collected when ADS-B messages (with position, thus a known distance under 6km) are received.  The data counts are stored by 4 distance categories.  For Mode-S, it is considered to be closer than some distance if the RSSI is higher than the highest RSSI for which most of the recorded ADS-B distances are farther.  E.g., if most ADS-B messages with RSSI 32 are from more than 1km away, then Mode-S messages with RSSI 32 or below are assumed to be more than 1km away (and thus do not generate a collision warning).  The sample is highly biased towards farther distances since the covered area is proportional to the distance squared.  But this is not corrected for, since a real-time signal is also similarly biased.  The sampled data is not used until at least 100 ADS-B messages have been received from less than 1km away, which may require multiple flights.  Until then default RSSI thresholds are used.  The data is stored in a file in SPIFFS, to reset it (e.g., after revising the antenna installation) use the "clear all SPIFFS files" button in the web interface.
 
-ADS-B traffic (and similarly traffic from an external GDL90 source) can be included in the "air relay" feature of my version of SoftRF.  I.e., if an ADS-B aircraft is received from, SoftRF can optionally re-transmit (but not re-re-transmit) the position of that aircraft, in the "Latest" radio packet format.  That makes the ADS-B traffic visible to other nearby SoftRF devices that do not have an ADS-B receiver.
+ADS-B traffic (and similarly traffic from an external GDL90 source) can be included in the "air relay" feature of my version of SoftRF.  I.e., if an ADS-B aircraft is received from, SoftRF can optionally re-transmit (but not re-re-transmit) the position of that aircraft, in the "Latest" (or "Legacy") radio packet format.  That makes the ADS-B traffic visible to other nearby SoftRF devices that do not have an ADS-B receiver.
 
 Data bridging
 
@@ -198,13 +198,15 @@ TIPS AND TRICKS
 
 Air Relay
 
-Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("ADS-B") also relays other aircraft that were received via ADS-B (if an ADS-B receiver module is installed), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  In "3" ("relay only") mode, SoftRF (only if it is airborne) relays ADS-B traffic, more often, at lower power (8 mW if set to "full power), but does not transmit its own position - use this mode to spread the benefit of ADS-B reception in SoftRF to Classic FLARMs in the same or nearby aircraft.
+Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B (if an ADS-B receiver module is installed), or FLARM traffic (if no ADS-B module is installed), relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or OGNTP), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away is relayed.  Conversely, only ADS-B traffic that is less than 10km away is relayed, unless the traffic is a jet or helicopter.
 
-Relayed packets from landed-out aircraft (marked by the aircraft type being zero) are visible to FLARMs.  ADS-B traffic relayed by SoftRF in relay-ADS-B mode can only be received by other SoftRF devices, since they are relayed in the "Legacy" old protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field, which seems to be ignored by OGN ground stations.  To test relaying on the ground (while not airborne) can enter "test mode".
+In "3" ("relay only") mode, SoftRF (only if it is airborne) relays ADS-B traffic, more often, at lower power (8 mW if set to "full power), but does not transmit its own position - use this mode to spread the benefit of ADS-B reception in SoftRF to Classic FLARMs in the same or nearby aircraft.
+
+Relayed packets from landed-out aircraft (marked by the aircraft type being zero) are visible to FLARMs.  ADS-B and FLARM traffic relayed by SoftRF in relay-all mode are relayed in the ADS-L protocol to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
 
 Test Mode
 
-Some things are arranged at compile time to behave differently in "test mode".  Currently: air-relay will happen even if not airborne.  To toggle test mode, double-click middle button of T-Beam, use the URL .../testmode in the web interface, or send the NMEA command $PSRFT.  Querying test mode status with $PSRFT,?*50 when a GNS5892 is active also saves and shows (in USB-serial output) the "RSSI zone stats".
+Some things are arranged at compile time to behave differently in "test mode".  Currently: in test mode air-relay will happen even if not airborne.  To toggle test mode, double-click middle button of T-Beam, or use the URL .../testmode in the web interface, or send the NMEA command $PSRFT.  Querying test mode status with $PSRFT,?*50 when a GNS5892 is active also saves and shows (in USB-serial output) the "RSSI zone stats".
 
 How to upload and download files
 

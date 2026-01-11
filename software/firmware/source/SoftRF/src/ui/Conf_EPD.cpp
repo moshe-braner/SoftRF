@@ -56,7 +56,7 @@ static void EPD_Draw_Conf()
 
 /*
 Normal  Glider  R
-US TX P:LEG A:LEG
+US TX P:LAT A:LAT
 Device: 123456
 Aircft: 123456 >>
 --123456 ++123456
@@ -86,11 +86,33 @@ NMEA2: USB LD
 
       y += CONF_VIEW_LINE_SPACING;
 
+      const char *protostr = Protocol_ID[settings->rf_protocol];
+      if (settings->altprotocol != RF_PROTOCOL_NONE) {
+          if (settings->rf_protocol == RF_PROTOCOL_LATEST) {
+              if (settings->altprotocol == RF_PROTOCOL_ADSL)
+                  protostr = "T+A";
+              if (settings->altprotocol == RF_PROTOCOL_OGNTP)
+                  protostr = "TAo";
+          }
+          if (settings->rf_protocol == RF_PROTOCOL_ADSL) {
+              if (settings->altprotocol == RF_PROTOCOL_LATEST)
+                  protostr = "A+T";
+              if (settings->altprotocol == RF_PROTOCOL_OGNTP)
+                  protostr = "ATo";
+          }
+          if (settings->rf_protocol == RF_PROTOCOL_OGNTP) {
+              if (settings->altprotocol == RF_PROTOCOL_LATEST)
+                  protostr = "O/t";
+              if (settings->altprotocol == RF_PROTOCOL_ADSL)
+                  protostr = "O/a";
+          }
+      }
+
       snprintf(info_line, sizeof(info_line), "%s %s P:%s A:%s",
           Region_Label[settings->band],
           (settings->txpower == RF_TX_POWER_FULL ? "TX" :
           (settings->txpower == RF_TX_POWER_LOW  ? "tx" : "--" )),
-          Protocol_ID[settings->rf_protocol],
+          protostr,
           (settings->alarm == TRAFFIC_ALARM_LATEST ? "LAT" :
           (settings->alarm == TRAFFIC_ALARM_VECTOR ? "VCT" :
           (settings->alarm == TRAFFIC_ALARM_DISTANCE ? "DST" : "---"))));

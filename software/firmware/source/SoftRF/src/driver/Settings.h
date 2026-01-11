@@ -413,10 +413,10 @@ typedef struct Settings {
     uint8_t  vrange1090;  // hundreds of meters
     uint8_t  gdl90_in;    // data from this port will be interpreted as GDL90
     uint8_t  gnss_pins;
-    bool     ppswire;
-    uint8_t  sd_card;      // gpio pins for SD card adapter
+    uint8_t  ppswire;
+    uint8_t  sd_card;     // gpio pins for SD card adapter
     bool     invert2;     // whether to invert the logic levels on UART2
-    bool     altpin0;     // whether to use a different pin for UART0 RX
+    uint8_t  altpin0;     // whether to use a different pin for UART0 RX
     bool     log_nmea;
 //#endif
     uint8_t  logflight;

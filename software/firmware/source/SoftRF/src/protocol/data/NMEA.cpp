@@ -2153,7 +2153,7 @@ void NMEA_Process_SRF_SKV_Sentences()
           }
 
           // only restart if Version field is nonzero
-          if (loaded && version0 != '0')
+          if ( /* loaded && */ version0 != '0')
               nmea_cfg_restart(true);
         }
       }

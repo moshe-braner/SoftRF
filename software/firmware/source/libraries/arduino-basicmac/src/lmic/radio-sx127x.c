@@ -983,7 +983,7 @@ static void rxfsk (bool rxcontinuous) {
 
     int syncsize = LMIC.protocol->syncword_size;
     int syncskip = LMIC.protocol->syncword_skip;
-    uint8_t *syncword = LMIC.protocol->syncword;
+    const uint8_t *syncword = LMIC.protocol->syncword;
     if (syncskip != 0) {
         // when receiving, ignore this many sync bytes
         syncword = &syncword[syncskip];
