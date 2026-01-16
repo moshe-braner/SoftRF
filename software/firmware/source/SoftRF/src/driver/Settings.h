@@ -413,10 +413,10 @@ typedef struct Settings {
     uint8_t  vrange1090;  // hundreds of meters
     uint8_t  gdl90_in;    // data from this port will be interpreted as GDL90
     uint8_t  gnss_pins;
-    uint8_t  ppswire;
-    uint8_t  sd_card;     // gpio pins for SD card adapter
+    bool     ppswire;
+    uint8_t  sd_card;      // gpio pins for SD card adapter
     bool     invert2;     // whether to invert the logic levels on UART2
-    uint8_t  altpin0;     // whether to use a different pin for UART0 RX
+    bool     altpin0;     // whether to use a different pin for UART0 RX
     bool     log_nmea;
 //#endif
     uint8_t  logflight;
@@ -514,6 +514,7 @@ typedef union EEPROM_U {
 #define DEBUG_DEEPER 0x10
 #define DEBUG_DEEPER2 0x20
 // now debug_flags is 24 bits so can have many other specific values
+#define DEBUG_RELAY 0x800
 #define DEBUG_SIMULATE 0x800000
 
 void Adjust_Settings(void);

@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Jan 10, 2026 to fit software version MB172
+This version last updated Jan 16, 2026 to fit software version MB173
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -74,7 +74,7 @@ geoid - Geoid Separation.  Only accessible via editing the settings.txt file.  M
 
 On the T-Beam only:
 
-altpin0 - Serial Port input pin: the default (altpin0,0) is the "RX" pin on the T-Beam, which is connected to the USB interface and thus not available for input from a TTL serial device.  You can choose (altpin0,1) to use the "VP" pin instead, dis-associating serial input from the USB port.  Or specify any pin (altpin0,36).  Or use the secondary serial port instead.
+altpin0 - Serial Port input pin: the default (altpin0,0) is the "RX" pin on the T-Beam, which is connected to the USB interface and thus not available for input from a TTL serial device.  You can choose (altpin0,1) to use the "VP" pin instead, dis-associating serial input from the USB port.  Or specify any available pin, e.g., altpin0,25.  Or use the secondary serial port instead.
 
 baudrate2 - baud rate code (0=off 2=9600 3=19200 4=38400 etc) for the secondary serial port (pins 39 ("VN") & 4)
 
@@ -181,7 +181,7 @@ The additional code to process the ADS-B messages only added about 20 KB to the 
 
 Mode-S messages only convey altitude, not position.  The aircraft ID is overlaid on the CRC bits but is recovered on the assumption that there are no bit errors.  A very rough estimate of the distance is computed based on the signal strength (RSSI), which is an integer in the range 22-42.  This estimate, taylored for the specific installation, is based on data collected when ADS-B messages (with position, thus a known distance under 6km) are received.  The data counts are stored by 4 distance categories.  For Mode-S, it is considered to be closer than some distance if the RSSI is higher than the highest RSSI for which most of the recorded ADS-B distances are farther.  E.g., if most ADS-B messages with RSSI 32 are from more than 1km away, then Mode-S messages with RSSI 32 or below are assumed to be more than 1km away (and thus do not generate a collision warning).  The sample is highly biased towards farther distances since the covered area is proportional to the distance squared.  But this is not corrected for, since a real-time signal is also similarly biased.  The sampled data is not used until at least 100 ADS-B messages have been received from less than 1km away, which may require multiple flights.  Until then default RSSI thresholds are used.  The data is stored in a file in SPIFFS, to reset it (e.g., after revising the antenna installation) use the "clear all SPIFFS files" button in the web interface.
 
-ADS-B traffic (and similarly traffic from an external GDL90 source) can be included in the "air relay" feature of my version of SoftRF.  I.e., if an ADS-B aircraft is received from, SoftRF can optionally re-transmit (but not re-re-transmit) the position of that aircraft, in the "Latest" (or "Legacy") radio packet format.  That makes the ADS-B traffic visible to other nearby SoftRF devices that do not have an ADS-B receiver.
+ADS-B traffic (and similarly traffic from an external GDL90 source) can be included in the "air relay" feature of my version of SoftRF.  I.e., if an ADS-B aircraft is received from, SoftRF can optionally re-transmit (but not re-re-transmit) the position of that aircraft, in the "Legacy" radio protocol, or in ADS-L.  That makes the ADS-B traffic visible to other nearby SoftRF devices that do not have an ADS-B receiver.
 
 Data bridging
 
@@ -198,11 +198,11 @@ TIPS AND TRICKS
 
 Air Relay
 
-Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B (if an ADS-B receiver module is installed), or FLARM traffic (if no ADS-B module is installed), relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or OGNTP), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away is relayed.  Conversely, only ADS-B traffic that is less than 10km away is relayed, unless the traffic is a jet or helicopter.
+Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B (if an ADS-B receiver module is installed), or FLARM traffic (if no ADS-B module is installed), relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or OGNTP), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away (or closer if lower) is relayed.  Conversely, only ADS-B traffic that is less than 8km away is relayed (10km for helicopters and 16km for jets).
 
 In "3" ("relay only") mode, SoftRF (only if it is airborne) relays ADS-B traffic, more often, at lower power (8 mW if set to "full power), but does not transmit its own position - use this mode to spread the benefit of ADS-B reception in SoftRF to Classic FLARMs in the same or nearby aircraft.
 
-Relayed packets from landed-out aircraft (marked by the aircraft type being zero) are visible to FLARMs.  ADS-B and FLARM traffic relayed by SoftRF in relay-all mode are relayed in the ADS-L protocol to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
+Relayed packets from landed-out aircraft (SoftRF manually switched into this mode, marked by the aircraft type being zero) are visible to FLARMs.  If SoftRF is in dual-protocol mode and in relay-all mode, it relays ADS-B and FLARM traffic in the ADS-L protocol, to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  If not in dual-protocol mode, FLARM traffic is not relayed, and ADS-B traffic is relayed in the "Legacy" protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
 
 Test Mode
 
@@ -462,6 +462,10 @@ From version MB155, SoftRF collects summary data about the distance and receptio
         -91.4,2.58      # average RSSI, mean square deviation
 The file is read, new data appended during the flight, and a new version of the file is written after landing.  If a flight log is being recorded, the range statistics are also written as "LPLTAN,..." comment lines in the IGC file.  Samples are only taken if airborne, of other aircraft that are airborne, and at least 1km away and not at too high or low a vertical angle.  ADS-B traffic is not sampled.  The range averaging is done on a log scale, but the range numbers as plain km appear as the first item in each line in the file.  If, after enough data has been collected, the range is much lower in some directions than others, the antenna placement may not be ideal.  If the RSSI average is much higher (less negative) than -100, there is radio noise in the cockpit making SoftRF reception less sensitive.  E.g., a USB power converter may generate such noise.  If the RSSI mean square deviation is large, such noise may be intermittent, perhaps caused by a device that is only sometimes carried along or turned on.  To forget the old data and start over collecting new range data, delete the file range.txt.
 
+Dual-protocol reception
+
+From version MB172, can receive FLARM and ADS-L simultaneously.  This is done following Pawel Jalocha's method in his OGN Tracker.  The sync word is just 16 bits, starting 2 bits into the "0x55 0x99" part of the sync word, which mimics the nRF905 preamble, and ending 2 bits into the rest of the sync word.  These 16 bits are the same in both protocols.  If such a packet arrives, the software then checks the next 32 bits of the sync word (2 bytes after Manchester decoding).  If these match that part of the sync word for either FLARM or ADS-L then the packet is processed: the received bits are shifted to recover the real payload, the CRC is computed and compared with the received CRC, and the packet is accepted if the CRCs match.  To enable this dual reception, ADS-L is sent and received on the same frequency as FLARM - setting a standard for future use of ADS-L in regions outside the EU.  OGNTP is always sent and received on a different frequency, thus cannot be received simultaneously as these other protocols.
+
 
 KNOWN ISSUES
 
@@ -470,8 +474,6 @@ Packets-transmitted count on OLED sometimes increments by dozens or hundreds at 
 Packets-received occasionally increments on the T-Echo while there is no traffic within range.  The code reports "RF loopback", meaning an exact replica of the last transmitted packet appears as if it was received.  Probably a bug in programming the sx1262 registers.  This is apparently harmless.  (The sx1276 bug which caused some received packets to be actually retransmitted has been fixed.)
 
 Reception of FLARM signals can be further improved by shifting our clock (for frequency hopping) by about 50 ms.  Not clear why.
-
-Should switch (from the version used in SoftRF v1.0) to a later version of the basicmac library?  Use the new RadioLib?
 
 
 COMPILING SOFTRF

@@ -783,7 +783,7 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
 void logOneTraffic(container_t *fop, const char *label)
 {
 //#if defined(USE_SD_CARD)
-    uint32_t addr = ((fop->no_track && fop->tx_type==TX_TYPE_FLARM)? 0xAAAAAA : fop->addr);
+    uint32_t addr = (fop->no_track? 0xAAAAAA : fop->addr);
     int alarm_level = fop->alarm_level - 1;
     if (alarm_level < ALARM_LEVEL_NONE)
         alarm_level = ALARM_LEVEL_NONE;
@@ -799,6 +799,21 @@ void logOneTraffic(container_t *fop, const char *label)
     NMEAOutD();
     FlightLogComment(NMEABuffer+4);   // it will prepend the LPLT
 //#endif
+}
+
+void logrelayed(container_t *cip)
+{
+    uint32_t addr = (cip->no_track? 0xAAAAAA : cip->addr);
+    snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+      PSTR("LPLTR,%d,%d,%d,%06x,%d,%d,%d,%d\r\n"),
+      cip->tx_type, cip->protocol, cip->aircraft_type, addr,
+      (int)cip->distance, (int)cip->bearing, (int)cip->alt_diff, cip->rssi);
+    if (settings->debug_flags & DEBUG_RELAY)
+        NMEAOutD();
+    else
+        Serial.print(NMEABuffer);
+    if (FlightLogOpen && settings->logflight == FLIGHT_LOG_TRAFFIC)
+        FlightLogComment(NMEABuffer+4);   // it will prepend the LPLT
 }
 
 // insert data about all "close" traffic into the flight log
@@ -985,6 +1000,10 @@ void Traffic_Update(container_t *fop)
       }
 //#endif
   }
+
+  // report received relayed - if first time or fresh
+  if (fop->relayed && (fop->timerelayed==0 || fop->timerelayed==fop->timestamp))
+      logrelayed(fop);
 }
 
 static float oldrange[12];
@@ -1174,6 +1193,7 @@ Serial.println("...relay_waiting");
                        && cip->airborne == 0 && cip->protocol == RF_PROTOCOL_LATEST);
     bool normal_protocol = (current_RF_protocol == settings->rf_protocol);
     bool adsb = (cip->tx_type >= TX_TYPE_TISB || cip->tx_type <= TX_TYPE_ADSB);
+                // - this may be GDL90 input from an attached device, possibly not truly ADS-B
     bool adsl_relay = false;
 
     if (! landed_out) {
@@ -1181,7 +1201,13 @@ Serial.println("...relay_waiting");
             return;
         if (dual_protocol == RF_FLR_ADSL && cip->protocol == RF_PROTOCOL_LATEST) {
             // relay FLARM traffic >10km away in ADSL protocol
-            if (cip->distance < 10000 && (! test_mode))
+            //if (cip->distance < 10000 && (! test_mode))
+            //    return;
+            bool relay = test_mode;
+            if (cip->distance > 10000)  relay = true;
+            // also relay closer traffic if it is much lower
+            else if (cip->alt_diff < -1000.0f && cip->adj_distance > 15000)  relay = true;
+            if (! relay)
                 return;
         } else {
             // only relay ADS-B
@@ -1189,16 +1215,27 @@ Serial.println("...relay_waiting");
                 return;
             if (! normal_protocol)  // do not relay ADS-B in altprotocol
                 return;
-            if (cip->aircraft_type != AIRCRAFT_TYPE_JET && cip->aircraft_type != AIRCRAFT_TYPE_HELICOPTER) {
-                if (cip->distance > 10000)  // only relay gliders and light planes if close
+            if (cip->aircraft_type == AIRCRAFT_TYPE_JET) {
+                if (cip->distance > 16000)
                     return;
+            } else if (cip->aircraft_type == AIRCRAFT_TYPE_HELICOPTER) {
+                if (cip->distance > 10000)
+                    return;
+            } else {
+                if (cip->distance > 8000)  // only relay gliders and light planes if close
+                    return;
+            }
+            //if (cip->aircraft_type != AIRCRAFT_TYPE_JET && cip->aircraft_type != AIRCRAFT_TYPE_HELICOPTER) {
+            //    if (cip->distance > 10000)  // only relay gliders and light planes if close
+            //        return;
                 // - The idea is that if the aircraft is also sending FLARM signals, then if close
                 //     those signals will be received, and other protocols will be ignored.
                 //   Thus if close and another protocol, then no FLARM, and safe to relay,
                 //     meaning it won't make a FLARM "see itself" and go crazy.
-            }
+                // - no longer an issue if we relay in ADS-L protocol
+            //}
         }
-        if (settings->relay < RELAY_ONLY)
+        if (dual_protocol == RF_FLR_ADSL && settings->relay < RELAY_ONLY)
             adsl_relay = true;   // relay non-landed-out in ADS-L protocol
     }
 
@@ -1243,7 +1280,7 @@ Serial.println("...relay_waiting");
     if (RF_Transmit_Happened() == false         // no transmission yet in this time slot 
             && (millis()+20 < TxEndMarker)) {   // enough time left in current time slot
         delay(10);  // give receivers in other aircraft time to process the original packet
-        // re-encode packets for relaying (might be in LEGACY, LATEST or OGNTP protocol)
+        // re-encode packets for relaying (might be in LEGACY, LATEST, ADS-L or OGNTP protocol)
         if (adsl_relay)
             current_RF_protocol = RF_PROTOCOL_ADSL;   // override normal protocol
         size_t s = RF_Encode(cip, false);       // no wait (but must be within time slot)
@@ -1394,18 +1431,24 @@ void AddTraffic(ufo_t *fop, const char *callsign)
 
     bool landed_out = (fop->aircraft_type == AIRCRAFT_TYPE_UNKNOWN && fop->airborne == 0);
 
-    if (settings->rf_protocol == RF_PROTOCOL_LATEST && fop->protocol == RF_PROTOCOL_LATEST) {
+    if (settings->rf_protocol == RF_PROTOCOL_LATEST
+          && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode)) {
       // relay some traffic - only if we are airborne (even in "relay only" mode)
       // - do not relay if ownship main protocol is ADS-L or OGNTP for now
       // - do not relay ADS-L and OGNTP traffic for now
       // - use relay,4 for testing "relay only" mode on the ground
-      if (settings->relay != RELAY_OFF
+      if (fop->protocol == RF_PROTOCOL_LATEST
+          && settings->relay != RELAY_OFF
           && (landed_out || (dual_protocol == RF_FLR_ADSL && settings->relay == RELAY_ALL && settings->rx1090 == 0))
-          && fop->relayed == false        // not a packet already relayed one hop
-          && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode))
+          && fop->relayed == false)        // not a packet already relayed one hop
       {
             do_relay = true;
       }
+      else if (settings->relay >= RELAY_ALL && fop->protocol == RF_PROTOCOL_GDL90)
+      {
+            do_relay = true;
+      }
+      // for ADS-B air_relay() is called directly from GNS5892.cpp
     }
 
     /* first check whether we are already tracking this object */

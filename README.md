@@ -7,17 +7,17 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 <p><img src="https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation/T-Beam_MB149_.jpg"></p>
 
-### Latest additions:
+### Latest major additions:
 
-* vMB162: overwrite oldest flight log if space tight, 12.5 KHz dev for PilotAware
-* vMB161: special callsign prefixes for ADS-R and TIS-B in the PFLAA
+* vMB172: dual-protocol FLARM/ADS-L reception, and relay in ADS-L protocol
+* vMB171: Revised relaying of ADS-B traffic, including a "relay only" mode 
+* vMB166: added the ADS-L protocol
+* vMB162: overwrite oldest flight log if space tight
 * vMB160: setting to control the time traffic not-heard from-is reported
-* vMB157: revert approx math, optimize TinyGPS, bug fixes
-* vMB156: GNSS baud rate autodetection, option to log NMEA to SD card
+* vMB159: capability to periodically transmit in an alternate protocol
 * vMB155: collect statistics on reception range by relative direction 
 * vMB153: record compressed flight logs in flash memory (T-Beam & T-Echo)
 * vMB152: settings stored in an editable text file
-* vMB149: handles Mode-S in addition to ADS-B
 * vMB140: supports adding an SD card and writing flight logs on the T-Beam
 * vMB138: supports using add-on GNSS modules, on the T-Beam
 * vMB130: supports the GNS5892R ADS-B receiver module, on the T-Beam

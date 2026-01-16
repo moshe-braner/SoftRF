@@ -928,6 +928,7 @@ static void rxfsk (bool rxcontinuous) {
     //writeReg(FSKRegRxConfig, 0x1E); // AFC auto, AGC, trigger on preamble?!?
     writeReg(FSKRegRxConfig, 0x0E); // AFC off, AGC on, trigger on preamble?!?
     //writeReg(FSKRegRxConfig, 0x06); // AFC off, AGC off, trigger on preamble?!?
+    // GXAirCom uses 0x09 - Auto AFC off, LNA controlled by AGC
 
     // set receiver bandwidth
     switch (LMIC.protocol->bandwidth)
@@ -971,6 +972,7 @@ static void rxfsk (bool rxcontinuous) {
       // Legacy, OGNTP
       writeReg(FSKRegPreambleDetect, 0x85); // enable, 1 bytes, 5 chip errors
       //writeReg(FSKRegPreambleDetect, 0xAA); // enable, 2 bytes, 10 chip errors
+      // GXAirCom uses 0x85 - 1 bytes, 5 chip errors
       break;
     case 3:
     case 4:

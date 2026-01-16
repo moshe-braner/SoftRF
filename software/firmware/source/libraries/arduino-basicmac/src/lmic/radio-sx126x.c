@@ -505,18 +505,17 @@ static void SetPacketParamsLora (u2_t rps, int len, int inv) {
 static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
     uint8_t param[9];
 
+#if 1
+    param[0] = 0;
+    param[1] = ((LMIC.protocol->preamble_size) << 3);
+    param[2] = 0x04;     // PreambleDetectorLength 8 bits
+#else
     uint16_t PreambleLength = LMIC.protocol->preamble_size;
-#if 0
-    // copied idea from radio-sx127x.c:
-    /* add extra preamble symbol at Tx to ease reception on partner's side */
-    if (PreambleLength <= 2)  ++PreambleLength;
-    // - instead set it explicitly to 2 bytes in the protocol definition
-#endif
-
     PreambleLength <<= 3;      // convert bytes to bits
     // to end with 0x55 use an odd number of bits
-    if (LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_55)
-        ++PreambleLength;
+    // - actually this does not make any difference
+    //if (LMIC.protocol->preamble_type == RF_PREAMBLE_TYPE_55)
+    //    ++PreambleLength;
 
 // test: PreambleLength = 5;
 // that was received both by PowerFLARM and by SoftRF in dual FLR_ADSL reception mode
@@ -546,6 +545,7 @@ static void SetPacketParamsFsk (u2_t rps, int len, u1_t quirks) {
       break;
     }
     param[2] = PreambleDetectorLength; // RX preamble detector length
+#endif
 
     uint8_t SyncWordLength = LMIC.protocol->syncword_size << 3;
     if (quirks == RX_QUIRKS) {
