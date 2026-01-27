@@ -37,9 +37,9 @@
 #include "../driver/RF.h"
 
 #include <gfxfont.h>
-#include <FreeMono9pt7b.h>
-#include <FreeMonoBold9pt7b.h>
-#include <FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
 #include <Picopixel.h>
 
 static int EPD_zoom = ZOOM_MEDIUM;

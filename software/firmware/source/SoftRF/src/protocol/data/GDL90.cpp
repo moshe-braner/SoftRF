@@ -48,15 +48,16 @@ static GDL90_Msg_Traffic_t Traffic;
 static GDL90_Msg_OwnershipGeometricAltitude_t GeometricAltitude;
 
 const char *GDL90_CallSign_Prefix[] = {
-  [RF_PROTOCOL_LEGACY]    = "FL",
+  [RF_PROTOCOL_NONE]      = "??",
   [RF_PROTOCOL_OGNTP]     = "OG",
   [RF_PROTOCOL_P3I]       = "PA",
   [RF_PROTOCOL_ADSB_1090] = "AD",
   [RF_PROTOCOL_ADSB_UAT]  = "UA",
   [RF_PROTOCOL_FANET]     = "FA",
-  [RF_PROTOCOL_GDL90]     = "GD",    // data from external device
+  [RF_PROTOCOL_LEGACY]    = "FL",
   [RF_PROTOCOL_LATEST]    = "FL",
-  [RF_PROTOCOL_ADSL]      = "AL"
+  [RF_PROTOCOL_ADSL]      = "AL",
+  [RF_PROTOCOL_GDL90]     = "GD"     // data from external device
 };
 
 const uint8_t aircraft_type_to_gdl90[] PROGMEM = {

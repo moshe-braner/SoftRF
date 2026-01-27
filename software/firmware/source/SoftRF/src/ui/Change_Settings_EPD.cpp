@@ -36,7 +36,7 @@
 #include "../protocol/radio/Legacy.h"
 
 #include <gfxfont.h>
-#include <FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
 
 
 struct set_entry
@@ -71,15 +71,6 @@ set_entry protocols[] = {
   {RF_PROTOCOL_NONE,      "NONE"},
 //  {RF_PROTOCOL_ADSB_UAT,  "ADSB-UAT"},
 //  {RF_PROTOCOL_ADSB_1090, "ADSB-1090"},
-  {-1, NULL}
-};
-
-set_entry altprotos[] = {
-  {RF_PROTOCOL_LEGACY,    "LEGACY"},
-  {RF_PROTOCOL_LATEST,    "LATEST"},
-  {RF_PROTOCOL_ADSL,      "ADS-L"},
-  {RF_PROTOCOL_OGNTP,     "OGNTP"},
-  {RF_PROTOCOL_NONE,      "NONE"},
   {-1, NULL}
 };
 
@@ -209,7 +200,7 @@ page pages[] = {
   {&decision, decisions, NULL, "what to", "do next:"},
   {&actype, actypes, NULL, "Aircraft", "Type:"},
   {&protocol, protocols, NULL, "RF", "Protocol:"},
-  {&altproto, altprotos, NULL, "Alt", "Protocol:"},
+  {&altproto, protocols, NULL, "Alt", "Protocol:"},
   {&region, regions, NULL, "Frequency", "Band:"},
   {&alarm, alarms, "Collision", "Prediction", "Algorithm:"},
   {&relay, relays, NULL, "Air", "Relay:"},
@@ -236,7 +227,7 @@ void get_settings()
         return;
     actype    = get_one_setting((int) settings->acft_type, actypes);
     protocol  = get_one_setting((int) settings->rf_protocol, protocols);
-    altproto  = get_one_setting((int) settings->altprotocol, altprotos);
+    altproto  = get_one_setting((int) settings->altprotocol, protocols);
     region    = get_one_setting((int) settings->band, regions);
     alarm     = get_one_setting((int) settings->alarm, alarms);
     relay     = get_one_setting((int) settings->relay, relays);
@@ -260,7 +251,7 @@ void EPD_chgconf_save()
 {
     settings->acft_type   = actypes[actype].code;
     settings->rf_protocol = protocols[protocol].code;
-    settings->altprotocol = altprotos[altproto].code;
+    settings->altprotocol = protocols[altproto].code;
     settings->band        = regions[region].code;
     settings->alarm       = alarms[alarm].code;
     settings->relay       = relays[relay].code;

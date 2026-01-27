@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Jan 16, 2026 to fit software version MB173
+This version last updated Jan 27, 2026 to fit software version MB174
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -37,7 +37,9 @@ pflaa_cs - 1 (default) to include "callsign" after hex ID in PFLAA sentences, 0 
 expire - number of seconds to keep reporting traffic not heard from - 1-30, default=5
     (note: the display device may keep reporting for longer, e.g., XCsoar for 5 more seconds)
 
-altprotocol - default=255, meaning none.  Set to 0 (Legacy), 1 (OGNTP), 7 (Latest) or 8 (ADS-L) to transmit in an alternative protocol once every 4 seconds.  This is only possible if the main protocol is also 0, 1, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP, to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting once per 16 seconds.  New in version mb172: if the main protocol is "Latest" and the altprotocol is ADS-L, or vice versa, then reception is dual-protocol, both FLARM (Latest or Legacy) and ADS-L are received simultaneously.  If altprotocol is OGNTP, the same FLARM+ADS-L dual mode reception happens, and the altprotocol transmissions alternate between ADS-L and OGNTP - call it "two and a half protocols".  But there is no OGNTP reception, unless it is the main protocol, in which case there is no FLARM nor ADS-L reception.
+altprotocol - default=0, meaning none.  Set to 1 (OGNTP), 6 (Legacy), 7 (Latest) or 8 (ADS-L) to transmit in an alternative protocol once every 4 seconds.  This is if the main protocol is also 1, 6, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is relayed in both protocols, taking priority over self-reporting, once per 16 seconds.  New in version mb174: Can mix Latest (or ADS-L) and either FANET or P3I, then time-slicing will be used to transmit and receive in both protocols.  Note that the same ID will be transmitted in all protocols used, including FANET (over-riding the convention for FANET to use a "vendor ID for the first 2 hex digits").  If you have registered a FANET ID, and you don't want to change it, then use the "override" id_method setting to force that ID - but that ID will then be sent in the other protocols too.
+
+flr_adsl - default=0.  If set to 1, dual-protocol modes Latest+ADS-L and ADS-L+Latest will receive in simultaneous Latest+ADS-L mode, and dual-protocol modes Latest+FANET, Latest+P3I and Latest+OGNTP will receive in simultaneous Latest+ADS-L mode and also transmit in ADS-L occasionally.
 
 nmea_out and nmea_out2 - NMEA output destination codes are: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=Bluetooth 6=secondary serial.  Some destinations are not available on some devices, e.g., the T-Echo has BT but not UDP nor TCP nor secondary serial.
 
@@ -196,21 +198,86 @@ Added option to input GDL90 traffic messages and merge them into the traffic tab
 
 TIPS AND TRICKS
 
+Protocol choices
+
+The following protocol choices are available:
+Single protocols:
+* ADS-L
+    - if flr_adsl=1 receive in flr_adsl dual mode in time slot 0
+* Legacy - compatible with the old (pre-2024) FLARM protocol, not recommended
+* Latest - compatible with the new (post-2024) FLARM protocol, recommended
+    - if flr_adsl=1 receive in flr_adsl dual mode in time slot 0
+* OGNTP
+    - if flr_adsl=1 receive in flr_adsl dual mode in time slot 0 every 4 seconds
+* FANET
+* P3I (Pilot Aware)
+Mixed protocols:
+* Latest + ADS-L
+    - tx & rx in Latest, except every 4 seconds in slot 0 tx in ADSL - note no ADSL rx
+    - if flr_adsl=1: in slot 0 rx in flr_adsl simultaneous dual mode
+* ADS-L + Latest
+    - tx & rx in ADSL, except every 4 seconds in slot 0 tx in Latest - note no Latest rx
+    - if flr_adsl=1: in slot 0 rx in flr_adsl simultaneous dual mode
+* Latest + OGNTP: tx & rx in Latest, tx in OGNTP every 4 seconds - note no OGNTP rx
+    - if flr_adsl=1: receive in flr_adsl dual mode - note no OGNTP rx, and:
+            in slot 0: tx in adsl every 8 seconds
+            in slot 1: tx in OGNTP every 8 seconds
+Time-slicing dual protocol modes:
+* Latest + FANET
+        in slot 0: tx & rx in Latest
+        in slot 1: tx & rx in FANET
+    - if flr_adsl=1:
+        in slot 0 rx in flr_adsl simultaneous dual mode
+            and every 8 seconds tx in ADSL
+* FANET + Latest - same as Latest + FANET above
+* Latest + P3I
+        in slot 0: tx & rx in Latest
+        in slot 1: tx & rx in P3I
+    - if flr_adsl=1:
+        in slot 0 rx in flr_adsl simultaneous dual mode
+            and every 8 seconds tx in ADSL
+* P3I + Latest - same as Latest + P3I above
+* FANET + OGNTP
+        in slot 0: tx and rx in OGNTP
+        in slot 1: tx & rx in FANET
+    - if flr_adsl=1:
+         in slot 0 rx in flr_adsl simultaneous dual mode every 4 seconds
+            and every 8 seconds tx in ADSL - note no tx in Latest
+* FANET + ADS-L
+         in slot 0 tx & rx in ADSL
+         in slot 1 tx & rx in FANET
+    - if flr_adsl=1:
+         in slot 0 rx in flr_adsl dual mode, tx in ADSL
+            and every 8 seconds tx in Latest
+* P3I + ADS-L
+         in slot 0 tx & rx in ADSL
+         in slot 1 tx & rx in P3I
+    - if flr_adsl=1:
+         in slot 0 rx in flr_adsl dual mode, tx in ADSL
+            and every 8 seconds tx in Latest
+* P3I + OGNTP
+            slot 0: tx and rx in OGNTP
+            slot 1: tx & rx in P3I
+    - if flr_adsl=1:
+         in slot 0 rx in flr_adsl simultaneous dual mode every 4 seconds
+            and every 8 seconds tx in ADSL - note no tx in Latest
+
+
 Air Relay
 
-Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B (if an ADS-B receiver module is installed), or FLARM traffic (if no ADS-B module is installed), relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or OGNTP), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away (or closer if lower) is relayed.  Conversely, only ADS-B traffic that is less than 8km away is relayed (10km for helicopters and 16km for jets).
+Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B, if an ADS-B receiver module is installed.  Or, if no ADS-B module is installed, FLARM traffic relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or the flr_adsl setting is enabled), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away (or closer if lower) is relayed.  Conversely, only ADS-B traffic that is less than 8km away is relayed (10km for helicopters and 16km for jets).
 
 In "3" ("relay only") mode, SoftRF (only if it is airborne) relays ADS-B traffic, more often, at lower power (8 mW if set to "full power), but does not transmit its own position - use this mode to spread the benefit of ADS-B reception in SoftRF to Classic FLARMs in the same or nearby aircraft.
 
-Relayed packets from landed-out aircraft (SoftRF manually switched into this mode, marked by the aircraft type being zero) are visible to FLARMs.  If SoftRF is in dual-protocol mode and in relay-all mode, it relays ADS-B and FLARM traffic in the ADS-L protocol, to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  If not in dual-protocol mode, FLARM traffic is not relayed, and ADS-B traffic is relayed in the "Legacy" protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
+Relayed packets from "landed-out" aircraft (meaning SoftRF that is manually switched into this mode, marked by the aircraft type being zero) are visible to FLARMs.  If SoftRF is in dual-protocol mode and in relay-all mode, it relays ADS-B and FLARM traffic in the ADS-L protocol, to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  If not in dual-protocol mode, FLARM traffic is not relayed, and ADS-B traffic is relayed in the "Legacy" protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
 
 Test Mode
 
-Some things are arranged at compile time to behave differently in "test mode".  Currently: in test mode air-relay will happen even if not airborne.  To toggle test mode, double-click middle button of T-Beam, or use the URL .../testmode in the web interface, or send the NMEA command $PSRFT.  Querying test mode status with $PSRFT,?*50 when a GNS5892 is active also saves and shows (in USB-serial output) the "RSSI zone stats".
+Some things are arranged at compile time to behave differently in "test mode".  Currently: in test mode air-relay will happen even if not airborne.  Also, ADS-L transmissions on the ground are normally only once per 8 seconds, but in test mode once per second as if airborne.  To toggle test mode, double-click middle button of T-Beam, or use the URL .../testmode in the web interface, or send the NMEA command $PSRFT.  Querying test mode status with $PSRFT,?*50 when a GNS5892 is active also saves and shows (in USB-serial output) the "RSSI zone stats".
 
 How to upload and download files
 
-To see the list of files in SPIFFS, click the "manage files" button in the web interface.  The "Upload egm96s.dem" button, or the Settings "Upload" button, on the status web page can actually be used to upload any file into SPIFFS.  To download any file from SPIFFS, click on the file name in the "manage files" page that lists the files.  Or use the URL 192.168.1.1/filename (where the "192.168.1.1" will be something else if using an external network).  The page listing flight logs on the SD card does not show files other than .igc and .txt that may be there.  To see a list of all files in the /logs folder, use the URL .../listsdall.  To upload any file into the /logs folder on the SD card, use .../logupload.
+To see the list of files in SPIFFS, click the "manage files" button in the web interface.  The "Upload egm96s.dem" button, or the Settings "Upload" button, on the status web page can actually be used to upload any file into SPIFFS.  (Remember the space available is small.)  To download any file from SPIFFS, click on the file name in the "manage files" page that lists the files.  Or use the URL 192.168.1.1/filename (where the "192.168.1.1" will be something else if using an external network).  The page listing flight logs on the SD card does not show files other than .igc and .txt that may be there.  To see a list of all files in the /logs folder, use the URL .../listsdall.  To upload any file into the /logs folder on the SD card, use .../logupload.
 
 How to monitor RSSI of received signals
 
@@ -226,12 +293,12 @@ Settings via NMEA
 
 In a web browser, open up one of the HTML files from this folder: https://github.com/moshe-braner/SoftRF/tree/master/software/app/Settings - the settings1 file for the basic settings, and the settings2 file for the additional settings.  In these open HTML pages, one can select the settings in the browser.  When done, be sure to click somewhere outside the input field last changed.  The cryptic $PSRF... line of text at the bottom will change.  Copy that line, and paste it into the terminal program so that it will be sent to the T-Echo (or T-Beam).  This will cause the device to reboot with the new settings.
 
-Added code to allow accessing additional settings via $PSRFD and $PSRFF sentences - useful for hardware (T-Echo) that does not offer the web UI, automated config, etc.  New in MB148+: the first field in the NMEA sentence (the "version" number) now says whether to "save and reboot".  Thus $PSRFC,1,... will work as before (including with the BT app), while $PSRFC,0,... will just change the setting variables, not save and not reboot.  Then can now do:  $PSRFC,SAV*3C   to save and reboot.  Also added replies (to source of the NMEA command) showing the correct checksum if wrong.
+Added code to allow accessing additional settings via $PSRFD and $PSRFF sentences - useful for hardware (T-Echo) that does not offer the web UI, automated config, etc.  New in MB148+: the first field in the NMEA sentence (the "version" number) now says whether to "save and reboot".  Thus $PSRFC,1,... will work as before (including with the BT app), while $PSRFC,0,... will just change the setting variables, not save and not reboot.  Thus can make several changes, and then do:  $PSRFC,SAV*3C   to save and reboot.  Also added replies (to source of the NMEA command) showing the correct checksum if wrong.
 
 Moved this code from GNSS.cpp to NMEA.cpp, following what was done in the mainline.
 Revised this code to be much more compact and readable.
 
-And, new in MB152: $PSRFS for one-setting-at-a-time configuration.  Send $PSRFS,?*57 to get a list of all settings and their current values, formatted as in the settings file.  $PSRFS,0,label,? to query one setting.  $PSRFS,0,label,value to change one setting at a time (and later $PSRFC,SAV*3C to save and reboot).  Or use $PSRFS,1,label,value to change one setting and save and reboot immediately.  (Or send a $PSRFC,SAV*3C later to save and reboot.)  Each sentence must end with a "*" followed by a valid NMEA checksum, but you can send the sentence with any two characters as the checksum, and SoftRF will send a reply showing what the correct checksum is.  It insists on the correct checksum before doing anything with the sentence, since the NMEA config mechanism is mostly intended for automated setup by a connected device.
+And, new starting in version MB152: $PSRFS for one-setting-at-a-time configuration.  This is far easier to use than $PSRFC/D/F.  Each setting is identified by its label, such as "id_method" or "tx_power".  Send $PSRFS,?*57 to get a list of all the settings and their current values, formatted as in the settings file.  $PSRFS,0,label,? to query one setting.  $PSRFS,0,label,value to change one setting at a time (and later $PSRFC,SAV*3C to save and reboot).  Or use $PSRFS,1,label,value to change one setting and save and reboot immediately.  (Or send a $PSRFC,SAV*3C later to save and reboot.)  Each sentence must end with a "*" followed by a valid NMEA checksum, but you can send the sentence with any two characters as the checksum, for example  $PSRFS,0,id_method,?*xx  and SoftRF will send a reply showing what the correct checksum is.  It insists on the correct checksum before doing anything with the sentence, since the NMEA config mechanism is mostly intended for automated setup by a connected device.
 
 
 DETAILS OF OPERATION

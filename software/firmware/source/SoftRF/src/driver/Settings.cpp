@@ -113,6 +113,7 @@ static void init_stgdesc()
   stgdesc[STG_MODE]       = { "mode",       (char*)&settings->mode,       STG_UINT1 };
   stgdesc[STG_PROTOCOL]   = { "protocol",   (char*)&settings->rf_protocol,STG_UINT1 };
   stgdesc[STG_ALTPROTOCOL]= { "altprotocol",(char*)&settings->altprotocol,STG_UINT1 };
+  stgdesc[STG_FLR_ADSL]   = { "flr_adsl",   (char*)&settings->flr_adsl,   STG_UINT1 };
   stgdesc[STG_BAND]       = { "band",       (char*)&settings->band,       STG_UINT1 };
   stgdesc[STG_ACFT_TYPE]  = { "acft_type",  (char*)&settings->acft_type,  STG_UINT1 };
   stgdesc[STG_ID_METHOD]  = { "id_method",  (char*)&settings->id_method,  STG_UINT1 };
@@ -213,7 +214,8 @@ static void init_stgdesc()
 
   stgcomment[STG_MODE]       = "0=Normal ...";
   stgcomment[STG_PROTOCOL]   = "7=Latest 1=OGNTP 2=P3I 5=FANET";
-  stgcomment[STG_ALTPROTOCOL]= "255=none 1=OGNTP 8=ADSL";
+  stgcomment[STG_ALTPROTOCOL]= "0=none 1=OGNTP 6=Legacy 8=ADSL";
+  stgcomment[STG_FLR_ADSL]   = "1=FLR+ADSL rx (& some tx)";
   stgcomment[STG_BAND]       = "1=EU 2=US ...";
   stgcomment[STG_ACFT_TYPE]  = "1=GL 2=TOWPL 6=HG 7=PG 0=landed out";
   stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device";
@@ -269,7 +271,7 @@ static void init_stgdesc()
 #if defined(USE_EPAPER)
   stgcomment[STG_EPD_UNITS]  = "0=metric 1=imperial 2=mixed";
   stgcomment[STG_EPD_VMODE]  = "0=status 1=radar 2=text ...";
-  stgcomment[STG_EPD_IDPREF] = "0=reg 1=tail 2=model 3=type";
+  stgcomment[STG_EPD_IDPREF] = "0=reg 1=tail 2=model 3=type, 4=hex";
   stgcomment[STG_EPD_AGHOST] = "0=off 1=auto 2=2min 3=5min";
 #endif
 
@@ -383,6 +385,18 @@ void Adjust_Settings()
         settings->rf_protocol = RF_PROTOCOL_LATEST;
     if (settings->altprotocol > RF_PROTOCOL_ADSL)
         settings->altprotocol = RF_PROTOCOL_NONE;
+    if (settings->rf_protocol == RF_PROTOCOL_NONE)  // old settings files before coding change
+        settings->rf_protocol = RF_PROTOCOL_LEGACY;
+    if (settings->rf_protocol == RF_PROTOCOL_LEGACY && settings->altprotocol != RF_PROTOCOL_LATEST)
+        settings->altprotocol = RF_PROTOCOL_NONE; 
+    if (settings->altprotocol == RF_PROTOCOL_LEGACY && settings->rf_protocol != RF_PROTOCOL_LATEST)
+        settings->altprotocol = RF_PROTOCOL_NONE;
+    /*
+     * Enforce legacy protocol setting for SX1276
+     * if other value (UAT) left in EEPROM from other (UATM) radio
+     */
+    if (settings->rf_protocol==RF_PROTOCOL_ADSB_1090 || settings->rf_protocol==RF_PROTOCOL_ADSB_UAT)
+        settings->rf_protocol = RF_PROTOCOL_LEGACY;
 
     if (settings->bluetooth == BLUETOOTH_SPP)
         settings->bluetooth = BLUETOOTH_LE_HM10_SERIAL;
@@ -892,7 +906,7 @@ void Settings_defaults(bool keepsome)
   settings->rotate      = ROTATE_0;
   settings->orientation = DIRECTION_TRACK_UP;
   settings->adb         = DB_NONE;
-  settings->epdidpref   = ID_TYPE;
+  settings->epdidpref   = ID_HEX;
   settings->viewmode    = VIEW_MODE_STATUS;
   settings->antighost   = ANTI_GHOSTING_AUTO;
   settings->team        = 0;
@@ -901,6 +915,7 @@ void Settings_defaults(bool keepsome)
   // new settings not in EEPROM
   settings->version = 0;        // SOFTRF_SETTINGS_VERSION will come from file
   settings->altprotocol = RF_PROTOCOL_NONE;
+  settings->flr_adsl    = 0;
   settings->rx1090x     = 100;
   settings->hrange      = 27;   // km
   settings->vrange      = 20;   // 2000m

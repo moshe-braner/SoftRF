@@ -98,12 +98,15 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
 
   r.Descramble();
 
+  if (r.Type != 0x02)   // not iConspicuity
+      return false;
+
   fop->protocol  = RF_PROTOCOL_ADSL;
 
   fop->addr      = r.getAddress();
 
   if (fop->addr == settings->ignore_id)
-         return false;                  /* ID told in settings to ignore */
+      return false;                  /* ID told in settings to ignore */
 
   if (fop->addr == ThisAircraft.addr) {
       if (landed_out_mode) {
@@ -121,7 +124,7 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
       if (cip->protocol == RF_PROTOCOL_LATEST
           && OurTime <= cip->timestamp + EXPORT_EXPIRATION_TIME) {
                     // 5s - not ENTRY_EXPIRATION_TIME (30s)
-                    // since that takes too long after FLARM reception drops out
+                    // since that takes too long after reception drops out
           // already tracked via other means
           //Serial.println("ADSL traffic also seen via Latest, ignore");
           return false;
@@ -149,7 +152,7 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   fop->timestamp = (uint32_t) RF_time;      // this_aircraft->timestamp;
   fop->gnsstime_ms = millis();
 
-  fop->airborne = (r.FlightState != 1);    // >>> ads-l.h lacks a method to read the "flight status" field?
+  fop->airborne = (r.FlightState != 1);    // >>> ads-l.h lacks a method to read the "flight state" field?
 
   fop->stealth   = 0;
   fop->no_track  = 0;
@@ -159,10 +162,6 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
 }
 
 size_t adsl_encode(void *pkt, container_t *aircraft) {
-
-  // if not airborne, transmit only once in 8 seconds
-  if (aircraft->airborne == 0 && (RF_time & 0x07 != 0x07))
-      return 0;
 
   pos.Latitude  = (int32_t) (aircraft->latitude * 600000);
   pos.Longitude = (int32_t) (aircraft->longitude * 600000);
@@ -184,7 +183,7 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
   pos.Sec     = second;
   pos.FracSec = 0;    // gnss.time.centisecond() is empty
 
-  t.Init();
+  t.Init();   // this implicitly sets the "type" to 0x02 i.e. iConspicuity
 
   t.setAddress(aircraft->addr);
 
@@ -194,6 +193,10 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
       t.setAddrTypeOGN(aircraft->addr_type);
       t.setRelay(1);
   } else {
+      // if not airborne, transmit only once in 8 seconds
+      if (ThisAircraft.airborne == 0 && ThisAircraft.timestamp < ThisAircraft.positiontime + 8 && (! test_mode))
+          return 0;
+      ThisAircraft.positiontime = ThisAircraft.timestamp;
       uint8_t addr_type = settings->id_method;
       if (addr_type == ADDR_TYPE_OVERRIDE)
           addr_type = ADDR_TYPE_FLARM;

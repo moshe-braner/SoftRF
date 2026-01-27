@@ -30,15 +30,15 @@
 #include "../system/Time.h"
 
 #include <gfxfont.h>
-#include <FreeMonoBold24pt7b.h>
-#include <FreeMonoBold18pt7b.h>
-#include <FreeMonoBold12pt7b.h>
-#include <FreeMonoBold9pt7b.h>
-#include <FreeMono18pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
+#include <Fonts/FreeMono18pt7b.h>
 
 #include <Org_01.h>
-#include <FreeMonoBoldOblique9pt7b.h>
-#include <FreeSerif9pt7b.h>
+#include <Fonts/FreeMonoBoldOblique9pt7b.h>
+#include <Fonts/FreeSerif9pt7b.h>
 
 const char EPD_SoftRF_text1[] = "SoftRF";
 const char EPD_SoftRF_text2[] =  "and"  ;

@@ -204,6 +204,7 @@ unsigned int enscale( int value, unsigned int mbits, unsigned int ebits, unsigne
 int descale( unsigned int value, unsigned int mbits, unsigned int ebits, unsigned int sbits);
 
 extern const rf_proto_desc_t legacy_proto_desc;
+extern const rf_proto_desc_t latest_proto_desc;
 extern const rf_proto_desc_t flr_adsl_proto_desc;
 
 #endif /* PROTOCOL_LEGACY_H */

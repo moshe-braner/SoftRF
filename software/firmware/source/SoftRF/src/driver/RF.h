@@ -83,7 +83,9 @@ enum
 enum
 {
   RF_SINGLE_PROTOCOL,
-  RF_FLR_ADSL
+  RF_FLR_ADSL,         // true dual-protocol reception
+  RF_FLR_FANET,        // time-slicing
+  RF_FLR_P3I           // time-slicing
 };
 
 typedef struct rfchip_ops_struct {
@@ -128,13 +130,14 @@ bool    RF_Receive(void);
 void    RF_Shutdown(void);
 uint8_t RF_Payload_Size(uint8_t);
 bool    in_family(uint8_t protocol);
+const char *protocol_lbl(uint8_t main, uint8_t alt);
 
 extern byte TxBuffer[MAX_PKT_SIZE], RxBuffer[MAX_PKT_SIZE];
 extern uint32_t TxTimeMarker;
 extern uint32_t TxEndMarker;
 extern time_t RF_time;
 extern uint8_t RF_current_slot;
-extern uint8_t current_RF_protocol;
+extern uint8_t current_TX_protocol;
 extern uint8_t dual_protocol;
 
 extern const rfchip_ops_t *rf_chip;
@@ -143,6 +146,7 @@ extern size_t (*protocol_encode)(void *, container_t *);
 extern bool (*protocol_decode)(void *, container_t *, ufo_t *);
 
 extern const char *Protocol_ID[];
+extern const char *dual_protocol_lbl[];
 extern uint32_t RF_last_crc;
 extern int8_t RF_last_rssi;
 extern int8_t which_rx_try;

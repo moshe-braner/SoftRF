@@ -21,16 +21,16 @@
 
 enum
 {
-	RF_PROTOCOL_LEGACY    = 0,    /* Air V6 */
+	RF_PROTOCOL_NONE      = 0,
 	RF_PROTOCOL_OGNTP     = 1,    /* Open Glider Network tracker */
 	RF_PROTOCOL_P3I       = 2,    /* PilotAware */
 	RF_PROTOCOL_ADSB_1090 = 3,    /* ADS-B 1090ES */
 	RF_PROTOCOL_ADSB_UAT  = 4,    /* ADS-B UAT */
 	RF_PROTOCOL_FANET     = 5,    /* Skytraxx */
-	RF_PROTOCOL_GDL90     = 6,    /* from external device */
+	RF_PROTOCOL_LEGACY    = 6,    /* Air V6 */
 	RF_PROTOCOL_LATEST    = 7,    /* new 2024 protocol */
 	RF_PROTOCOL_ADSL      = 8,    /* ADS-L on OGNTP frequency */
-	RF_PROTOCOL_NONE = 255
+	RF_PROTOCOL_GDL90     = 9     /* from external device */
 };
 
 enum

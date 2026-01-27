@@ -31,9 +31,9 @@
 #include <protocol.h>
 
 #include <gfxfont.h>
-#include <FreeMono9pt7b.h>
-#include <FreeSerifBold12pt7b.h>
-#include <FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeSerifBold12pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
 
 extern uint32_t tx_packets_counter, rx_packets_counter;
 

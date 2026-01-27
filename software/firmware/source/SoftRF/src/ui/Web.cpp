@@ -1945,7 +1945,7 @@ void list_files(int mode)
       bool is_txt = file_name.endsWith(".txt");
       if ((mode == LIST_SPIFFS_LOGS || mode == LIST_SD_LOGS) && (! is_igc) && (! is_txt))
           continue;
-      if (len < FILELSTSIZ-160) {
+      if (len < FILELSTSIZ-200) {
         strcpy(cp, "&nbsp;<a href=\"");
         more = strlen(cp);
         len += more;
@@ -2028,7 +2028,7 @@ void list_files(int mode)
       len += more;
       cp  += more;
   }
-  if (len < FILELSTSIZ-120) {
+  if (len < FILELSTSIZ-100) {
     if (mode == LIST_SD_LOGS || mode == LIST_SD_ALL) {
       label = "Open Trash";
       url = "/listsdold";
@@ -2157,7 +2157,9 @@ void doClearSD(bool allfiles)
         logpath += file_name;
         bool move = (file.size() > 4000);
         file = root.openNextFile();
-        if (allfiles || file_name.endsWith(".IGC") || file_name.endsWith(".igc")) {
+        if (allfiles
+         || file_name.endsWith(".IGC") || file_name.endsWith(".igc")
+         || file_name.endsWith("NMEA.txt")) {
             if (move) {            // move large files
                 String oldpath;
                 oldpath = "/logs/old/";

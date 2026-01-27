@@ -27,9 +27,9 @@
 #include "../driver/Settings.h"
 
 #include <gfxfont.h>
-#include <FreeMono9pt7b.h>
-#include <FreeMono12pt7b.h>
-#include <FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeMono12pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
 #include <TinyGPS++.h>
 
 const char Altitude_text[]    = "ALTITUDE, ";

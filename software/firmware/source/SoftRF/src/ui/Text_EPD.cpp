@@ -38,7 +38,7 @@
 #include "../protocol/radio/Legacy.h"
 
 #include <gfxfont.h>
-#include <FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
 
 static int EPD_current = 1;
 
@@ -53,6 +53,25 @@ enum {
 static int view_state_curr = STATE_TVIEW_NONE;
 static int view_state_prev = STATE_TVIEW_NONE;
 
+const char *aircraft_type_lbl[] = {
+  [AIRCRAFT_TYPE_UNKNOWN]    = "--",
+  [AIRCRAFT_TYPE_GLIDER]     = "GL",
+  [AIRCRAFT_TYPE_TOWPLANE]   = "TP",
+  [AIRCRAFT_TYPE_HELICOPTER] = "HC",
+  [AIRCRAFT_TYPE_PARACHUTE]  = "PC",
+  [AIRCRAFT_TYPE_DROPPLANE]  = "DP",
+  [AIRCRAFT_TYPE_HANGGLIDER] = "HG",
+  [AIRCRAFT_TYPE_PARAGLIDER] = "PG",
+  [AIRCRAFT_TYPE_POWERED]    = "PP",
+  [AIRCRAFT_TYPE_JET]        = "JT",
+  [AIRCRAFT_TYPE_UFO]        = "UF",
+  [AIRCRAFT_TYPE_BALLOON]    = "BL",
+  [AIRCRAFT_TYPE_ZEPPELIN]   = "ZP",
+  [AIRCRAFT_TYPE_UAV]        = "DR",
+  [AIRCRAFT_TYPE_RESERVED]   = "--",
+  [AIRCRAFT_TYPE_STATIC]     = "ST",
+  [AIRCRAFT_TYPE_WINCH]      = "WI"
+};
 
 static void EPD_Draw_Text()
 {
@@ -139,15 +158,16 @@ static void EPD_Draw_Text()
       break;
     }
 
+    uint8_t acft_type = traffic_by_dist[i].fop->aircraft_type;
+    if (acft_type > AIRCRAFT_TYPE_STATIC)  acft_type = AIRCRAFT_TYPE_UNKNOWN;
+    uint32_t hexid = traffic_by_dist[i].fop->addr;
     if (ui->epdidpref == ID_TYPE) {
-      uint8_t acft_type = traffic_by_dist[i].fop->aircraft_type;
-      acft_type = acft_type > AIRCRAFT_TYPE_STATIC ? AIRCRAFT_TYPE_UNKNOWN : acft_type;
       strncpy(id_text, Aircraft_Type[acft_type], sizeof(id_text));
+    } else if (ui->epdidpref == ID_HEX) {
+      snprintf(id_text, sizeof(id_text), "%s: %06X", aircraft_type_lbl[acft_type], hexid);
     } else {
-      uint32_t id = traffic_by_dist[i].fop->addr;
-
-      if (!(SoC->ADB_ops && SoC->ADB_ops->query(DB_OGN, id, id_text, sizeof(id_text)))) {
-        snprintf(id_text, sizeof(id_text), "ID: %06X", id);
+      if (!(SoC->ADB_ops && SoC->ADB_ops->query(DB_OGN, hexid, id_text, sizeof(id_text)))) {
+        snprintf(id_text, sizeof(id_text), "%s: %06X", aircraft_type_lbl[acft_type], hexid);
       }
     }
 

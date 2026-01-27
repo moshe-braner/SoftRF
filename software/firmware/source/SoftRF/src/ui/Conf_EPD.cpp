@@ -38,7 +38,7 @@
 #include "../protocol/radio/Legacy.h"
 
 #include <gfxfont.h>
-#include <FreeMonoBold9pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
 
 bool conf_initialized = false;
 
@@ -86,27 +86,7 @@ NMEA2: USB LD
 
       y += CONF_VIEW_LINE_SPACING;
 
-      const char *protostr = Protocol_ID[settings->rf_protocol];
-      if (settings->altprotocol != RF_PROTOCOL_NONE) {
-          if (settings->rf_protocol == RF_PROTOCOL_LATEST) {
-              if (settings->altprotocol == RF_PROTOCOL_ADSL)
-                  protostr = "T+A";
-              if (settings->altprotocol == RF_PROTOCOL_OGNTP)
-                  protostr = "TAo";
-          }
-          if (settings->rf_protocol == RF_PROTOCOL_ADSL) {
-              if (settings->altprotocol == RF_PROTOCOL_LATEST)
-                  protostr = "A+T";
-              if (settings->altprotocol == RF_PROTOCOL_OGNTP)
-                  protostr = "ATo";
-          }
-          if (settings->rf_protocol == RF_PROTOCOL_OGNTP) {
-              if (settings->altprotocol == RF_PROTOCOL_LATEST)
-                  protostr = "O/t";
-              if (settings->altprotocol == RF_PROTOCOL_ADSL)
-                  protostr = "O/a";
-          }
-      }
+      const char *protostr = protocol_lbl(settings->rf_protocol, settings->altprotocol);
 
       snprintf(info_line, sizeof(info_line), "%s %s P:%s A:%s",
           Region_Label[settings->band],

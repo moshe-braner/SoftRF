@@ -177,17 +177,23 @@ static void OLED_settings()
     snprintf (buf, sizeof(buf), "%06X", ThisAircraft.addr);
     u8x8->draw2x2String(0, 2, buf);
 
-    if (settings->debug_flags & DEBUG_SIMULATE)
-        u8x8->drawString(8, 1, "SIM");
-    else
+    if (settings->debug_flags & DEBUG_SIMULATE) {
+        u8x8->drawString(11, 1, "SIM");
+    } else if (dual_protocol != RF_SINGLE_PROTOCOL) {
+        u8x8->drawString(7, 1, dual_protocol_lbl[dual_protocol]);
+    } else if (settings->altprotocol != RF_PROTOCOL_NONE) {
+        const char *protostr = protocol_lbl(settings->rf_protocol, settings->altprotocol);
+        u8x8->drawString(11, 1, protostr);
+    } else {
         u8x8->drawString(8, 1, PROTOCOL_text);
+    }
 
     char c = Protocol_ID[ThisAircraft.protocol][0];
     if (settings->relay >= RELAY_ONLY)
         c = 'R';
-    else if (dual_protocol == RF_FLR_ADSL)
+    else if (dual_protocol != RF_SINGLE_PROTOCOL)
         c = 'D';
-    else if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Latest
+    else if (ThisAircraft.protocol == RF_PROTOCOL_LATEST)   // keep 'L' for Legacy
         c = 'T';
     else if (ThisAircraft.protocol == RF_PROTOCOL_ADSB_1090)  // 'A' for ADS-L
         c = 'S';

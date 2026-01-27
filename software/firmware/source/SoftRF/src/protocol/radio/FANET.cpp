@@ -30,6 +30,7 @@
 
 #include "../../../SoftRF.h"
 #include "../../driver/RF.h"
+#include "../../driver/Settings.h"
 
 const rf_proto_desc_t fanet_proto_desc = {
   "FANET",
@@ -55,6 +56,8 @@ const rf_proto_desc_t fanet_proto_desc = {
   .deviation        = 0 /* INVALID FOR LORA */,
   .whitening        = RF_WHITENING_NONE,
   .bandwidth        = 0, /* INVALID FOR LORA */
+     // later upstream code says: RF_RX_BANDWIDTH_SS_125KHZ, /* RF_RX_BANDWIDTH_SS_250KHZ */
+     // although the .bandwidth field is not used in FANET
 
   .air_time         = FANET_AIR_TIME,
 
@@ -70,7 +73,7 @@ const uint8_t aircraft_type_to_fanet[] PROGMEM = {
 	FANET_AIRCRAFT_TYPE_GLIDER,
 	FANET_AIRCRAFT_TYPE_POWERED,
 	FANET_AIRCRAFT_TYPE_HELICOPTER,
-	FANET_AIRCRAFT_TYPE_OTHER,
+	FANET_AIRCRAFT_TYPE_PARAGLIDER,   // changed from OTHER, following later upstream code
 	FANET_AIRCRAFT_TYPE_POWERED,
 	FANET_AIRCRAFT_TYPE_HANGGLIDER,
 	FANET_AIRCRAFT_TYPE_PARAGLIDER,
@@ -218,15 +221,18 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
 
   if (pkt->ext_header == 0 && pkt->type == 1 ) {  /* Tracking  */
 
+    fop->addr     = (pkt->vendor << 16) | pkt->address;
+
     /* ignore this device own (relayed) packets */
-    if (pkt->vendor  == SOFRF_FANET_VENDOR_ID &&
-        pkt->address == (this_aircraft->addr & 0xFFFF) /* && */
-        /* pkt->forward == 1 */) {
-      return rval;
-    }
+    //if (pkt->vendor  == SOFRF_FANET_VENDOR_ID &&
+    //    pkt->address == (this_aircraft->addr & 0xFFFF) /* && */
+    //    /* pkt->forward == 1 */) {
+    //  return rval;
+    //}
+    if (fop->addr == this_aircraft->addr)
+        return false;
 
     fop->protocol = RF_PROTOCOL_FANET;
-    fop->addr     = (pkt->vendor << 16) | pkt->address;
     fop->addr_type = ADDR_TYPE_FLARM;    // i.e., device - was ADDR_TYPE_FANET
     fop->timestamp = this_aircraft->timestamp;
     fop->gnsstime_ms = millis();
@@ -278,12 +284,8 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
 
     fop->stealth = 0;
     fop->no_track = !(pkt->track_online);
-/*
-    fop->ns[0] = 0; fop->ns[1] = 0;
-    fop->ns[2] = 0; fop->ns[3] = 0;
-    fop->ew[0] = 0; fop->ew[1] = 0;
-    fop->ew[2] = 0; fop->ew[3] = 0;
-*/
+    if (settings->debug_flags & DEBUG_RELAY)  fop->no_track = 0;   // for testing
+
 #if 0
     Serial.print(fop->addr, HEX);
     Serial.print(',');
@@ -327,8 +329,9 @@ size_t fanet_encode(void *fanet_pkt, container_t *this_aircraft) {
   pkt->forward        = 1;
   pkt->type           = 1;  /* Tracking  */
 
-  pkt->vendor         = SOFRF_FANET_VENDOR_ID;
-  pkt->address        = id & 0xFFFF;
+  //pkt->vendor         = SOFRF_FANET_VENDOR_ID;
+  pkt->vendor         = (id >> 16) & 0x00FF;   // will not be a constant
+  pkt->address        = id & 0x00FFFF;
 
 #if defined(FANET_DEPRECATED)
   pkt->latitude       = coord2payload_compressed(lat);

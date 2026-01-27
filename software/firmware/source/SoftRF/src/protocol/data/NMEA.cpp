@@ -175,15 +175,16 @@ NmeaMallocedBuffer nmealib_buf;
 #endif /* USE_NMEALIB */
 
 const char *NMEA_CallSign_Prefix[] = {
-  [RF_PROTOCOL_LEGACY]    = "FLO",
+  [RF_PROTOCOL_NONE]      = "???",
   [RF_PROTOCOL_OGNTP]     = "OGN",
   [RF_PROTOCOL_P3I]       = "PAW",
   [RF_PROTOCOL_ADSB_1090] = "ADS",
   [RF_PROTOCOL_ADSB_UAT]  = "UAT",
   [RF_PROTOCOL_FANET]     = "FAN",
-  [RF_PROTOCOL_GDL90]     = "GDL",   // data from external device
+  [RF_PROTOCOL_LEGACY]    = "FLO",
   [RF_PROTOCOL_LATEST]    = "FLR",
-  [RF_PROTOCOL_ADSL]      = "ADL"
+  [RF_PROTOCOL_ADSL]      = "ADL",
+  [RF_PROTOCOL_GDL90]     = "GDL"    // data from external device
 };
 
 const uint8_t data_source_code[] = {
@@ -1231,8 +1232,8 @@ void NMEA_Export()
       unsigned int nmealen;
       int nacft = Traffic_Count();   // maxrssi and adsb_acfts are byproducts
       snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-              PSTR("$PSRFH,%06X,%d,%d,%d,%d,%d,%d,%d,%d*"),
-              ThisAircraft.addr, settings->rf_protocol,
+              PSTR("$PSRFH,%06X,%d,%d,%d,%d,%d,%d,%d,%d,%d*"),
+              ThisAircraft.addr, settings->rf_protocol, settings->altprotocol,
               millis(), (int)(voltage*100), SoC->getFreeHeap(),
               rx_packets_counter, tx_packets_counter, nacft, maxrssi);
       NMEAOutC(NMEA_T);

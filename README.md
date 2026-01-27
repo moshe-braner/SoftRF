@@ -9,8 +9,9 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### Latest major additions:
 
+* vMB174: dual-protocol FANET (or P3I) plus FLARM (or ADS-L) modes
 * vMB172: dual-protocol FLARM/ADS-L reception, and relay in ADS-L protocol
-* vMB171: Revised relaying of ADS-B traffic, including a "relay only" mode 
+* vMB171: Revised relaying of ADS-B traffic, including "relay only" mode 
 * vMB166: added the ADS-L protocol
 * vMB162: overwrite oldest flight log if space tight
 * vMB160: setting to control the time traffic not-heard from-is reported

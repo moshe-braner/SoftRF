@@ -152,6 +152,7 @@ enum stgidx {
     STG_MODE,
     STG_PROTOCOL,
     STG_ALTPROTOCOL,
+    STG_FLR_ADSL,
     STG_BAND,
     STG_ACFT_TYPE,
     STG_ID_METHOD,
@@ -349,6 +350,7 @@ typedef struct Settings {
     uint8_t  mode;
     uint8_t  rf_protocol;
     uint8_t  altprotocol;
+    uint8_t  flr_adsl;
     uint8_t  band;
     uint8_t  acft_type;
     uint8_t  alarm;

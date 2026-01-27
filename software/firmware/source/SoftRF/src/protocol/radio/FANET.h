@@ -28,9 +28,15 @@
  * FANET uses LoRa modulation
  * FANET+ uses both LoRa (FANET) and FSK(FLARM)
  *
+ * Zone 1: EU, default
  * Freq: 868.2 [ 869.525 ] MHz
  * Modulation: LoRa (TM)
  * Parameters: BW_250 SF_7 CR_5
+ *
+ * Zone 2: America (South+North), Australia, New Zealand, China, Japan
+ * Freq: 920.8 MHz
+ * Modulation: LoRa (TM)
+ * Parameters: BW_500 SF_7 CR_5
  */
 
 #define SOFRF_FANET_VENDOR_ID       0x07
@@ -56,12 +62,20 @@ enum
  * Broadcast
  */
 typedef struct {
+
+// header (4 bytes):
+
   unsigned int type           :6;
   unsigned int forward        :1;
   unsigned int ext_header     :1;
 
   unsigned int vendor         :8;
   unsigned int address        :16;
+
+// if ext_header==1 then there are 4 more header bytes
+// - but tracking message (type=1) uses "standard header"
+
+// body (12 bytes):
 
 #if defined(FANET_DEPRECATED)
   unsigned int latitude       :16;
@@ -98,8 +112,7 @@ typedef struct {
 #define FANET_PAYLOAD_SIZE    sizeof(fanet_packet_t)
 #define FANET_HEADER_SIZE     4
 
-/* Declared air time of FANET+ is 20-40 ms */
-#define FANET_AIR_TIME        40   /* in ms */
+#define FANET_AIR_TIME        36   /* in ms */
 
 #define FANET_TX_INTERVAL_MIN 2500 /* in ms */
 #define FANET_TX_INTERVAL_MAX 3500

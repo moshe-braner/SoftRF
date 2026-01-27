@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Jan 11, 2026 to fit software version MB172
+This version last updated Jan 27, 2026 to fit software version MB174
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -18,7 +18,7 @@ PART 1: USER GUIDE
 
 WHAT IS SOFTRF
 
-SoftRF is a do-it-yourself, multifunctional, compatible, radio-based proximity awareness system for general aviation.  SoftRF is free, open-source software that runs on inexpensive off-the-shelf hardware.  This software, when installed on suitable hardware and carried in an aircraft, transmits data on its position, and receives position data from other aircraft with compatible systems.  It can send information about nearby traffic, in standard formats, to visualization devices and to navigation software commonly used in sailplanes.  Several radio communications and local data exchange protocols are supported, but the one of interest to most glider pilots is the FLARM-compatible "Latest" mode.  Both incoming and outgoing radio transmissions are fully interoperable with FLARM devices and with OGN ground stations.
+SoftRF is a do-it-yourself, multifunctional, compatible, radio-based proximity awareness system for general aviation.  SoftRF is free, open-source software that runs on inexpensive off-the-shelf hardware.  This software, when installed on suitable hardware and carried in an aircraft, transmits data on its position, and receives position data from other aircraft with compatible systems.  It can send information about nearby traffic, in standard formats, to visualization devices and to navigation software commonly used in sailplanes.  Several radio communications and local data exchange protocols are supported.  The one of interest to most glider pilots is the FLARM-compatible "Latest" mode.  SoftRF can also work in the FANET protocol popular with paragliders, and more.
 
 Using SoftRF in your aircraft (when configured to use the "Latest" protocol) will:
 * make you visible to other FLARMs
@@ -26,7 +26,7 @@ Using SoftRF in your aircraft (when configured to use the "Latest" protocol) wil
 * make other FLARMs visible on your devices such as glide computers
 * generate collision warnings, alone or in conjuction with other devices
 
-Some people call this an "OGN tracker", although that label should be reserved for the devices used in some high level soaring competitions for the spectators' benefit - which are not compatible with FLARM.  SoftRF is better described as a functional equivalent for, and compatible with, FLARM.
+Some people call this an "OGN tracker", although that label should be reserved for the devices used in some high level soaring competitions for the spectators' benefit - which are not compatible with FLARM.  SoftRF is better described as a functional equivalent for, and compatible with, FLARM, if used in the "Latest" protocol.
 
 What can SoftRF do that FLARM cannot?
 
@@ -40,8 +40,9 @@ What can my version of SoftRF do that the mainline version cannot?
 
 My version can now receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP or ADS-L) once every 4 seconds.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
 
-And starting with version MB172, SoftRF can also be configured to:
+And recent version of my SoftRF can also be configured to:
 * Receive ADS-L signals simultaneously with FLARM signals
+* Operate on two (even three!) protocols at the same time, including FANET or P3I (PilotAware)
 * Relay selected other FLARM traffic, for increased range - in ADS-L format invisible to FLARMs
 * Or, relay selected ADS-B traffic, if so equipped, for the benefit of nearby SoftRF that is not
 
@@ -92,7 +93,7 @@ for an example connection circuit.  The resistors reduce the output signal level
 You also have the option to attach (through a 100-ohm resistor) an LED, or LED-strobe-driving circuit, to pin 25 (note: strobe uses pin 15 if voice output is turned on which uses pin 25).  This can be an LED on the T-Beam case, or elsewhere in the cockpit, that flashes in case of collision alarm.  Or, it can trigger a high-intensity strobe mounted in the front of the canopy, to visually warn pilots of other aircraft - with periodic flashes, and more frequent flashes in case of collision alarm.  For now, this needs a wired connection, specifically to a T-Beam.  SoftRF now also sends a special $PSRSF NMEA message whenever a flash happens (or could happen).  Utilizing that, can use a separate device ("SkyStrobe"), possibly embedded into the strobe unit, that receives data from SoftRF (or FLARM, wired or wirelessly), and controls the strobe based on that data.  See pinout diagram here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation/T-beam_wiring.jpg
 
-Often T-Beams are sold with a small "OLED" display that one needs to solder to the board using a 4-pin header (or is already soldered).  That is optional.  SoftRF will run just fine without the OLED display.  But if added, the OLED shows some information about SoftRF operation.  During booting, it first shows the firmware version and whether the user settings have been restored.  Later it shows the device ID, protocol, selected regional band, aircraft type, the number of aircraft tracked, the number of radio packets sent and received, the GNSS satellite reception status, battery voltage, IP address, etc., and even lists the tracked aircraft.  Press the power-on button briefly to rotate between several "pages" of information.  This display is too small and dim to be useful during flight.  Be sure to *remove* the battery from the T-beam before soldering the OLED display to it.  It is not enough to turn the T-Beam "off".  See photo of the OLED attachement to pins 21 (SDA) and 22 (SCL):
+Often T-Beams are sold with a small "OLED" display that one needs to solder to the board using a 4-pin header (or is already soldered).  That is optional.  SoftRF will run just fine without the OLED display.  But if added, the OLED shows some information about SoftRF operation.  During booting, it first shows the firmware version and whether the user settings have been restored.  Later it shows the device ID, protocol, selected regional band, aircraft type, the number of aircraft tracked, the number of radio packets sent and received, the GNSS satellite reception status, battery voltage, IP address, etc., and even lists the tracked aircraft.  Press the power-on button briefly to rotate between several "pages" of information.  This display is thus useful to verify operation and configuration.  But it is too small and dim to be useful during flight.  Be sure to *remove* the battery from the T-beam before soldering the OLED display to it.  It is not enough to turn the T-Beam "off".  See photo of the OLED attachement to pins 21 (SDA) and 22 (SCL):
   https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/T-beam_OLED_attached.jpg
 It can alternatively be connected to pins 13 (SDA) and 2 (SCL), the software automatically detects which pins are used.  (But be sure to connect pin 2 in a way that is easy to disconnect - see section on USB flashing.)  Can share the same pins as the barometric sensor.  (The AXP PMU too is using pins 21,22.) 
 
@@ -220,9 +221,9 @@ Device ID: this is unique to each device and you cannot change it.  The first he
 
 Aircraft ID: 6 hex digits.  If your aircraft is registered, you can enter its ICAO ID, which is unique.  You can obtain it from the authorities in your country.  In the USA go here: https://registry.faa.gov/aircraftinquiry/Search/NNumberInquiry and in the search results look for "Mode S Code (Base 16 / Hex)".  If you also have a transponder or some other device, setting all of them to the same ID will avoid duplicate reporting of the aircraft in OGN.
 
-ID type to use: You can choose ICAO (the ID entered above), Device (the fixed device ID), or Anonymous.  The latter is random but is fixed for the flight.  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic transmitted ID will be shown in those viewers.
+ID type to use: You can choose ICAO (the ID entered above), Device (the fixed device ID), or Anonymous.  The latter is random but is fixed for the flight.  For FANET "Device ID" is preferred.  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic transmitted ID will be shown in those viewers.
 
-Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices set to either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.  The P3I and FANET protocols are also available choices, commonly used by light planes in the UK, and by paragliders, respectively.  New in version MB166: can also choose the ADS-L protocol.  Note that you can also choose to transmit in an alternate protocol once every 16 seconds, see the "under the hood" document.
+Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices set to either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts in gliders on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.  But it is best to have the tow plane transmit in a protocol that makes it visible to the other gliders.  The FANET and P3I (PilotAware) protocols are also available choices, commonly used by paragliders, and by light planes in the UK, respectively.  New in version MB166: can also choose the ADS-L protocol.  Note that you can also choose to operate in two protocols at once, see the "under the hood" document.
 
 Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.
 
@@ -286,7 +287,7 @@ And so forth.  Note that after each "click" or "touch", it will take about 2 sec
 The settings accessible via this method are:
 * AIRCRAFT TYPE:Glider, Towplane Helicopter, Powered, Hangglider, Paraglider, Dropplane, Parachute, Balloon, UAV, Static.
 * RF PROTOCOL: LATEST, LEGACY, OGNTP, P3I, FANET, ADS-L.
-* ALTERNATE PROTOCOL: LATEST, LEGACY, OGNTP, ADS-L.  (P3I and FANET listed but are not valid as alternates)
+* ALTERNATE PROTOCOL: same list
 * RF BAND (REGION): EU, US, UK, AU, NZ, RU, CN, IN, IL, KR.  (UK only for P3I.)
 * Collision prediction algorithm: Latest, Vector, Distance, None.
 * Relay mode: None, Landed, All.
@@ -306,12 +307,13 @@ The settings file is plain text, label,value pairs, one per line.  The labels mu
 
 Many of the lines in the settings file have comments added at the end of the line (following "#"), which explain the coding.  That is handy when you are editing the file and want to know what code to enter after the comma.  Here are the codes used for a few important settings:
 
-protocol (and altprotocol - P3I and FANET not valid as alternates)
-0	Legacy   /* Air V6 */
+protocol (and altprotocol)
+0	none     /* for altprotocol */
 1	OGNTP
 2	P3I      /* PilotAware */
 5	FANET    /* Skytraxx */
-7	Latest   /* new 2024 V7 protocol */
+6	Legacy   /* Air V6 */
+7	Latest   /* new 2024 Air V7 protocol */
 8	ADS-L
 
 band
@@ -321,7 +323,7 @@ band
 4	NZ     /* 869.250 MHz band */
 5	RU     /* 868.8 MHz band */
 6	CN     /* 470 MHz band */
-7	UK     /* treated as EU, unless FANET */
+7	UK     /* treated as EU, unless P3I */
 8	IN     /* 866.0 MHz band */
 9	IL     /* 916.2 MHz band */
 10	KR     /* 920.9 MHz band */

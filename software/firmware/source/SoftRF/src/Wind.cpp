@@ -858,7 +858,8 @@ void project_this(container_t *this_aircraft)
         this_aircraft->air_ew[i] = ew;
       }
 
-      if (settings->rf_protocol == RF_PROTOCOL_LEGACY) {    // but not LATEST
+      if (settings->rf_protocol == RF_PROTOCOL_LEGACY
+      ||  settings->altprotocol == RF_PROTOCOL_LEGACY) {    // but not LATEST
         /* also need to compute fla_ns[] & fla_ew[] for transmissions */
         ns = (int16_t) roundf(4.0 * gs_ns);
         ew = (int16_t) roundf(4.0 * gs_ew);
@@ -912,7 +913,8 @@ void project_this(container_t *this_aircraft)
 
       //this_aircraft->turnrate = 0.0;     // over-riding turnrate from other sources
 
-      if (settings->rf_protocol == RF_PROTOCOL_LEGACY) {    // but not LATEST
+      if (settings->rf_protocol == RF_PROTOCOL_LEGACY
+      ||  settings->altprotocol == RF_PROTOCOL_LEGACY) {    // but not LATEST
         /* also need to compute fla_ns[] & fla_ew[] for transmissions */
         ns = (int16_t) roundf(4.0 * gs_ns);
         ew = (int16_t) roundf(4.0 * gs_ew);
@@ -979,7 +981,8 @@ void project_this(container_t *this_aircraft)
        this_aircraft->air_ew[i] = ew;
     }
 
-    if (settings->rf_protocol != RF_PROTOCOL_LEGACY) {
+    if (settings->rf_protocol != RF_PROTOCOL_LEGACY
+    &&  settings->altprotocol != RF_PROTOCOL_LEGACY) {
         if (report) report_this_projection(this_aircraft, proj_type);
         return;
     }
