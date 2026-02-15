@@ -1272,6 +1272,7 @@ void NMEA_Export()
     bool HP_nondir = false;
     bool HP_stealth = false;
     int total_objects = 0;
+    int hidden_objects = 0;
     int head = 0;
 
     bool has_Fix = (isValidFix() || (settings->mode == SOFTRF_MODE_TXRX_TEST));
@@ -1286,7 +1287,8 @@ void NMEA_Export()
 
         cip = &Container[i];
 
-        if (cip->addr && ((OurTime - cip->timestamp) <= settings->expire)) {
+        if (cip->addr == 0 || ((OurTime - cip->timestamp) > settings->expire))
+            continue;
 #if 0
           Serial.println(i);
           Serial.printf("%06X\r\n", cip->addr);
@@ -1312,64 +1314,76 @@ void NMEA_Export()
 
           bool show = true;
 
+         if (distance > 99000)     // too-far ADS-B aircraft
+             show = false;
+
           /* mask some data following FLARM protocol: */
-          if (stealth && alarm_level <= ALARM_LEVEL_CLOSE) {
+          if (alarm_level <= ALARM_LEVEL_CLOSE && (stealth || ThisAircraft.stealth)) {  /* reciprocal */
             if (distance > STEALTH_DISTANCE || abs(alt_diff) > STEALTH_VERTICAL) {
                 show = false;
             }
           }
 
-       /* if (cip->protocol == RF_PROTOCOL_LEGACY && cip->airborne == 0)
-                   show = false; */
-
-          if ((alarm_level > ALARM_LEVEL_NONE
-               //|| (distance < ALARM_ZONE_NONE && abs_alt_diff < VERTICAL_VISIBILITY_RANGE)
-               || (cip->tx_type <= TX_TYPE_ADSB)   // filtering done in ADS-B processing
-               || (distance < maxdistance && abs_alt_diff < maxaltdiff)
-               || cip->addr == follow_id)
-              && show) {
-
-             /* put candidate traffic to report into a sorted list */
-
-             int next, previous;
-             if (total_objects == 0) {  /* first inserted into the list */
-               head = i;
-               cip->next = MAX_TRACKING_OBJECTS;
-               total_objects = 1;
-             } else {
-               next = head;
-               while (next < MAX_TRACKING_OBJECTS) {
-                 fop = &Container[next];
-                 if (fop->alarm_level <= alarm_level
-                  && fop->addr != follow_id
-                  && fop->adj_distance >= adj_dist)
-                        break;   /* insert before this one */
-                 /* else */
-                   previous = next;  /* the preceding list entry */
-                   next = fop->next;
-               }
-               cip->next = next;
-               if (head == next)
-                 head = i;
-               else
-                 Container[previous].next = i;
-               total_objects++;
-             }
-
-             /* Alarm or close traffic is treated as highest priority */
-             if (alarm_level > HP_alarm_level ||
-                    (alarm_level == HP_alarm_level && adj_dist <= HP_adj_dist)) {  // was <
-                HP_bearing = bearing;
-                HP_alt_diff = alt_diff;
-                HP_alarm_level = alarm_level;
-                HP_distance = distance;
-                HP_adj_dist = adj_dist;
-                HP_addr = (stealth? 0xFFFFF0 + i : cip->addr);
-                HP_stealth = stealth;
-                HP_nondir = (cip->tx_type <= TX_TYPE_S);
-             }
+          // if this aircraft is not airborne, no-track targets should not be reported,
+          //  unless the target is closer than 200m horizontally and 100m vertically.
+          if (cip->no_track && ThisAircraft.airborne == 0 && test_mode == false) {
+             if (abs_alt_diff > 100)
+                 show = false;
+            if (distance > 200.0f)
+                 show = false;
           }
-        }
+
+          if (alarm_level == ALARM_LEVEL_NONE
+               && (cip->tx_type > TX_TYPE_ADSB)   // filtering not done in ADS-B processing
+               && (distance > maxdistance || abs_alt_diff > maxaltdiff)
+               && cip->addr != follow_id) {
+                 show = false;
+          }
+
+          if (show == false) {
+              ++hidden_objects;
+              continue;
+          }
+
+          /* put candidate traffic to report into a sorted list */
+
+          int next, previous;
+          if (total_objects == 0) {  /* first inserted into the list */
+            head = i;
+            cip->next = MAX_TRACKING_OBJECTS;
+            total_objects = 1;
+          } else {
+            next = head;
+            while (next < MAX_TRACKING_OBJECTS) {
+              fop = &Container[next];
+              if (fop->alarm_level <= alarm_level
+               && fop->addr != follow_id
+               && fop->adj_distance >= adj_dist)
+                     break;   /* insert before this one */
+              /* else */
+                previous = next;  /* the preceding list entry */
+                next = fop->next;
+            }
+            cip->next = next;
+            if (head == next)
+              head = i;
+            else
+              Container[previous].next = i;
+            total_objects++;
+          }
+
+          /* Alarm or close traffic is treated as highest priority */
+          if (alarm_level > HP_alarm_level ||
+                 (alarm_level == HP_alarm_level && adj_dist <= HP_adj_dist)) {  // was <
+             HP_bearing = bearing;
+             HP_alt_diff = alt_diff;
+             HP_alarm_level = alarm_level;
+             HP_distance = distance;
+             HP_adj_dist = adj_dist;
+             HP_addr = (stealth? 0xFFFFF0 + i : cip->addr);
+             HP_stealth = stealth;
+             HP_nondir = (cip->tx_type <= TX_TYPE_S);
+          }
       }
 
       fop = &Container[head];
@@ -1389,34 +1403,33 @@ void NMEA_Export()
          uint32_t id = fop->addr;
          alarm_level = fop->alarm_level;
          alt_diff = (int) (fop->alt_diff);  /* sent to NMEA */
-         int dx = fop->dx;
-         int dy = fop->dy;
+         //int dx = fop->dx;
+         //int dy = fop->dy;
 
          bool stealth = (fop->stealth || ThisAircraft.stealth);  /* reciprocal */
          if (stealth) {
-            if (abs(alt_diff) > 300)
+/* already done:
+           if (abs(alt_diff) > 300)
                 continue;               // do not report this aircraft
            if (dx*dx + dy*dy > (2000*2000))
                 continue;               // do not report this aircraft
+*/
            id = 0xFFFFF0 + i;            // show as anonymous
            addr_type = ADDR_TYPE_RANDOM;    // (0) - not ADDR_TYPE_ANONYMOUS
            if (alarm_level <= ALARM_LEVEL_CLOSE)
                alt_diff = (alt_diff & 0xFFFFFF00) + 128;   /* fuzzify */
          }
 
+/* already done:
          // if this aircraft is not airborne, no-track targets should not be reported,
          //  unless the target is closer than 200m horizontally and 100m vertically.
-
          if (fop->no_track && ! ThisAircraft.airborne) {
             if (abs(alt_diff) > 100)
                 continue;               // do not report this aircraft
            if (dx*dx + dy*dy > (200*200))
                 continue;               // do not report this aircraft
          }
-
-         if (fop->distance > 99000)     // too-far ADS-B aircraft
-             continue;
-
+*/
          // If either target or this aircraft is "stealth" then:
          //   course should be empty
          //   speed should be empty
@@ -1431,13 +1444,14 @@ void NMEA_Export()
          //   climbrate should be empty
 
          char str_dx[8];                      // need room for a minus sign
-         snprintf(str_dx, 8, "%d", dx);
+         snprintf(str_dx, 8, "%d", fop->dx);
          char str_climb_rate[8];
          char str_course[4];
          char str_speed[4];
          str_climb_rate[0] = '\0';
          str_course[0] = '\0';
          str_speed[0] = '\0';
+         int dy = fop->dy;
          if (fop->tx_type <= TX_TYPE_S) {     // a non-directional target
              dy = (int) fop->distance;
              if (dy > 2*ALARM_ZONE_LOW && !deeper)
@@ -1598,7 +1612,7 @@ void NMEA_Export()
         int alarm_type = (HP_alarm_level > 0)? ALARM_TYPE_AIRCRAFT : ALARM_TYPE_TRAFFIC;
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
                 PSTR("$PFLAU,%d,%d,%d,%d,%d,%s,%d,%d,%u,%06X" PFLAU_EXT1_FMT "*"),
-                total_objects, tx_status, gps_status,
+                total_objects+hidden_objects, tx_status, gps_status,
                 power_status, HP_alarm_level, str_relbrg,
                 alarm_type, HP_alt_diff, (int) HP_distance, HP_addr
                 PFLAU_EXT1_ARGS );
@@ -1610,8 +1624,8 @@ void NMEA_Export()
                 PFLAU_EXT1_ARGS );
     } else {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-                PSTR("$PFLAU,0,%d,%d,%d,%d,,0,,," PFLAU_EXT1_FMT "*"),  // had extra comma
-                tx_status, gps_status,
+                PSTR("$PFLAU,%d,%d,%d,%d,%d,,0,,," PFLAU_EXT1_FMT "*"),  // had extra comma
+                hidden_objects, tx_status, gps_status,
                 power_status, ALARM_LEVEL_NONE
                 PFLAU_EXT1_ARGS );
     }

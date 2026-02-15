@@ -2096,8 +2096,10 @@ uint8_t Try_GNSS_sentence() {
     else
 #endif
     {
-        if (is_g && settings->gn_to_gp)   // convert $GN, $GA, $GL to $GP if needed
+        if (is_g && settings->gn_to_gp) {   // convert $GN, $GA, $GL to $GP if needed
             gb[2] = 'P';
+            (void) NMEA_add_checksum();     // since we patched the sentence
+        }
         NMEA_Outs(nmeatype, gb, write_size, true);
     }
     return 1;
