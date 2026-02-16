@@ -809,6 +809,14 @@ static bool sx12xx_receive()
     RF_last_rssi = LMIC.rssi;
     rx_packets_counter++;
     success = true;
+
+if (settings->debug_flags) {
+uint32_t ms = millis() - ref_time_ms;
+if (ms < 300)  ms += 1000;
+Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms\r\n",
+    RF_last_protocol, RF_current_slot, RF_time, (RF_time & 0x0F), ms);
+}
+
   }
 
   return success;
@@ -898,7 +906,7 @@ static void sx12xx_rx_func(osjob_t* job) {
       // examine 2 later bytes in the sync word to identify the protocol
       // - that was 4 bytes before Manchester decoding
       if (LMIC.frame[0]==FLR_ID_BYTE_1 && LMIC.frame[1]==FLR_ID_BYTE_2) {
-          RF_last_protocol = RF_PROTOCOL_LEGACY;
+          RF_last_protocol = RF_PROTOCOL_LATEST;
           crc_type = RF_CHECKSUM_TYPE_CCITT_FFFF;
       } else if (LMIC.frame[0]==ADSL_ID_BYTE_1 && LMIC.frame[1]==ADSL_ID_BYTE_2) {
           RF_last_protocol = RF_PROTOCOL_ADSL;
@@ -1062,6 +1070,16 @@ Serial.println("FLR CRC wrong");
     }
     break;
   }
+
+/*
+if (sx12xx_receive_complete && settings->debug_flags) {
+uint8_t protocol = LMIC.protocol->type;
+if (rx_flr_adsl)  protocol = RF_last_protocol;
+Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms\r\n",
+    protocol, RF_current_slot, RF_time, (RF_time & 0x0F), millis()-ref_time_ms);
+}
+*/
+
 }
 
 // Transmit the given string and call the given function afterwards
@@ -2231,8 +2249,8 @@ byte RF_setup(void)
   mainprotocol_encode = protocol_encode;
   mainprotocol_decode = protocol_decode;
 
-Serial.printf("Main protocol: %d\r\n", mainprotocol_ptr->type);
-Serial.printf(" Alt protocol: %d\r\n",  altprotocol_ptr->type);
+  Serial.printf("Main RF protocol: %d\r\n", mainprotocol_ptr->type);
+  Serial.printf(" Alt RF protocol: %d\r\n",  altprotocol_ptr->type);
 
   RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
 
@@ -2602,13 +2620,14 @@ void set_protocol_for_slot()
       RF_chip_channel(current_RX_protocol);
   }
 
+/*
   if (dual_protocol == RF_SINGLE_PROTOCOL && current_TX_protocol != settings->rf_protocol) {
       Serial.print("set up to tx one time slot in protocol ");
       Serial.print(current_TX_protocol);
       Serial.print(" rather than ");
       Serial.println(settings->rf_protocol);
   }
-
+*/
 }
 
 void RF_loop()
@@ -2765,7 +2784,7 @@ void RF_loop()
       Serial.println(RF_OK_until - slot_base_ms);
   }
 */
-if (settings->debug_flags) {
+if (settings->debug_flags & DEBUG_DEEPER) {
 Serial.printf("Prot %d/%d(%s), Slot %d set for sec %d at PPS+%d ms, PPS %d, tx ok %d - %d, gd to %d\r\n",
 current_RX_protocol, current_TX_protocol, ((curr_tx_protocol_ptr == &latest_proto_desc)? "T" : "?"),
    RF_current_slot, (RF_time & 0x0F), ms_since_pps, slot_base_ms,
@@ -2867,7 +2886,7 @@ bool RF_Transmit(size_t size, bool wait)   // only called with no-wait for air-r
             else
                 success = false;
 
-if (settings->debug_flags) {
+if (settings->debug_flags & DEBUG_DEEPER) {
 Serial.printf("TX in protocol %d(%s) at %d ms, size=%d\r\n",
     current_TX_protocol, ((LMIC.protocol == &latest_proto_desc)? "T" : "?"),
     millis()-ref_time_ms, RF_tx_size);

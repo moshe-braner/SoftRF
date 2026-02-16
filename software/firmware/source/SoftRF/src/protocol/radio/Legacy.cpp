@@ -760,10 +760,10 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
 
 bool flr_adsl_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
 
-    if (RF_last_protocol==RF_PROTOCOL_LEGACY)
-        return legacy_decode(buffer, this_aircraft, fop);
     if (RF_last_protocol==RF_PROTOCOL_ADSL)
         return adsl_decode(buffer, this_aircraft, fop);
+    if (RF_last_protocol==RF_PROTOCOL_LATEST || RF_last_protocol==RF_PROTOCOL_LEGACY)
+        return legacy_decode(buffer, this_aircraft, fop);
     return false;
 }
 
