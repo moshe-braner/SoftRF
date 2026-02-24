@@ -34,7 +34,7 @@ float wind_best_ns = 0.0;  /* mps */
 float wind_best_ew = 0.0;
 float wind_speed = 0.0;
 float wind_direction = 0.0;
-// time_t AirborneTime = 0;
+// uint32_t AirborneTime = 0;
 
 static float avg_abs_turnrate = 0.0;  /* absolute - average when circling */
 static float avg_speed = 0.0;     /* average around the circle */

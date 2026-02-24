@@ -1152,7 +1152,7 @@ void NMEA_loop()
             NmeaTCP[i].connect_ts = 0;
           }
           NmeaTCP[i].client = NmeaTCPServer.available();
-          NmeaTCP[i].connect_ts = OurTime;
+          NmeaTCP[i].connect_ts = (time_t) OurTime;
           NmeaTCP[i].ack = false;
           NmeaTCP[i].client.print(F("PASS?"));
           break;
@@ -1167,7 +1167,7 @@ void NMEA_loop()
     for (i = 0; i < MAX_NMEATCP_CLIENTS; i++) {
       if (NmeaTCP[i].client && NmeaTCP[i].client.connected() &&
          !NmeaTCP[i].ack && NmeaTCP[i].connect_ts > 0 &&
-         (OurTime - NmeaTCP[i].connect_ts) >= NMEATCP_ACK_TIMEOUT) {
+         ((time_t)OurTime - NmeaTCP[i].connect_ts) >= NMEATCP_ACK_TIMEOUT) {
 
           if (! is_a_prime_mk2) {
               /* Clean TCP input buffer from any pass codes sent by client */

@@ -69,7 +69,7 @@ const rf_proto_desc_t legacy_proto_desc = {
 };
 
 const rf_proto_desc_t latest_proto_desc = {
-  "Legacy",
+  "Latest",  // was "Legacy"
   .type            = RF_PROTOCOL_LATEST,   // otherwise same as legacy_proto_desc
   .modulation_type = RF_MODULATION_TYPE_2FSK,
   .preamble_type   = LEGACY_PREAMBLE_TYPE,

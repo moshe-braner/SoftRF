@@ -23,7 +23,6 @@ extern float wind_best_ns;    /* mps */
 extern float wind_best_ew;
 extern float wind_speed;
 extern float wind_direction;
-// extern time_t AirborneTime;
 
 void this_airborne(bool validfix);
 void project_this(container_t *);

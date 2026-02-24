@@ -1250,7 +1250,6 @@ void handleRoot() {
   bool usbpwr = ESP32_onExternalPower();
   float vusb = (usbpwr? 0.001*(float)ESP32_VbusVoltage() : 0.0);
 
-  //time_t timestamp = ThisAircraft.timestamp;
   int hour   = gnss.time.hour();
   int minute = gnss.time.minute();
   unsigned int sats = gnss.satellites.value(); // Number of satellites in use (u32)

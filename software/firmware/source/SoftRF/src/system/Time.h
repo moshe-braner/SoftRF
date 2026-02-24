@@ -25,7 +25,8 @@ enum
   RTC_PCF8563
 };
 
-extern time_t OurTime;
+//extern time_t OurTime;
+extern uint32_t OurTime;
 extern uint32_t ref_time_ms;
 
 void Time_setup(void);

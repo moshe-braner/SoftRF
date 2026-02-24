@@ -38,7 +38,8 @@
 
 byte RxBuffer[MAX_PKT_SIZE] __attribute__((aligned(sizeof(uint32_t))));
 
-time_t RF_time;
+//time_t RF_time;
+uint32_t RF_time;
 uint8_t RF_current_slot = 0;
 uint8_t RF_current_chan = 0;
 uint32_t RF_OK_from   = 0;
@@ -810,7 +811,7 @@ static bool sx12xx_receive()
     rx_packets_counter++;
     success = true;
 
-if (settings->debug_flags) {
+if (settings->debug_flags & DEBUG_DEEPER) {
 uint32_t ms = millis() - ref_time_ms;
 if (ms < 300)  ms += 1000;
 Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms\r\n",
@@ -2436,7 +2437,7 @@ void RF_SetChannel(void)
 
 //  Time = makeTime(tm) + (gnss.time.age() - time_corr_neg) / 1000;
     Time = makeTime(tm) + (gnss.time.age() + time_corr_neg) / 1000;
-    OurTime = Time;
+    OurTime = (uint32_t) Time;
 
     break;
   }
@@ -2568,9 +2569,25 @@ void set_protocol_for_slot()
   } else {  // slot 1
 
     if (dual_protocol == RF_FLR_FANET) {
-        curr_rx_protocol_ptr = &fanet_proto_desc;
+#if 1
+        // FANET+ (at least XCtracer) only transmits FLARM in Slot 1 of odd seconds
+        // So listen for FLARM in Slot 1 every 4 seconds in odd seconds
+        // This reduces the reception of FANET by 25%
+        if (sec_3_7_11_15) {
+            if (settings->flr_adsl) {
+                curr_rx_protocol_ptr = &flr_adsl_proto_desc;
+                protocol_decode = &flr_adsl_decode;
+            } else {
+                curr_rx_protocol_ptr = &latest_proto_desc;
+                protocol_decode = &legacy_decode;
+            }
+        } else
+#endif
+        {
+            curr_rx_protocol_ptr = &fanet_proto_desc;
+            protocol_decode = &fanet_decode;
+        }
         curr_tx_protocol_ptr = &fanet_proto_desc;
-        protocol_decode = &fanet_decode;
         protocol_encode = &fanet_encode;
     } else if (dual_protocol == RF_FLR_P3I) {
         curr_rx_protocol_ptr = &p3i_proto_desc;
@@ -2954,7 +2971,7 @@ OurTime, ms, (int)gnss.time.minute(), (int)gnss.time.second(), (RF_time & 0x0F),
 
     if (!wait || millis() > TxTimeMarker) {
 
-      time_t timestamp = OurTime;
+      uint32_t timestamp = OurTime;
 
       if (settings->txpower != RF_TX_POWER_OFF) {
         rf_chip->transmit();

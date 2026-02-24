@@ -21,7 +21,8 @@
 #include "../driver/RF.h"
 #include "../driver/Settings.h"
 
-time_t  OurTime = 0;           /* UTC time in seconds since start of 1970 */
+//time_t OurTime = 0;           /* UTC time in seconds since start of 1970 */
+uint32_t OurTime = 0;           /* UTC time in seconds since start of 1970 */
 uint32_t base_time_ms = 0;     /* this device millis() at last verified PPS */
 uint32_t ref_time_ms = 0;      /* assumed local millis() at last PPS */
 
