@@ -2438,6 +2438,7 @@ void RF_SetChannel(void)
 //  Time = makeTime(tm) + (gnss.time.age() - time_corr_neg) / 1000;
     Time = makeTime(tm) + (gnss.time.age() + time_corr_neg) / 1000;
     OurTime = (uint32_t) Time;
+    RF_time = OurTime;
 
     break;
   }
