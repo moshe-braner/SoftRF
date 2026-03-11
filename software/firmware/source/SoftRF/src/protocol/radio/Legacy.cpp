@@ -674,11 +674,11 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     int16_t alt = pkt->alt ; /* relative to WGS84 ellipsoid */
 
     fop->airborne = pkt->airborne;
+    fop->protocol = RF_PROTOCOL_LEGACY;
     if (fop->relayed && fop->airborne) {
         //fop->protocol = RF_PROTOCOL_ADSB_1090;   // assumption
         fop->tx_type = TX_TYPE_ADSB;   // assumption
-    }
-    fop->protocol = RF_PROTOCOL_LEGACY;
+    } // else tx_type will be set to TX_TYPE_FLARM in ParseData()
 
     /* FLARM sometimes sends packets with implausible data */
     bool implausible = false;
@@ -795,10 +795,7 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
     pkt->msg_type = 2;
 
     pkt->stealth = aircraft->stealth;
-    //if (aircraft->tx_type < TX_TYPE_FLARM)     // if relaying ADS-B
-    //    pkt->no_track = 1;                     // then hide from OGN - alas then also rarely reported by FLARM
-    //else
-        pkt->no_track = aircraft->no_track;
+    pkt->no_track = aircraft->no_track;
 
     uint8_t aircraft_type = aircraft->aircraft_type;
     if (aircraft == &ThisAircraft) {                    // not relaying some other aircraft
@@ -807,11 +804,15 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
           if (test_mode)
               pkt->addr_type |= 4;   // >>> as if relayed - for testing how FLARM reacts
       }
-    } else {
+    } else {    // relaying some other aircraft
       if (aircraft_type == AIRCRAFT_TYPE_UNKNOWN && aircraft->airborne == 0) {
            // relaying a landed-out SoftRF device
-           if (settings->relay > RELAY_ONLY + 2)          // testing with relay,6
-               aircraft_type = AIRCRAFT_TYPE_GLIDER;      // maybe more FLARM-compatible
+           if (settings->relay > RELAY_ONLY + 2)         // testing with relay,6
+               aircraft_type = AIRCRAFT_TYPE_GLIDER;     // maybe more FLARM-compatible
+      }
+      if (aircraft->tx_type < TX_TYPE_FLARM
+              && settings->relay == RELAY_ALL) {         // if relaying ADS-B
+          pkt->no_track = 1;                             // then hide from OGN
       }
     }
     if (aircraft_type == AIRCRAFT_TYPE_WINCH) {
@@ -1005,9 +1006,11 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     pkt->vs = vs10 >> smult;
 
     pkt->stealth = aircraft->stealth;
-    //if (aircraft->tx_type < TX_TYPE_FLARM)     // if relaying ADS-B
-    //    pkt->no_track = 1;                     // then hide from OGN - alas then also rarely reported by FLARM
-    //else
+
+    if (relay && aircraft->tx_type < TX_TYPE_FLARM   // if relaying ADS-B
+            && settings->relay == RELAY_ALL)
+        pkt->no_track = 1;                           // then hide from OGN
+    else
         pkt->no_track = aircraft->no_track;
 
     uint8_t aircraft_type = aircraft->aircraft_type;

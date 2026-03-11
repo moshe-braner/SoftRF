@@ -1326,7 +1326,8 @@ void NMEA_Export()
 
           // if this aircraft is not airborne, no-track targets should not be reported,
           //  unless the target is closer than 200m horizontally and 100m vertically.
-          if (cip->no_track && ThisAircraft.airborne == 0 && test_mode == false) {
+          if (cip->no_track && cip->tx_type == TX_TYPE_FLARM
+                  && ThisAircraft.airborne == 0 && test_mode == false) {
              if (abs_alt_diff > 100)
                  show = false;
             if (distance > 200.0f)

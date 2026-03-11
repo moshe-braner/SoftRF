@@ -786,7 +786,7 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
 void logOneTraffic(container_t *fop, const char *label)
 {
 //#if defined(USE_SD_CARD)
-    uint32_t addr = (fop->no_track? 0xAAAAAA : fop->addr);
+    uint32_t addr = ((fop->no_track && fop->tx_type==TX_TYPE_FLARM)? 0xAAAAAA : fop->addr);
     int alarm_level = fop->alarm_level - 1;
     if (alarm_level < ALARM_LEVEL_NONE)
         alarm_level = ALARM_LEVEL_NONE;
@@ -806,7 +806,7 @@ void logOneTraffic(container_t *fop, const char *label)
 
 void logrelayed(container_t *cip)
 {
-    uint32_t addr = (cip->no_track? 0xAAAAAA : cip->addr);
+    uint32_t addr = ((cip->no_track && cip->tx_type==TX_TYPE_FLARM)? 0xAAAAAA : cip->addr);
     snprintf_P(NMEABuffer, sizeof(NMEABuffer),
       PSTR("LPLTR,%d,%d,%d,%06x,%d,%d,%d,%d\r\n"),
       cip->tx_type, cip->protocol, cip->aircraft_type, addr,
@@ -1243,7 +1243,13 @@ Serial.println("...relay_waiting");
             // but in FLR_FANET only have Slot 0 for ownship+relay, so relay less often
             if (dual_protocol != RF_FLR_ADSL && ((RF_time & 0x0F) != 0x0F))
                 return;
-            adsl_relay = true;   // relay non-landed-out in ADS-L protocol
+            // >>> maybe relay non-landed-out in ADS-L protocol
+            //     - but then OGN stations (they now receive ADS-L) will report it?
+            //          - unless they look at the "relayed" bit in the ADS-L packet
+            //     - OTOH relaying in ADS-L ensures won't cause a FLARM to see itself
+            // >>> but SoftRF with FLR_ADSL & flr_adsl only listen to ADS-L in slot 0
+            //if (RF_current_slot == 0)
+            //    adsl_relay = true;
         }
     }
 

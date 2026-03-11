@@ -2875,7 +2875,7 @@ size_t RF_Encode(container_t *fop, bool wait)
   return size;
 }
 
-bool RF_Transmit(size_t size, bool wait)   // only called with no-wait for air-relay
+bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-relay
 {
   if (RF_ready && rf_chip && (size > 0)) {
 
@@ -2889,6 +2889,10 @@ bool RF_Transmit(size_t size, bool wait)   // only called with no-wait for air-r
 
       if (RF_Transmit_Ready(wait)) {
 
+        if (current_TX_protocol == RF_PROTOCOL_ADSL) {
+            // for relaying in ADS-L instead of normal protocol
+            curr_tx_protocol_ptr = &adsl_proto_desc;
+        }
         if (LMIC.protocol != curr_tx_protocol_ptr) {
             // (usually LMIC.protocol was set in set_protocol_for_slot())
             RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
