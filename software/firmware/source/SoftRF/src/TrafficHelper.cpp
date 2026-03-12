@@ -1202,16 +1202,22 @@ Serial.println("...relay_waiting");
     if (! landed_out) {
         if (settings->relay < RELAY_ALL)     // RELAY_LANDED
             return;
-        if (dual_protocol == RF_FLR_ADSL && cip->protocol == RF_PROTOCOL_LATEST) {
+        if ((dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
+                         && cip->protocol == RF_PROTOCOL_LATEST) {
             // relay FLARM traffic >10km away in ADSL protocol
             //if (cip->distance < 10000 && (! test_mode))
             //    return;
             bool relay = test_mode;
-            if (cip->distance > 10000)  relay = true;
+            if (cip->distance > 10000)
+                relay = true;
             // also relay closer traffic if it is much lower
-            else if (cip->alt_diff < -1000.0f && cip->adj_distance > 15000)  relay = true;
+            else if (cip->alt_diff < -1000.0f && cip->adj_distance > 15000)
+                relay = true;
             if (! relay)
                 return;
+            if (RF_current_slot != 0)
+                return;
+            adsl_relay = true;
         } else {
             // only relay ADS-B
             if (! adsb)
@@ -1452,12 +1458,13 @@ void AddTraffic(ufo_t *fop, const char *callsign)
       // - do not relay if ownship main protocol is ADS-L or OGNTP for now
       // - do not relay ADS-L and OGNTP traffic for now
       // - use relay,4 for testing "relay only" mode on the ground
-      if (fop->protocol == RF_PROTOCOL_LATEST
-          && settings->relay != RELAY_OFF
+      if (settings->relay != RELAY_OFF
+          && fop->protocol == RF_PROTOCOL_LATEST
+          && fop->relayed == false         // not a packet already relayed one hop
           && (landed_out ||
-              (dual_protocol == RF_FLR_ADSL && settings->relay == RELAY_ALL
-               && settings->rx1090 == 0 && settings->gdl90_in == DEST_NONE))
-          && fop->relayed == false)        // not a packet already relayed one hop
+              (settings->relay == RELAY_ALL
+               && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
+               && settings->rx1090 == 0 && settings->gdl90_in == DEST_NONE)))
       {
             do_relay = true;
       }
