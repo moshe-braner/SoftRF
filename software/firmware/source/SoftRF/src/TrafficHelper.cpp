@@ -1460,6 +1460,8 @@ void AddTraffic(ufo_t *fop, const char *callsign)
       // - use relay,4 for testing "relay only" mode on the ground
       if (settings->relay != RELAY_OFF
           && fop->protocol == RF_PROTOCOL_LATEST
+          && fop->no_track == false
+          && fop->stealth == false
           && fop->relayed == false         // not a packet already relayed one hop
           && (landed_out ||
               (settings->relay == RELAY_ALL
