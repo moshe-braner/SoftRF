@@ -142,6 +142,7 @@ static int8_t (*Alarm_Level)(container_t *, container_t *);
 static uint32_t Alarm_timer = 0;
 
 container_t *relay_waiting = NULL;
+uint32_t priority_relay = 0;   // ID of landed-out or close ADS-B
 
 // Compute registration-number from ICAO ID - USA and Canada only
 
@@ -1199,11 +1200,13 @@ Serial.println("...relay_waiting");
                 // - this may be GDL90 input from an attached device, possibly not truly ADS-B
     bool adsl_relay = false;
 
-    if (! landed_out) {
-        if (settings->relay < RELAY_ALL)     // RELAY_LANDED
-            return;
-        if ((dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
-                         && cip->protocol == RF_PROTOCOL_LATEST) {
+    if (landed_out) {
+        priority_relay = cip->addr;  // don't relay non-landed-out FLARM traffic
+    } else {
+        //if (settings->relay < RELAY_ALL)     // RELAY_LANDED - already checked
+        //    return;
+        if (cip->protocol == RF_PROTOCOL_LATEST) {
+            // && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl) - already checked
             // relay FLARM traffic >10km away in ADSL protocol
             //if (cip->distance < 10000 && (! test_mode))
             //    return;
@@ -1224,25 +1227,32 @@ Serial.println("...relay_waiting");
                 return;
             if (! normal_protocol)  // do not relay ADS-B in altprotocol
                 return;
+            bool relay = true;
             if (cip->aircraft_type == AIRCRAFT_TYPE_JET) {
                 if (cip->distance > 16000)
-                    return;
+                    relay = false;
             } else if (cip->aircraft_type == AIRCRAFT_TYPE_HELICOPTER) {
                 if (cip->distance > 10000)
-                    return;
+                    relay = false;
             } else {
                 if (cip->distance > 8000)  // only relay gliders and light planes if close
-                    return;
+                    relay = false;
             }
             //if (cip->aircraft_type != AIRCRAFT_TYPE_JET && cip->aircraft_type != AIRCRAFT_TYPE_HELICOPTER) {
             //    if (cip->distance > 10000)  // only relay gliders and light planes if close
-            //        return;
+            //        relay = false;
                 // - The idea is that if the aircraft is also sending FLARM signals, then if close
                 //     those signals will be received, and other protocols will be ignored.
                 //   Thus if close and another protocol, then no FLARM, and safe to relay,
                 //     meaning it won't make a FLARM "see itself" and go crazy.
                 // - no longer an issue if we relay in ADS-L protocol
             //}
+            if (! relay) {
+                if (priority_relay == cip->addr)  // was closer earlier
+                    priority_relay = 0;
+                return;
+            }
+            priority_relay = cip->addr;  // don't relay non-landed-out FLARM traffic
         }
         if (dual_protocol != RF_SINGLE_PROTOCOL && settings->relay < RELAY_ONLY) {
             // even for RF_FLR_FANET, not just for RF_FLR_ADSL
@@ -1453,28 +1463,26 @@ void AddTraffic(ufo_t *fop, const char *callsign)
     bool landed_out = (fop->aircraft_type == AIRCRAFT_TYPE_UNKNOWN && fop->airborne == 0);
 
     if ((settings->rf_protocol == RF_PROTOCOL_LATEST || dual_protocol == RF_FLR_ADSL)
-          && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode)) {
+          && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode)
+          && fop->relayed == false) {           // not a packet already relayed one hop
       // relay some traffic - only if we are airborne (even in "relay only" mode)
       // - do not relay if ownship main protocol is ADS-L or OGNTP for now
       // - do not relay ADS-L and OGNTP traffic for now
       // - use relay,4 for testing "relay only" mode on the ground
-      if (settings->relay != RELAY_OFF
-          && fop->protocol == RF_PROTOCOL_LATEST
-          && fop->no_track == false
-          && fop->stealth == false
-          && fop->relayed == false         // not a packet already relayed one hop
-          && (landed_out ||
-              (settings->relay == RELAY_ALL
-               && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
-               && settings->rx1090 == 0 && settings->gdl90_in == DEST_NONE)))
-      {
-            do_relay = true;
+      if (landed_out && settings->relay != RELAY_OFF) {
+          do_relay = true;
+      } else if (settings->relay == RELAY_ALL  // but not RELAY_ONLY
+                 && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
+                 && fop->protocol == RF_PROTOCOL_LATEST
+                 && fop->stealth  == false
+                 && fop->no_track == false
+                 // && settings->rx1090 == 0 && settings->gdl90_in == DEST_NONE)))
+                 && priority_relay == 0) {
+          do_relay = true;
+      } else if (settings->relay >= RELAY_ALL && fop->protocol == RF_PROTOCOL_GDL90) {
+          do_relay = true;
       }
-      else if (settings->relay >= RELAY_ALL && fop->protocol == RF_PROTOCOL_GDL90)
-      {
-            do_relay = true;
-      }
-      // for ADS-B air_relay() is called directly from GNS5892.cpp
+      // for ADS-B traffic air_relay() is called directly from GNS5892.cpp
     }
 
     /* first check whether we are already tracking this object */
@@ -1581,6 +1589,8 @@ void AddTraffic(ufo_t *fop, const char *callsign)
     for (i=0; i < MAX_TRACKING_OBJECTS; i++) {
       if (OurTime > Container[i].timestamp + ENTRY_EXPIRATION_TIME) {
         cip = &Container[i];
+        if (cip->addr == priority_relay)
+            priority_relay = 0;
         //*cip = EmptyContainer;
         EmptyContainer(cip);
         CopyTraffic(cip, fop, callsign);
@@ -1625,6 +1635,8 @@ void AddTraffic(ufo_t *fop, const char *callsign)
     if (max_dist_ndx < MAX_TRACKING_OBJECTS
         && (adj_distance < max_dist || fop->addr == follow_id || fop->relayed)) {
       cip = &Container[max_dist_ndx];
+      if (cip->addr == priority_relay)
+          priority_relay = 0;
       //*cip = EmptyContainer;
       EmptyContainer(cip);
       CopyTraffic(cip, fop, callsign);
@@ -1792,6 +1804,9 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
 }
           sample_range(fop);
 
+          if (fop->addr == priority_relay)
+              priority_relay = 0;
+
           // EmptyContainer(fop);
           fop->addr = 0;
 
@@ -1882,6 +1897,8 @@ void ClearExpired()
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
     if (Container[i].addr &&
          (OurTime > Container[i].timestamp + ENTRY_EXPIRATION_TIME)) {
+      if (Container[i].addr == priority_relay)
+          priority_relay = 0;
       //EmptyContainer(&Container[i]);
       Container[i].addr = 0;
     }
