@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated March 29, 2026 to fit software version MB179
+This version last updated March 31, 2026 to fit software version MB179
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -126,7 +126,7 @@ How to power the SoftRF device
 
 There are basically 3 options:
 
-One can install an 18650 size cylindrical lithium-ion cell in the battery holder of the T-Beam (or a small Lithium-polymer pouch battery in the T-Echo), and run the device on that battery.  (Be sure to buy FLAT TOP and not BUTTON TOP 18650 batteries as only FLAT TOP will fit in the holder.)  This will suffice for long flights.  The battery can be charged via the USB port of the T-Beam or T-Echo.  When a charger is attached, the board turns on, one can then turn it off to make the charging process somewhat faster.  On the T-Beams with a PMU (v1.x), once turned "off", the blue LED indicates the charging.  There is no indication on the older T-Beams (v0.7) of when the charging is complete.  If your charger gets warm to the touch while charging, it will be cool to the touch when no longer charging at a significant rate.
+One can install an 18650 size cylindrical lithium-ion cell in the battery holder of the T-Beam (or a small Lithium-polymer pouch battery in the T-Echo), and run the device on that battery.  (Be sure to buy FLAT TOP and not BUTTON TOP 18650 batteries as only FLAT TOP will fit in the holder on the T-Beam.)  This will suffice for long flights.  The battery can be charged via the USB port of the T-Beam or T-Echo.  When a charger is attached, the board turns on, one can then turn it off to make the charging process somewhat faster.  On the T-Beams with a PMU (v1.x), once turned "off", the blue LED indicates the charging.  There is no indication on the older T-Beams (v0.7) of when the charging is complete.  If your charger gets warm to the touch while charging, it will be cool to the touch when no longer charging at a significant rate.
 
 Or, one can power the T-Beam via the USB port, without installing a battery on the board.  Any USB power source will do.  You may install a 12V to 5V dc-dc converter and use the aircraft main power so that SoftRF (plugged in via a USB cable) turns on when aircraft power is turned on.  The needed current is about 120 mA normally, perhaps double that during the very short transmission pulses (1 % of the time).  A disadvantage of this approach is that, after sitting unpowered for a while, the device may take a relatively long time to acquire a GNSS fix.  An advantage is that the device can be mounted "permanently" in the aircraft, one does not need to dismount it and take it elsewhere to charge it.
 
@@ -202,6 +202,8 @@ The settings are now stored in a text file called "settings.txt" in the file sys
 Note that clicking "save and reboot" in the settings web page replaces the existing backup settings file (if any) with the current settings file before writing the new file.  I.e., after the save and reboot, clicking the "Restore/Swap" button will revert to the previous settings.
 
 On the T-Echo, adjusting the settings is more difficult.  Now that the settings are stored in a "settings.txt" file, the best way is to edit that file.  After connecting the T-Echo to a computer via USB and opening it as a "drive", one can access that file from the computer.  To prepare the file space so that SoftRF can then create the settings file, may first need to connect the T-Echo to a PC, format that "drive" (as "FAT"), then disconnect and restart SoftRF.  Once you can see that file, you can edit it using a text editing app on the computer.  Each line must have a setting label, comma, and setting value.  The existing file will include comments further on some lines explaining the values.  Save the file and reboot the T-Echo for the new settings to take effect.
+
+NEW method available for the T-Echo: use the fantastic web page by Vlad Belayev (can be downloaded and used off-line too):  https://ogn.helioho.st/mysoftrf/  - it connects to the device via Bluetooth LE, shows device status and settings (and traffic), and allows an easy way to change the settings.  It is still under development, and in the future may also allow connection via USB instead of Bluetooth.  Turn on Bluetooth on your phone (or laptop), but do not "pair" it with the SoftRF device.  Instead, click "connect" in that web page, and select the SoftRF device in the list it shows.
 
 The older methods for changing the settings on the T-Echo include:
 
