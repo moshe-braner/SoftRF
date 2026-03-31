@@ -227,6 +227,7 @@ void setup()
   }
 #endif
 
+  uint32_t chip_id = SoC->getChipId() & 0x00FFFFFF;
   if (settings->stealth
         || settings->id_method == ADDR_TYPE_RANDOM
         || settings->id_method == ADDR_TYPE_ANONYMOUS) {
@@ -236,11 +237,15 @@ void setup()
   } else if (settings->id_method == ADDR_TYPE_OVERRIDE && settings->aircraft_id != 0) {
     ThisAircraft.addr = settings->aircraft_id;
   } else {
-    uint32_t id = SoC->getChipId() & 0x00FFFFFF;
-    ThisAircraft.addr = id;
+    // switched to restricting device ID to a 20-bit range
+    // following '8' to avoid overlapping with any of FLARM ranges
+    if (settings->id_method == ADDR_TYPE_FANET)
+        ThisAircraft.addr = (0x00870000 | (chip_id & 0x0000FFFF));
+    else
+        ThisAircraft.addr = chip_id;   // it already has the 0x008_____ prefix
   }
-Serial.printf("\r\nID_method: %d, settings_ID: %06X, used_ID: %06X\r\n\r\n",
-settings->id_method, settings->aircraft_id, ThisAircraft.addr);
+  Serial.printf("\r\nID_method: %d, chip_ID: %06X, settings_ID: %06X, used_ID: %06X\r\n\r\n",
+  settings->id_method, chip_id, settings->aircraft_id, ThisAircraft.addr);
 
   SoC->Button_setup();
 
@@ -455,6 +460,19 @@ void reboot()
 static uint32_t lastsuccess = 0;
 #endif
 
+// borrowed from freqplan.h but uses float lat/lon:
+uint8_t calcBand(float lat, float lon)
+{
+    if( (lon>=(-20.0f)) && (lon<=(60.0f)) )
+        return RF_BAND_EU;  // between -20 and 60 deg Lon => Europe + Africa: 868MHz band
+    if( lat<(20.0f) ) {     // below 20deg latitude
+        if( ( lon>(164.0f)) && (lat<(-30.0f)) && (lat>(-48.0f)) )
+            return RF_BAND_NZ;
+        return RF_BAND_AU;  // => Australia + South America: upper half of 915MHz band
+    }
+    return RF_BAND_US; 
+}
+
 void normal()
 {
   static uint8_t firstfix = 1;
@@ -534,14 +552,25 @@ Serial.println("Tentative GNSS fix");
           || (settings->debug_flags & DEBUG_SIMULATE)) {
         /* 20 sec after first fix, or 5 sec after re-fix (but no wait if simulating) */
         GNSSTimeMarker = millis();
-Serial.printf("Stable GNSS fix:\r\n\
-    lat/lon: %.5f %.5f\r\n\
-    date: %d %d %d\r\n\
-    time: %d %d %d\r\n",
-gnss.location.lat(), gnss.location.lng(),
-gnss.date.year(), gnss.date.month(), gnss.date.day(),
-gnss.time.hour(), gnss.time.minute(), gnss.time.second());
+        float lat = gnss.location.lat();
+        float lon = gnss.location.lng();
+        Serial.printf("Stable GNSS fix:\r\n\
+            lat/lon: %.5f %.5f\r\n\
+            date: %d %d %d\r\n\
+            time: %d %d %d\r\n",
+            lat, lon,
+            gnss.date.year(), gnss.date.month(), gnss.date.day(),
+            gnss.time.hour(), gnss.time.minute(), gnss.time.second());
         (void) leap_seconds_valid();    // computes leap_seconds_correction
+        if (settings->volume != BUZZER_OFF && settings->volume != BUZZER_EXT) {
+          SoC->Buzzer_tone(440, 333);
+          SoC->Buzzer_tone(640, 333);
+        }
+        if (settings->band == RF_BAND_AUTO) {
+            settings->band = calcBand(lat, lon);
+            Serial.print("Auto band chose: ");
+            Serial.println(settings->band);
+        }
       } else {
         validfix = false;          // do not transmit yet
       }

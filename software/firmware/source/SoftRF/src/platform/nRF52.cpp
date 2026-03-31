@@ -1120,12 +1120,12 @@ extern BLEMidi blemidi;
 extern midi::MidiInterface<BLEMidi> MIDI_BLE;
 #endif /* USE_BLE_MIDI */
 
-static void nRF52_Buzzer_tone(int hz, uint8_t volume)
+static void nRF52_Buzzer_tone(int hz, int duration)
 {
 #if defined(USE_PWM_SOUND)
-  if (SOC_GPIO_PIN_BUZZER != SOC_UNUSED_PIN && volume != BUZZER_OFF) {
+  if (SOC_GPIO_PIN_BUZZER != SOC_UNUSED_PIN && settings->volume != BUZZER_OFF) {
     if (hz > 0) {
-      tone(SOC_GPIO_PIN_BUZZER, hz, ALARM_TONE_MS);
+      tone(SOC_GPIO_PIN_BUZZER, hz, duration);
     } else {
       noTone(SOC_GPIO_PIN_BUZZER);
     }
@@ -1133,7 +1133,7 @@ static void nRF52_Buzzer_tone(int hz, uint8_t volume)
 #endif /* USE_PWM_SOUND */
 
 #if defined(USE_USB_MIDI)
-  if (USBDevice.mounted() && volume != BUZZER_OFF) {
+  if (USBDevice.mounted() && settings->volume != BUZZER_OFF) {
     if (hz > 0) {
       MIDI_USB.sendNoteOn (60, 127, MIDI_CHANNEL_TRAFFIC); // 60 == middle C
     } else {
@@ -1143,7 +1143,7 @@ static void nRF52_Buzzer_tone(int hz, uint8_t volume)
 #endif /* USE_USB_MIDI */
 
 #if defined(USE_BLE_MIDI)
-  if (volume != BUZZER_OFF  &&
+  if (settings->volume != BUZZER_OFF  &&
       Bluefruit.connected() &&
       blemidi.notifyEnabled()) {
     if (hz > 0) {

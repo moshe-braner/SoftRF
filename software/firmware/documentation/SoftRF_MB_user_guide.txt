@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Jan 27, 2026 to fit software version MB174
+This version last updated March 29, 2026 to fit software version MB179
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -156,6 +156,8 @@ The T-Echo has a Reset button and a Mode button on the side, along with a touch 
     https://github.com/lyusupov/SoftRF/wiki/Badge-Edition
 Note that in this version of SoftRF, if you touch and hold the touch pad, for 2 seconds, the display will show "SCREEN SAVER" and then go blank, but the device will keep operating.  Click the Mode button to activate the display again.  If you press and hold and then release the Mode button while touching the pad, the T-Echo will turn off in "screen saver" mode.
 
+If a buzzer is installed, it will emit a series of 4 beeps rising in pitch when done booting.  Later it will emit 2 shorter beeps rising in pitch when a GNSS fix is achieved.
+
 FLARM does not generate collision warnings while it is not airborne.  My version of SoftRF follows that rule.  But to allow testing on the ground, my version does give such warnings - and sends signals out pretending to be airborne - for one minute after it is has booted and has acquired a GNSS fix.  If a strobe is connected, it will fire during the first 9 seconds, despite not being airborne, for testing.
 
 
@@ -221,11 +223,11 @@ Device ID: this is unique to each device and you cannot change it.  The first he
 
 Aircraft ID: 6 hex digits.  If your aircraft is registered, you can enter its ICAO ID, which is unique.  You can obtain it from the authorities in your country.  In the USA go here: https://registry.faa.gov/aircraftinquiry/Search/NNumberInquiry and in the search results look for "Mode S Code (Base 16 / Hex)".  If you also have a transponder or some other device, setting all of them to the same ID will avoid duplicate reporting of the aircraft in OGN.
 
-ID type to use: You can choose ICAO (the ID entered above), Device (the fixed device ID), or Anonymous.  The latter is random but is fixed for the flight.  For FANET "Device ID" is preferred.  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic transmitted ID will be shown in those viewers.
+ID type to use: You can choose ICAO (the ID entered above), or Device (the fixed device ID).  (Additional ID types are available, see the "under the hood" document.)  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic (6 hex digits) transmitted ID will be shown in those viewers.
 
 Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices set to either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts in gliders on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.  But it is best to have the tow plane transmit in a protocol that makes it visible to the other gliders.  The FANET and P3I (PilotAware) protocols are also available choices, commonly used by paragliders, and by light planes in the UK, respectively.  New in version MB166: can also choose the ADS-L protocol.  Note that you can also choose to operate in two protocols at once, see the "under the hood" document.
 
-Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.
+Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.  On devices other than the T-Beam the default region is "automatic", will be set upon first GNSS fix, but only saved for the future if the settings are saved manually.
 
 Aircraft type: E.g., glider, powered plane, etc.  This is important for collision avoidance and situational awareness, and also for OGN tracking.  This version of SoftRF added the aircraft type "winch", see the relevant section below.
 

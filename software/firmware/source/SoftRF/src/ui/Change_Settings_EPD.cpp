@@ -118,6 +118,7 @@ set_entry relays[] = {
 };
 
 set_entry idtypes[] = {
+  {ADDR_TYPE_FANET,     "FANET"},
   {ADDR_TYPE_FLARM,     "Device"},
   {ADDR_TYPE_ICAO,      "ICAO"},
   {ADDR_TYPE_ANONYMOUS, "Anonymous"},
@@ -228,6 +229,8 @@ void get_settings()
     actype    = get_one_setting((int) settings->acft_type, actypes);
     protocol  = get_one_setting((int) settings->rf_protocol, protocols);
     altproto  = get_one_setting((int) settings->altprotocol, protocols);
+    if (settings->band == RF_BAND_AUTO)
+        settings->band = RF_BAND_EU;
     region    = get_one_setting((int) settings->band, regions);
     alarm     = get_one_setting((int) settings->alarm, alarms);
     relay     = get_one_setting((int) settings->relay, relays);

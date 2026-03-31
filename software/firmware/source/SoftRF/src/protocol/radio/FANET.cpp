@@ -329,8 +329,8 @@ size_t fanet_encode(void *fanet_pkt, container_t *this_aircraft) {
   pkt->forward        = 1;
   pkt->type           = 1;  /* Tracking  */
 
-  //pkt->vendor         = SOFRF_FANET_VENDOR_ID;
-  pkt->vendor         = (id >> 16) & 0x00FF;   // will not be a constant
+  //pkt->vendor       = SOFRF_FANET_VENDOR_ID;
+  pkt->vendor         = (id >> 16) & 0x00FF;
   pkt->address        = id & 0x00FFFF;
 
 #if defined(FANET_DEPRECATED)

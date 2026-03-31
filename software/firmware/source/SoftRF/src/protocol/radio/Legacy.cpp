@@ -916,8 +916,7 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
 {
     legacy_packet_t *pkt = (legacy_packet_t *) pkt_buffer;
 
-    uint32_t id = aircraft->addr;
-    pkt->addr = id & 0x00FFFFFF;
+    pkt->addr = aircraft->addr;
 
     bool relay = (aircraft != &ThisAircraft);  // aircraft is some other aircraft
     bool relay_landed_out = (relay && aircraft->aircraft_type == AIRCRAFT_TYPE_UNKNOWN);
@@ -936,7 +935,7 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
         // for RELAY_ONLY don't mark, intended for reception by Classic FLARMs
     } else {
         addr_type = settings->id_method;
-        if (addr_type == ADDR_TYPE_OVERRIDE)
+        if (addr_type == ADDR_TYPE_FANET || addr_type == ADDR_TYPE_OVERRIDE)
             addr_type = ADDR_TYPE_FLARM;
         if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
             addr_type = ADDR_TYPE_OGN;  // since main protocol is OGNTP & using device ID

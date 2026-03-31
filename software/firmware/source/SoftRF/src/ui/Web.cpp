@@ -658,16 +658,17 @@ void handleSettings() {
 <select name='id_method'>\
 <option %s value='%d'>ICAO</option>\
 <option %s value='%d'>Device</option>\
-<option %s value='%d'>Anonymous</option>\
 </select>\
 </td>\
 </tr>"),
-    (settings->id_method == ADDR_TYPE_ICAO ? "selected" : ""),      ADDR_TYPE_ICAO,
-    ((settings->id_method!=ADDR_TYPE_ICAO && settings->id_method!=ADDR_TYPE_ANONYMOUS) ? "selected" : ""),
-     (settings->id_method==ADDR_TYPE_OVERRIDE? ADDR_TYPE_OVERRIDE : ADDR_TYPE_FLARM),
-    (settings->id_method == ADDR_TYPE_ANONYMOUS ? "selected" : ""), ADDR_TYPE_ANONYMOUS
+      (settings->id_method == ADDR_TYPE_ICAO ? "selected" : ""), ADDR_TYPE_ICAO,
+      (settings->id_method != ADDR_TYPE_ICAO ? "selected" : ""),
+      (settings->id_method == ADDR_TYPE_ICAO? ADDR_TYPE_FLARM : settings->id_method)
     );
-  
+    // if it is FANET or ANONYMOUS or OVERRIDE leave it as it is unless ICAO is selected
+    // note: cannot turn on (or off) FANET or ANONYMOUS or OVERRIDE from here,
+    //       use advanced settings page or edit the settings file
+
   len = strlen(offset);
   offset += len;
   size -= len;

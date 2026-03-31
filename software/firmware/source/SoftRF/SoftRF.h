@@ -35,7 +35,7 @@
 #include <raspi/raspi.h>
 #endif /* RASPBERRY_PI */
 
-#define SOFTRF_FIRMWARE_VERSION "MB178"
+#define SOFTRF_FIRMWARE_VERSION "MB179"
 #define SOFTRF_IDENT            "SoftRF"
 #define SOFTRF_USB_FW_VERSION   0x0101
 
@@ -367,9 +367,7 @@ enum
 
 static inline uint32_t DevID_Mapper(uint32_t id)
 {
-  // switched to restricting device ID to a 20-bit range
-  // to avoid overlapping with any of FLARM ranges
-  return (0x800000 | (id & 0x000FFFFF));
+  return (0x00800000 | (id & 0x000FFFFF));   // may be mapped to 0087xxxx in SoftRF.ino for transmissions
 }
 
 extern container_t ThisAircraft;

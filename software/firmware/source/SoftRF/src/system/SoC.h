@@ -50,7 +50,7 @@ typedef struct SoC_ops_struct {
   uint32_t (*getFreeHeap)();
   long (*random)(long, long);
   void (*Buzzer_test)(int);
-  void (*Buzzer_tone)(int, uint8_t);
+  void (*Buzzer_tone)(int hz, int duration);
   uint32_t (*maxSketchSpace)();
   void (*WiFi_set_param)(int, int);
   void (*WiFi_transmit_UDP)(int, byte *, size_t);

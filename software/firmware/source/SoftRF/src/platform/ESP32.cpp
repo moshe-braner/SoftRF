@@ -1877,9 +1877,9 @@ static void Buzzer_tone(int hz, int duration)
 }
 
 /* dummy function to fit the SoC_ops structure */
-static void ESP32_Buzzer_tone(int hz, uint8_t volume)
+static void ESP32_Buzzer_tone(int hz, int duration)
 {
-    Buzzer_tone(hz, 500);
+    Buzzer_tone(hz, duration);
 }
 
 void ESP32_Buzzer_test(int reason)

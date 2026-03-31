@@ -218,7 +218,7 @@ static void init_stgdesc()
   stgcomment[STG_FLR_ADSL]   = "1=FLR+ADSL rx (& some tx)";
   stgcomment[STG_BAND]       = "1=EU 2=US ...";
   stgcomment[STG_ACFT_TYPE]  = "1=GL 2=TOWPL 6=HG 7=PG 0=landed out";
-  stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device";
+  stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device 5=FANET";
   stgcomment[STG_ALARM]      = "3=Latest 2=Vector 1=Dist";
   stgcomment[STG_HRANGE]     = "km";
   stgcomment[STG_VRANGE]     = "x100m";
@@ -381,6 +381,22 @@ void Adjust_Settings()
       settings->mode = SOFTRF_MODE_NORMAL;
     }
 
+#if defined(ARDUINO_ARCH_NRF52)
+    // try not to lose connection to the device due to bad settings
+    if (settings->nmea_out2 != DEST_BLUETOOTH && settings->nmea_out2 != DEST_USB) {
+        if (settings->nmea_out == DEST_BLUETOOTH) {
+            settings->nmea_out2 = DEST_USB;
+        } else if (settings->nmea_out == DEST_USB) {
+            settings->nmea_out2 = DEST_NONE;
+        } else {
+            settings->nmea_out  = DEST_BLUETOOTH;
+            settings->nmea_out2 = DEST_USB;
+        }
+    }
+    if (settings->nmea_out == DEST_BLUETOOTH || settings->nmea_out2 == DEST_BLUETOOTH)
+        settings->bluetooth = BLUETOOTH_LE_HM10_SERIAL;
+#endif
+
     if (settings->rf_protocol > RF_PROTOCOL_ADSL)
         settings->rf_protocol = RF_PROTOCOL_LATEST;
     if (settings->altprotocol > RF_PROTOCOL_ADSL)
@@ -396,7 +412,7 @@ void Adjust_Settings()
      * if other value (UAT) left in EEPROM from other (UATM) radio
      */
     if (settings->rf_protocol==RF_PROTOCOL_ADSB_1090 || settings->rf_protocol==RF_PROTOCOL_ADSB_UAT)
-        settings->rf_protocol = RF_PROTOCOL_LEGACY;
+        settings->rf_protocol = RF_PROTOCOL_LATEST;
 
     if (settings->bluetooth == BLUETOOTH_SPP)
         settings->bluetooth = BLUETOOTH_LE_HM10_SERIAL;
@@ -755,25 +771,33 @@ void Settings_defaults(bool keepsome)
   if (keepsome == false) {    // the following may be kept from previous version
 
     settings->mode        = SOFTRF_MODE_NORMAL;
-    settings->rf_protocol = hw_info.model == SOFTRF_MODEL_BRACELET ?
-                                RF_PROTOCOL_FANET : RF_PROTOCOL_LATEST;
+
+    if (hw_info.model == SOFTRF_MODEL_BRACELET)  // >>> T1000E, M3, maybe T-Echo?
+    {
+        settings->acft_type   = AIRCRAFT_TYPE_PARAGLIDER;
+        settings->rf_protocol = RF_PROTOCOL_FANET;
+        //settings->id_method   = ADDR_TYPE_FANET;
+        settings->id_method   = ADDR_TYPE_FLARM;
+    } else {
+        settings->acft_type   = AIRCRAFT_TYPE_GLIDER;
+        settings->rf_protocol = RF_PROTOCOL_LATEST;
+        settings->id_method   = ADDR_TYPE_FLARM;
+    }
 
 #if defined(DEFAULT_REGION_US)
     settings->band        = RF_BAND_US;
-#else
+#elif defined(DEFAULT_REGION_EU)
     settings->band        = RF_BAND_EU;
+#else
+    if (hw_info.model == SOFTRF_MODEL_PRIME_MK2)
+        settings->band    = RF_BAND_EU;
+    else
+        settings->band    = RF_BAND_AUTO;
 #endif
-    settings->acft_type   = hw_info.model == SOFTRF_MODEL_BRACELET ?
-                                                AIRCRAFT_TYPE_STATIC :
-                                                AIRCRAFT_TYPE_GLIDER;
-    settings->id_method   = ADDR_TYPE_FLARM;
+
     settings->aircraft_id = 0;
     settings->txpower     = RF_TX_POWER_FULL;
 
-#if defined(USBD_USE_CDC) && !defined(DISABLE_GENERIC_SERIALUSB)
-    settings->nmea_out    = DEST_USB;
-    settings->nmea_out2   = DEST_NONE;
-#else
     settings->nmea_out    = hw_info.model == SOFTRF_MODEL_BADGE ?
                                              DEST_BLUETOOTH :
                                           (hw_info.model == SOFTRF_MODEL_PRIME ?
@@ -781,6 +805,9 @@ void Settings_defaults(bool keepsome)
                                           (hw_info.model == SOFTRF_MODEL_PRIME_MK2 ?
                                              DEST_UDP :
                                            DEST_UART));
+#if defined(USBD_USE_CDC) && !defined(DISABLE_GENERIC_SERIALUSB)
+    settings->nmea_out2   = DEST_USB;
+#else
     settings->nmea_out2   = hw_info.model == SOFTRF_MODEL_BADGE ?
                                              DEST_USB :
                                           (hw_info.model == SOFTRF_MODEL_PRIME ?

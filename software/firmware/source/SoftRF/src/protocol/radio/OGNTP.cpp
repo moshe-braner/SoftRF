@@ -188,13 +188,13 @@ size_t ogntp_encode(void *pkt, container_t *this_aircraft) {
 
   ogn_tx_pkt.Packet.HeaderWord      = 0;
 
-  ogn_tx_pkt.Packet.Header.Address  = this_aircraft->addr;
+  ogn_tx_pkt.Packet.Header.Address = this_aircraft->addr;
 
   if (this_aircraft != &ThisAircraft) {   // relaying another aircraft
       ogn_tx_pkt.Packet.Header.AddrType = this_aircraft->addr_type;
   } else {
       uint8_t addr_type = settings->id_method;
-      if (addr_type == ADDR_TYPE_OVERRIDE)
+      if (addr_type == ADDR_TYPE_FANET || addr_type == ADDR_TYPE_OVERRIDE)
           addr_type = ADDR_TYPE_FLARM;
       if (addr_type == ADDR_TYPE_FLARM && settings->rf_protocol == RF_PROTOCOL_OGNTP)
           ogn_tx_pkt.Packet.Header.AddrType = ADDR_TYPE_OGN;  

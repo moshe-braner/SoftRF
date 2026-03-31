@@ -116,7 +116,9 @@ NMEA2: USB LD
 
       y += CONF_VIEW_LINE_SPACING;
 
-      if (settings->id_method == ADDR_TYPE_ICAO)
+      if (settings->id_method == ADDR_TYPE_FANET)
+        snprintf(info_line, sizeof(info_line), "Aircft: 87%04X >>", (ThisAircraft.addr & 0x0000FFFF));
+      else if (settings->id_method == ADDR_TYPE_ICAO)
         snprintf(info_line, sizeof(info_line), "Aircft: %06X >>", ThisAircraft.addr);
       else
         snprintf(info_line, sizeof(info_line), "Aircft: %06X", settings->aircraft_id);

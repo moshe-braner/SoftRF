@@ -198,7 +198,7 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
           return 0;
       ThisAircraft.positiontime = ThisAircraft.timestamp;
       uint8_t addr_type = settings->id_method;
-      if (addr_type == ADDR_TYPE_OVERRIDE)
+      if (addr_type == ADDR_TYPE_FANET || addr_type == ADDR_TYPE_OVERRIDE)
           addr_type = ADDR_TYPE_FLARM;
       t.setAddrTypeOGN(addr_type);
       t.setRelay(0);
