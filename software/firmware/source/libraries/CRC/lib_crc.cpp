@@ -1,11 +1,16 @@
+#include <cstddef>
+#include <cstdlib>
+#include <Arduino.h>
 #include "lib_crc.h"
 
-#if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__)
+#if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__) || \
+    defined(ARDUINO_ARCH_ASR650X)
 #include <pgmspace.h>
 #endif
 
-#if defined(ENERGIA_ARCH_CC13XX) || defined(ENERGIA_ARCH_CC13X2) || \
-    defined(ARDUINO_ARCH_STM32)
+#if defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
+    defined(ARDUINO_ARCH_STM32)   || defined(ARDUINO_ARCH_AVR)    || \
+    defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_SILABS)
 #include <avr/pgmspace.h>
 #endif
 
@@ -25,7 +30,6 @@
     *   tions  used  for  the  calculation of CRC-16, CRC-CCITT and     *
     *   CRC-32 cyclic redundancy values.                                *
     *                                                                   *
-    *                                                                   *
     *   Dependencies                                                    *
     *   ============                                                    *
     *                                                                   *
@@ -36,6 +40,8 @@
     *   ====================                                            *
     *                                                                   *
     *   Date        Version Comment                                     *
+    *                                                                   *
+    *   2026-03-26          by Moshe Braner: malloc() the tables        *
     *                                                                   *
     *   2008-04-20  1.16    Added CRC-CCITT calculation for Kermit      *
     *                                                                   *
@@ -94,23 +100,31 @@
     *                                                                   *
     \*******************************************************************/
 
-static int              crc_tab16_init          = FALSE;
-static int              crc_tab32_init          = FALSE;
-static int              crc_tabccitt_init       = FALSE;
-static int              crc_tabdnp_init         = FALSE;
-static int              crc_tabkermit_init      = FALSE;
+static unsigned short crc_tab16_init     = 0;
+static unsigned short crc_tab32_init     = 0;
+static unsigned short crc_tabccitt_init  = 0;
+static unsigned short crc_tabdnp_init    = 0;
+static unsigned short crc_tabkermit_init = 0;
 
-#if !defined(__ASR6501__)
+#if !defined(__ASR6501__) && !defined(ARDUINO_ARCH_ASR650X)
+/*
 static unsigned short   crc_tab16[256];
 static unsigned long    crc_tab32[256];
 static unsigned short   crc_tabdnp[256];
 static unsigned short   crc_tabkermit[256];
+*/
+static unsigned short *crc_tab16 = NULL;
+static unsigned long  *crc_tab32 = NULL;
+static unsigned short *crc_tabdnp = NULL;
+static unsigned short *crc_tabkermit = NULL;
 #endif
 
 #if !defined(ESP8266) && !defined(__ASR6501__) && \
-    !defined(ENERGIA_ARCH_CC13XX) && !defined(ENERGIA_ARCH_CC13X2) && \
-    !defined(ARDUINO_ARCH_STM32)
-static unsigned short   crc_tabccitt[256];
+    !defined(ARDUINO_ARCH_ASR650X) && \
+    !defined(ENERGIA_ARCH_CC13XX)  && !defined(ENERGIA_ARCH_CC13X2) && \
+    !defined(ARDUINO_ARCH_STM32)   && !defined(ARDUINO_ARCH_AVR)    && \
+    !defined(ARDUINO_ARCH_RENESAS) && !defined(ARDUINO_ARCH_SILABS)
+static unsigned short *crc_tabccitt;
 #else
 static const unsigned short crc_tabccitt[256] PROGMEM = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
@@ -149,11 +163,33 @@ static const unsigned short crc_tabccitt[256] PROGMEM = {
 #endif
 
 
+// wrapper for malloc(), used for allocating space for the CRC tables
+
+unsigned short *CRC_short_malloc()
+{
+    unsigned short *p = (unsigned short *) malloc(256 * sizeof(short));
+#if defined(ARDUINO)
+    if (p == NULL)
+        Serial.println("[lib_crc] failed to malloc table space");
+#endif
+    return p;
+}
+
+unsigned long *CRC_long_malloc()
+{
+    unsigned long *p = (unsigned long *) malloc(256 * sizeof(long));
+#if defined(ARDUINO)
+    if (p == NULL)
+        Serial.println("[lib_crc] failed to malloc table space");
+#endif
+    return p;
+}
+
     /*******************************************************************\
     *                                                                   *
     *   static void init_crc...tab();                                   *
     *                                                                   *
-    *   Three local functions are used  to  initialize  the  tables     *
+    *   These local functions are used  to  initialize  the  tables     *
     *   with values for the algorithm.                                  *
     *                                                                   *
     \*******************************************************************/
@@ -182,14 +218,19 @@ unsigned short update_crc_ccitt( unsigned short crc, char c ) {
 
     short_c  = 0x00ff & (unsigned short) c;
 
-    if ( ! crc_tabccitt_init ) init_crcccitt_tab();
+    if (crc_tabccitt_init == 0)
+        init_crcccitt_tab();
 
     tmp = (crc >> 8) ^ short_c;
 #if defined(ESP8266) || defined(__ASR6501__) || \
-    defined(ENERGIA_ARCH_CC13XX) || defined(ENERGIA_ARCH_CC13X2) || \
-    defined(ARDUINO_ARCH_STM32)
+    defined(ARDUINO_ARCH_ASR650X) || \
+    defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
+    defined(ARDUINO_ARCH_STM32)   || defined(ARDUINO_ARCH_AVR)    || \
+    defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_SILABS)
     crc = (crc << 8) ^ pgm_read_word(&crc_tabccitt[tmp]);
 #else
+    if (crc_tabccitt_init == 2)  // init failed to malloc() the table
+        return crc;
     crc = (crc << 8) ^ crc_tabccitt[tmp];
 #endif
 
@@ -228,7 +269,7 @@ unsigned short update_crc_sick( unsigned short crc, char c, char prev_byte ) {
 }  /* update_crc_sick */
 
 
-#if !defined(__ASR6501__)
+#if !defined(__ASR6501__) && !defined(ARDUINO_ARCH_ASR650X)
     /*******************************************************************\
     *                                                                   *
     *   unsigned short update_crc_16( unsigned short crc, char c );     *
@@ -243,10 +284,13 @@ unsigned short update_crc_16( unsigned short crc, char c ) {
 
     unsigned short tmp, short_c;
 
+    if (crc_tab16_init == 0)
+        init_crc16_tab();
+
+    if (crc_tab16_init == 2)  // init failed to malloc() the table
+        return crc;
+
     short_c = 0x00ff & (unsigned short) c;
-
-    if ( ! crc_tab16_init ) init_crc16_tab();
-
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tab16[ tmp & 0xff ];
 
@@ -270,10 +314,13 @@ unsigned short update_crc_kermit( unsigned short crc, char c ) {
 
     unsigned short tmp, short_c;
 
+    if (crc_tabkermit_init == 0)
+        init_crckermit_tab();
+
+    if (crc_tabkermit_init == 2)  // init failed to malloc() the table
+        return crc;
+
     short_c = 0x00ff & (unsigned short) c;
-
-    if ( ! crc_tabkermit_init ) init_crckermit_tab();
-
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tabkermit[ tmp & 0xff ];
 
@@ -297,10 +344,13 @@ unsigned short update_crc_dnp( unsigned short crc, char c ) {
 
     unsigned short tmp, short_c;
 
+    if (crc_tabdnp_init == 0)
+        init_crcdnp_tab();
+
+    if (crc_tabdnp_init == 2)  // init failed to malloc() the table
+        return crc;
+
     short_c = 0x00ff & (unsigned short) c;
-
-    if ( ! crc_tabdnp_init ) init_crcdnp_tab();
-
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tabdnp[ tmp & 0xff ];
 
@@ -324,10 +374,13 @@ unsigned long update_crc_32( unsigned long crc, char c ) {
 
     unsigned long tmp, long_c;
 
+    if (crc_tab32_init == 0)
+        init_crc32_tab();
+
+    if (crc_tab32_init == 2)  // init failed to malloc() the table
+        return crc;
+
     long_c = 0x000000ffL & (unsigned long) c;
-
-    if ( ! crc_tab32_init ) init_crc32_tab();
-
     tmp = crc ^ long_c;
     crc = (crc >> 8) ^ crc_tab32[ tmp & 0xff ];
 
@@ -351,6 +404,12 @@ static void init_crc16_tab( void ) {
     int i, j;
     unsigned short crc, c;
 
+    crc_tab16 = CRC_short_malloc();
+    if (crc_tab16 == NULL) {
+        crc_tab16_init = 2;
+        return;
+    }
+
     for (i=0; i<256; i++) {
 
         crc = 0;
@@ -367,7 +426,7 @@ static void init_crc16_tab( void ) {
         crc_tab16[i] = crc;
     }
 
-    crc_tab16_init = TRUE;
+    crc_tab16_init = 1;
 
 }  /* init_crc16_tab */
 
@@ -387,6 +446,12 @@ static void init_crckermit_tab( void ) {
     int i, j;
     unsigned short crc, c;
 
+    crc_tabkermit = CRC_short_malloc();
+    if (crc_tabkermit == NULL) {
+        crc_tabkermit_init = 2;
+        return;
+    }
+
     for (i=0; i<256; i++) {
 
         crc = 0;
@@ -403,7 +468,7 @@ static void init_crckermit_tab( void ) {
         crc_tabkermit[i] = crc;
     }
 
-    crc_tabkermit_init = TRUE;
+    crc_tabkermit_init = 1;
 
 }  /* init_crckermit_tab */
 
@@ -423,6 +488,12 @@ static void init_crcdnp_tab( void ) {
     int i, j;
     unsigned short crc, c;
 
+    crc_tabdnp = CRC_short_malloc();
+    if (crc_tabdnp == NULL) {
+        crc_tabdnp_init = 2;
+        return;
+    }
+
     for (i=0; i<256; i++) {
 
         crc = 0;
@@ -439,7 +510,7 @@ static void init_crcdnp_tab( void ) {
         crc_tabdnp[i] = crc;
     }
 
-    crc_tabdnp_init = TRUE;
+    crc_tabdnp_init = 1;
 
 }  /* init_crcdnp_tab */
 
@@ -459,6 +530,12 @@ static void init_crc32_tab( void ) {
     int i, j;
     unsigned long crc;
 
+    crc_tab32 = CRC_long_malloc();
+    if (crc_tab32 == NULL) {
+        crc_tab32_init = 2;
+        return;
+    }
+
     for (i=0; i<256; i++) {
 
         crc = (unsigned long) i;
@@ -472,7 +549,7 @@ static void init_crc32_tab( void ) {
         crc_tab32[i] = crc;
     }
 
-    crc_tab32_init = TRUE;
+    crc_tab32_init = 1;
 
 }  /* init_crc32_tab */
 #endif
@@ -490,10 +567,18 @@ static void init_crc32_tab( void ) {
 static void init_crcccitt_tab( void ) {
 
 #if !defined(ESP8266) && !defined(__ASR6501__) && \
-    !defined(ENERGIA_ARCH_CC13XX) && !defined(ENERGIA_ARCH_CC13X2) && \
-    !defined(ARDUINO_ARCH_STM32)
+    !defined(ARDUINO_ARCH_ASR650X) && \
+    !defined(ENERGIA_ARCH_CC13XX)  && !defined(ENERGIA_ARCH_CC13X2) && \
+    !defined(ARDUINO_ARCH_STM32)   && !defined(ARDUINO_ARCH_AVR)    && \
+    !defined(ARDUINO_ARCH_RENESAS) && !defined(ARDUINO_ARCH_SILABS)
     int i, j;
     unsigned short crc, c;
+
+    crc_tabccitt = CRC_short_malloc();
+    if (crc_tabccitt == NULL) {
+        crc_tabccitt_init = 2;
+        return;
+    }
 
     for (i=0; i<256; i++) {
 
@@ -512,7 +597,7 @@ static void init_crcccitt_tab( void ) {
     }
 #endif
 
-    crc_tabccitt_init = TRUE;
+    crc_tabccitt_init = 1;
 
 }  /* init_crcccitt_tab */
 
@@ -520,16 +605,19 @@ unsigned short update_crc_gdl90( unsigned short crc, char c ) {
 
     unsigned short tmp, short_c;
 
+    if (crc_tabccitt_init == 0)
+        init_crcccitt_tab();
+
     short_c  = 0x00ff & (unsigned short) c;
-
-    if ( ! crc_tabccitt_init ) init_crcccitt_tab();
-
     tmp = (crc >> 8) ;
-#if defined(ESP8266) || defined(__ASR6501__) || \
-    defined(ENERGIA_ARCH_CC13XX) || defined(ENERGIA_ARCH_CC13X2) || \
-    defined(ARDUINO_ARCH_STM32)
+#if defined(ESP8266) || defined(__ASR6501__) || defined(ARDUINO_ARCH_ASR650X) || \
+    defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
+    defined(ARDUINO_ARCH_STM32)   || defined(ARDUINO_ARCH_AVR)    || \
+    defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_SILABS)
     crc = pgm_read_word(&crc_tabccitt[tmp]) ^ (crc << 8) ^  short_c;
 #else
+    if (crc_tabccitt_init == 2)  // init failed to malloc() the table
+        return crc;
     crc = crc_tabccitt[tmp] ^ (crc << 8) ^  short_c;
 #endif
 
@@ -546,8 +634,10 @@ unsigned short update_crc_gdl90( unsigned short crc, char c ) {
 
 static const unsigned char crc8_table[256]
 #if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__) || \
-    defined(ENERGIA_ARCH_CC13XX) || defined(ENERGIA_ARCH_CC13X2) || \
-    defined(ARDUINO_ARCH_STM32)
+    defined(ARDUINO_ARCH_ASR650X) || \
+    defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
+    defined(ARDUINO_ARCH_STM32)   || defined(ARDUINO_ARCH_AVR)    || \
+    defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_SILABS)
  PROGMEM
 #endif
 = {
@@ -583,8 +673,10 @@ void update_crc8(unsigned char *crc, unsigned char m)
       */
 {
 #if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__) || \
-    defined(ENERGIA_ARCH_CC13XX) || defined(ENERGIA_ARCH_CC13X2) || \
-    defined(ARDUINO_ARCH_STM32)
+    defined(ARDUINO_ARCH_ASR650X) || \
+    defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
+    defined(ARDUINO_ARCH_STM32)   || defined(ARDUINO_ARCH_AVR)    || \
+    defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_SILABS)
   *crc = pgm_read_byte(&crc8_table[(*crc) ^ m]);
 #else
   *crc = crc8_table[(*crc) ^ m];
