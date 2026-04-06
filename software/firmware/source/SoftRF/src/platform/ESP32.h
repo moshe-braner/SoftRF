@@ -461,7 +461,11 @@ struct rst_info {
 //#define EXCLUDE_IMU
 
 #if !defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(CONFIG_IDF_TARGET_ESP32S3)
-#define EXCLUDE_UATM
+#define EXCLUDE_NRF905           //  -    kb
+//#define EXCLUDE_MAVLINK          //  -    kb
+#define EXCLUDE_UATM             //  -    kb
+#define EXCLUDE_UAT978           //  -    kb
+//#define EXCLUDE_D1090            //  -    kb
 #else
 //#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #define EXCLUDE_NRF905

@@ -28,7 +28,7 @@
 #include "protocol/radio/Legacy.h"
 #include "protocol/data/NMEA.h"
 #include "protocol/data/IGC.h"
-#include "protocol/data/GNS5892.h"
+#include "protocol/radio/ES1090.h"
 
 float wind_best_ns = 0.0;  /* mps */
 float wind_best_ew = 0.0;

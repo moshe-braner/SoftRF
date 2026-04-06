@@ -758,6 +758,8 @@ static void ESP32_setup()
     lmic_pins.rst  = SOC_GPIO_PIN_TBEAM_RF_RST_V05;
     lmic_pins.busy = SOC_GPIO_PIN_TBEAM_RF_BUSY_V08;
 
+    lmic_pins.dio[0] = SOC_GPIO_PIN_DIO0;
+
     /* use middle button on T-Beam v1.x to turn off transmissions in winch mode */
     if (hw_info.model == SOFTRF_MODEL_PRIME_MK2) {
         if (hw_info.revision == 8 || hw_info.revision == 12) {
@@ -2078,7 +2080,7 @@ static bool ESP32_EEPROM_begin(size_t size)
 {
   bool rval = true;
 
-#if !defined(EXCLUDE_EEPROM)
+#if defined(INCLUDE_EEPROM)
   rval = EEPROM.begin(size);
 #endif
 
@@ -3583,7 +3585,7 @@ const SoC_ops_t ESP32_ops = {
   ESP32_WiFi_hostname,
   ESP32_WiFi_clients_count,
   ESP32_EEPROM_begin,
-  ESP32_EEPROM_extension,
+  //ESP32_EEPROM_extension,
   ESP32_SPI_begin,
   ESP32_swSer_begin,
   ESP32_swSer_enableRx,

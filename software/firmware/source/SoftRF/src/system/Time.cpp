@@ -219,10 +219,12 @@ void Time_loop()
         return;
     last_loop = now_ms;
 
+#if 0
     if (settings->altprotocol == RF_PROTOCOL_NONE
      && in_family(settings->rf_protocol) == false)
         return;       /* time still handled in RF.cpp RF_SetChannel() */
     // RF_SetChannel() is called from RF_loop()
+#endif
 
     uint32_t gnss_age;
     uint32_t pps_btime_ms;

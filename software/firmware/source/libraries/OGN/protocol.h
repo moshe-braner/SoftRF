@@ -1,0 +1,157 @@
+/*
+ * Protocol.h
+ * Copyright (C) 2017-2021 Linar Yusupov
+ *
+ * Modified and moved here by Moshe Braner (LMIC & BASICMAC abandoned)  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
+enum
+{
+	RF_PROTOCOL_NONE      = 0,
+	RF_PROTOCOL_OGNTP     = 1,    /* Open Glider Network tracker */
+	RF_PROTOCOL_P3I       = 2,    /* PilotAware */
+	RF_PROTOCOL_ADSB_1090 = 3,    /* ADS-B 1090ES */
+	RF_PROTOCOL_ADSB_UAT  = 4,    /* ADS-B UAT */
+	RF_PROTOCOL_FANET     = 5,    /* Skytraxx */
+	RF_PROTOCOL_LEGACY    = 6,    /* Air V6 */
+	RF_PROTOCOL_LATEST    = 7,    /* new 2024 protocol */
+	RF_PROTOCOL_ADSL      = 8,    /* ADS-L on OGNTP frequency */
+	RF_PROTOCOL_GDL90     = 9     /* from external device */
+};
+
+enum
+{
+  RF_SINGLE_PROTOCOL,
+  RF_FLR_ADSL,         // true dual-protocol reception
+  RF_FLR_FANET,        // time-slicing
+  RF_FLR_P3I           // time-slicing
+};
+
+enum
+{
+	RF_MODULATION_TYPE_2FSK,
+	RF_MODULATION_TYPE_LORA,
+	RF_MODULATION_TYPE_PPM
+};
+
+enum
+{
+	RF_PREAMBLE_TYPE_55,
+	RF_PREAMBLE_TYPE_AA
+};
+
+enum
+{
+	RF_CHECKSUM_TYPE_NONE,
+	RF_CHECKSUM_TYPE_CCITT_FFFF,
+	RF_CHECKSUM_TYPE_CCITT_0000,
+	RF_CHECKSUM_TYPE_CCITT_1D02,
+	RF_CHECKSUM_TYPE_GALLAGER,
+	RF_CHECKSUM_TYPE_CRC8_107,
+	RF_CHECKSUM_TYPE_RS,
+	RF_CHECKSUM_TYPE_CRC_MODES
+};
+
+enum
+{
+	RF_BITRATE_100KBPS,
+	RF_BITRATE_38400,
+	RF_BITRATE_1042KBPS,
+	RF_BITRATE_2000KBPS
+};
+
+enum
+{
+	RF_FREQUENCY_DEVIATION_NONE,
+	RF_FREQUENCY_DEVIATION_12_5KHZ,
+	RF_FREQUENCY_DEVIATION_25KHZ,
+	RF_FREQUENCY_DEVIATION_50KHZ,
+	RF_FREQUENCY_DEVIATION_625KHZ
+};
+
+enum
+{
+	RF_WHITENING_NONE,
+	RF_WHITENING_MANCHESTER,
+	RF_WHITENING_PN9,
+	RF_WHITENING_NICERF
+};
+
+enum
+{
+	RF_PAYLOAD_DIRECT,
+	RF_PAYLOAD_INVERTED
+};
+
+enum
+{
+	RF_RX_BANDWIDTH_SS_50KHZ,
+	RF_RX_BANDWIDTH_SS_62KHZ,
+	RF_RX_BANDWIDTH_SS_100KHZ,
+	RF_RX_BANDWIDTH_SS_125KHZ,
+	RF_RX_BANDWIDTH_SS_166KHZ,
+	RF_RX_BANDWIDTH_SS_200KHZ,
+	RF_RX_BANDWIDTH_SS_250KHZ,
+	RF_RX_BANDWIDTH_SS_1567KHZ
+};
+
+enum
+{
+	RF_TIMING_INTERVAL,
+	RF_TIMING_2SLOTS_PPS_SYNC
+};
+
+#define RF_MAX_SYNC_WORD_SIZE  8
+
+typedef struct tslot_struct {
+    uint16_t   begin;
+    uint16_t   end;
+} tslot_t;
+
+typedef struct RF_PROTOCOL {
+    const char name[10];
+    uint8_t    type;
+    uint8_t    modulation_type;
+    uint8_t    preamble_type;
+    uint8_t    preamble_size;
+    uint8_t    syncword[RF_MAX_SYNC_WORD_SIZE];
+    uint8_t    syncword_size;
+    uint8_t    syncword_skip;   // ignore these many leading bytes when receiving
+    uint32_t   net_id;
+    uint8_t    payload_type;
+    uint8_t    payload_size;
+    uint8_t    payload_offset;
+    uint8_t    crc_type;
+    uint8_t    crc_size;
+
+    uint8_t    bitrate;
+    uint8_t    deviation;
+    uint8_t    whitening;
+    uint8_t    bandwidth;
+
+    uint16_t   air_time;
+
+    uint8_t    tm_type;
+    uint16_t   tx_interval_min;
+    uint16_t   tx_interval_max;
+    tslot_t    slot0;
+    tslot_t    slot1;
+} rf_proto_desc_t;
+
+#endif /* PROTOCOL_H */

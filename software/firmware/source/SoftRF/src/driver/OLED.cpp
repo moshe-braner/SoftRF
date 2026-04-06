@@ -26,7 +26,7 @@
 
 #include "Settings.h"
 #include "RF.h"
-#include "../protocol/data/GNS5892.h"
+#include "../protocol/radio/ES1090.h"
 #include "../protocol/data/NMEA.h"
 #include "LED.h"
 #include "GNSS.h"

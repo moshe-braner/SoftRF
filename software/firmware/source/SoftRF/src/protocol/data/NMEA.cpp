@@ -23,7 +23,7 @@
 
 #include "NMEA.h"
 #include "GDL90.h"
-#include "GNS5892.h"
+#include "../radio/ES1090.h"
 #include "../../driver/GNSS.h"
 #include "../../driver/RF.h"
 #include "../../system/SoC.h"

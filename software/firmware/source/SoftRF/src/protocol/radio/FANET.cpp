@@ -51,7 +51,7 @@ const rf_proto_desc_t fanet_proto_desc = {
   .payload_offset   = 0,
   .crc_type         = RF_CHECKSUM_TYPE_NONE, /* LoRa packet has built-in CRC */
   .crc_size         = 0 /* INVALID FOR LORA */,
-  .bitrate          = DR_SF7B /* CR_5 BW_250 SF_7 */,
+  .bitrate          = 0,  // radio.cpp will set, was DR_SF7B /* CR_5 BW_250 SF_7 */
 
   .deviation        = 0 /* INVALID FOR LORA */,
   .whitening        = RF_WHITENING_NONE,

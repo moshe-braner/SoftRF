@@ -56,7 +56,7 @@ void Web_fini()     {}
 #include "../protocol/data/IGC.h"
 #include "../protocol/data/GDL90.h"
 #include "../protocol/data/D1090.h"
-#include "../protocol/data/GNS5892.h"
+#include "../protocol/radio/ES1090.h"
 
 #if defined(ENABLE_AHRS)
 #include "../driver/AHRS.h"
@@ -1162,7 +1162,7 @@ void handleAdvStgs() {
           continue;
       if (stgdesc[i].type == STG_HIDDEN)   // only accessible via editing the file
           continue;
-      if (format_setting(i, false, buf, 64) == false)
+      if (format_setting(i, false, false, buf, 64) == false)
           continue;
       const char *w = stgdesc[i].label;
       int comma = strlen(w);

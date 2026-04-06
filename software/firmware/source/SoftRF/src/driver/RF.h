@@ -19,17 +19,10 @@
 #ifndef RFHELPER_H
 #define RFHELPER_H
 
-#include <nRF905.h>
 #include <TimeLib.h>
 
 #include "../system/SoC.h"
 
-#if defined(USE_BASICMAC)
-#include <basicmac.h>
-#else
-#include <lmic.h>
-#endif
-#include <hal/hal.h>
 #include <lib_crc.h>
 #include <protocol.h>
 #include <freqplan.h>
@@ -39,8 +32,13 @@
 #include "../protocol/radio/OGNTP.h"
 #include "../protocol/radio/P3I.h"
 #include "../protocol/radio/FANET.h"
-#include "../protocol/radio/UAT978.h"
 #include "../protocol/radio/ADSL.h"
+#include "../protocol/radio/ES1090.h"
+#include "../protocol/radio/UAT978.h"
+
+#define RADIOLIB_MAX_DATA_LENGTH    128
+extern uint8_t RL_txPacket[RADIOLIB_MAX_DATA_LENGTH];
+extern uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 
 #define maxof2(a,b)       (a > b ? a : b)
 #define maxof3(a,b,c)     maxof2(maxof2(a,b),c)
@@ -50,13 +48,21 @@
 /* Max. paket's payload size for all supported RF protocols */
 //#define MAX_PKT_SIZE  32 /* 48 = UAT LONG_FRAME_DATA_BYTES */
 
+#if 0
 #if !defined(EXCLUDE_UAT978)
-#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
-                             P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE, \
-                             UAT978_PAYLOAD_SIZE)
+#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE+OGNTP_CRC_SIZE, \
+                             P3I_PAYLOAD_SIZE+P3I_PAYLOAD_OFFSET+P3I_CRC_SIZE, \
+                             FANET_PAYLOAD_SIZE, UAT978_PAYLOAD_SIZE)
 #else
-#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
-                             P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE)
+#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE+OGNTP_CRC_SIZE, \
+                             P3I_PAYLOAD_SIZE+P3I_PAYLOAD_OFFSET+P3I_CRC_SIZE, FANET_PAYLOAD_SIZE)
+#endif
+#else
+#if !defined(EXCLUDE_UAT978)
+#define MAX_PKT_SIZE 48
+#else
+#define MAX_PKT_SIZE 32
+#endif
 #endif
 
 #define RXADDR {0x31, 0xfa , 0xb6} // Address of this device (4 bytes)
@@ -70,7 +76,9 @@ enum
   RF_IC_UATM,
   RF_IC_CC13XX,
   RF_DRV_OGN,
-  RF_IC_SX1262
+  RF_IC_SX1262,
+  RF_IC_LR11XX,
+  RF_IC_LR2021
 };
 
 enum
@@ -80,22 +88,46 @@ enum
   RF_TX_POWER_FULL
 };
 
-enum
-{
-  RF_SINGLE_PROTOCOL,
-  RF_FLR_ADSL,         // true dual-protocol reception
-  RF_FLR_FANET,        // time-slicing
-  RF_FLR_P3I           // time-slicing
+#define RF_CHANNEL_NONE 0xFF
+
+static const int NUM_DIO = 3;
+
+// this struct is filled in in SoC setup
+
+#define u1_t uint8_t
+#define u2_t uint16_t
+
+struct lmic_pinmap {
+    u1_t nss;
+
+    // Written HIGH in TX mode, LOW otherwise.
+    // Typically used with a single RXTX switch pin.
+    u1_t txe;
+    // Written HIGH in RX mode, LOW otherwise.
+    // Typicaly used with separate RX/TX pins, to allow switching off
+    // the antenna switch completely.
+    u1_t rxe;
+
+    u1_t rst;
+    u1_t dio[NUM_DIO];
+    u1_t busy;
+    u1_t tcxo;
 };
+
+// Use this for any unused pins.
+const u1_t LMIC_UNUSED_PIN = 0xff;
+
+extern lmic_pinmap lmic_pins;
 
 typedef struct rfchip_ops_struct {
   byte type;
   const char name[8];
-  bool (*probe)();
-  void (*setup)();
-  void (*channel)(uint8_t);
-  bool (*receive)();
-  void (*transmit)();
+  //bool (*probe)();         // called directly instead, during RF_setup
+  //void (*setup)(const rf_proto_desc_t*, bool);
+    // - can keep out of here if only called from receive() and transmit()
+  void (*setfreq)(uint32_t);
+  uint8_t (*receive)(uint8_t *packet);
+  int16_t (*transmit)(uint8_t *packet, uint8_t length);
   void (*shutdown)();
 } rfchip_ops_t;
 
@@ -119,6 +151,13 @@ typedef struct Slots_descr_struct {
 String Bin2Hex(byte *, size_t);
 uint8_t parity(uint32_t);
 
+// called directly during RF_setup
+//bool lr1276_probe();
+//bool lr1262_probe();
+//bool lr1110_probe();
+//bool lr1121_probe();
+bool rf_chips_probe();
+
 byte    RF_setup(void);
 void    RF_SetChannel(void);
 void    RF_loop(void);
@@ -132,6 +171,7 @@ uint8_t RF_Payload_Size(uint8_t);
 bool    in_family(uint8_t protocol);
 const char *protocol_lbl(uint8_t main, uint8_t alt);
 
+extern FreqPlan RF_FreqPlan;
 extern byte TxBuffer[MAX_PKT_SIZE], RxBuffer[MAX_PKT_SIZE];
 extern uint32_t TxTimeMarker;
 extern uint32_t TxEndMarker;
@@ -140,8 +180,15 @@ extern uint32_t RF_time;
 extern uint8_t RF_current_slot;
 extern uint8_t current_TX_protocol;
 extern uint8_t dual_protocol;
+extern const rf_proto_desc_t  *curr_rx_protocol_ptr;
+extern const rf_proto_desc_t  *curr_tx_protocol_ptr;
+
+extern float Vtcxo;
 
 extern const rfchip_ops_t *rf_chip;
+extern bool use_hardware_manchester;
+extern bool receive_active;
+extern volatile bool receive_complete;
 extern bool RF_SX12XX_RST_is_connected;
 extern size_t (*protocol_encode)(void *, container_t *);
 extern bool (*protocol_decode)(void *, container_t *, ufo_t *);
@@ -154,6 +201,7 @@ extern int8_t which_rx_try;
 extern uint8_t RF_last_protocol;
 
 extern uint32_t rx_packets_counter, tx_packets_counter;
+extern uint32_t receive_cb_count;
 
 /* #define TIMETEST */
 #ifdef TIMETEST

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "../../system/SoC.h"
+
 #if !defined(EXCLUDE_UAT978)
 
 #include <stdint.h>
