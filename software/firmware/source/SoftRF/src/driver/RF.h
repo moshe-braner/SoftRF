@@ -50,13 +50,21 @@
 /* Max. paket's payload size for all supported RF protocols */
 //#define MAX_PKT_SIZE  32 /* 48 = UAT LONG_FRAME_DATA_BYTES */
 
+#if 0
 #if !defined(EXCLUDE_UAT978)
-#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
-                             P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE, \
-                             UAT978_PAYLOAD_SIZE)
+#define MAX_PKT_SIZE  maxof5(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE+OGNTP_CRC_SIZE, \
+                             P3I_PAYLOAD_SIZE+P3I_PAYLOAD_OFFSET+P3I_CRC_SIZE, \
+                             FANET_PAYLOAD_SIZE, UAT978_PAYLOAD_SIZE)
 #else
-#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE, \
-                             P3I_PAYLOAD_SIZE, FANET_PAYLOAD_SIZE)
+#define MAX_PKT_SIZE  maxof4(LEGACY_PAYLOAD_SIZE+LEGACY_CRC_SIZE+3, OGNTP_PAYLOAD_SIZE+OGNTP_CRC_SIZE, \
+                             P3I_PAYLOAD_SIZE+P3I_PAYLOAD_OFFSET+P3I_CRC_SIZE, FANET_PAYLOAD_SIZE)
+#endif
+#else
+#if !defined(EXCLUDE_UAT978)
+#define MAX_PKT_SIZE 48
+#else
+#define MAX_PKT_SIZE 32
+#endif
 #endif
 
 #define RXADDR {0x31, 0xfa , 0xb6} // Address of this device (4 bytes)
