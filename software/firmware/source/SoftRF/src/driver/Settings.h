@@ -161,7 +161,6 @@ enum
 };
 
 enum stgidx {
-    STG_NONE,
     STG_VERSION,
     STG_MODE,
     STG_PROTOCOL,
@@ -257,32 +256,37 @@ enum stgidx {
     STG_EPD_AGHOST,
     STG_EPD_TEAM,
 //#endif
+    STG_FANET_CS,
+    STG_FANET_SOS,
     STG_DEBUG_FLAGS,
     STG_END
 };
 
 enum stgtyp {
     STG_OBSOLETE = -6,   // input-only (to be converted) (data type STG_INT1)
-    STG_HIDDEN = -5,     // not visible in web page (data type STG_INT1)
+    STG_HEX8  = -5,      // 8 hex digits
     STG_HEX6  = -4,      // 6 hex digits
     STG_HEX2  = -3,      // 00..FF
     STG_UINT1 = -2,      // 0..255
     STG_INT1  = -1,      // -128..+127
     STG_VOID  = 0,
-    STG_STR   = 1        // strings' "type" value equals their length
+    STG_STR   = 1        // strings' "type" value actually equals their length
 };
+
+#define STG_HIDDEN 0xFF  // not visible in web page
+
+bool hidden_setting(uint8_t index);
 
 struct setting_struct {
     const char *label;
     char *value;
-    uint8_t sh1;   // two-char short label
-    uint8_t sh2;
     int8_t type;
+    uint8_t hidden;
 };
 
 typedef struct Settings {
 
-    int8_t   version;
+    uint8_t  version;
     uint8_t  mode;
     uint8_t  rf_protocol;
     uint8_t  altprotocol;
@@ -293,14 +297,14 @@ typedef struct Settings {
     uint8_t  hrange;
     uint8_t  vrange;
     int8_t   old_txpwr;  // int not uint to allow making it "obsolete".
-    int8_t   txpower;    // int not uint to allow making it "hidden".
+    int8_t   txpower;    // int to allow minmax
     uint8_t  id_method;
     uint32_t aircraft_id;
     uint32_t ignore_id;
     uint32_t follow_id;
     uint8_t  volume;
     uint8_t  pointer;
-    int8_t   bluetooth;     // no effect on T-Echo?  (always BLE, always active?)
+    uint8_t  bluetooth;     // no effect on T-Echo?  (always BLE, always active?)
     uint8_t  baud_rate;
     uint8_t  nmea_out;
     uint8_t  nmea_g;        // now these are bitfields
@@ -322,12 +326,12 @@ typedef struct Settings {
     uint8_t  gdl90;         // output destination
     uint8_t  d1090;
     //uint8_t  json;
-    int8_t   gn_to_gp;
+    uint8_t  gn_to_gp;
     int8_t   geoid;
     int8_t   leapsecs;
     int8_t   freq_corr; /* +/-, kHz */   // <<< limited to +-30
     uint8_t  relay;
-    int8_t   expire;
+    int8_t   expire;        // int to allow minmax
     bool     pflaa_cs;
     bool     logalarms;
     uint32_t debug_flags;   /* each bit activates output of some debug info */
@@ -343,10 +347,10 @@ typedef struct Settings {
     uint8_t  tcpmode;
     uint8_t  tcpport;
     uint8_t  power_save;
-    int8_t   power_ext;   /* if nonzero, shuts down if battery is not full */
+    uint8_t  power_ext;   /* if nonzero, shuts down if battery is not full */
     uint8_t  rx1090;
     uint8_t  rx1090x;     // settings for the ADS-B receiver module
-    int8_t   mode_s;      // 0=off, 1-9="gain"
+    int8_t  mode_s;       // 0=off, 1-9="gain"  - int to allow minmax
     uint8_t  hrange1090;  // km
     uint8_t  vrange1090;  // hundreds of meters
     uint8_t  gdl90_in;    // data from this port will be interpreted as GDL90
@@ -380,6 +384,8 @@ typedef struct Settings {
     uint8_t  antighost;
     uint32_t team;
 //#endif
+    char     fanet_cs[32];
+    uint8_t  fanet_sos;
 
 } settings_t;
 
