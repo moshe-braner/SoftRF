@@ -776,7 +776,7 @@ int16_t SX126x::setFrequencyRaw(float freq) {
   return(setRfFrequency(frf));
 }
 
-int16_t SX126x::config(uint8_t modem) {
+int16_t SX126x::config(uint8_t modem, bool fast) {
   // reset buffer base address
   int16_t state = setBufferBaseAddress();
   RADIOLIB_ASSERT(state);
@@ -807,6 +807,10 @@ int16_t SX126x::config(uint8_t modem) {
   state = clearIrqStatus();
   state |= setDioIrqParams(RADIOLIB_SX126X_IRQ_NONE, RADIOLIB_SX126X_IRQ_NONE);
   RADIOLIB_ASSERT(state);
+
+  // mb: added "fast" option to skip calibration on repeat calls
+  if (fast)
+      return state;
 
   // calibrate all blocks
   data[0] = RADIOLIB_SX126X_CALIBRATE_ALL;

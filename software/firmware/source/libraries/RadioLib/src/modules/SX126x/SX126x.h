@@ -81,8 +81,10 @@ class SX126x: public PhysicalLayer {
       \param tcxoVoltage TCXO reference voltage to be set on DIO3. Defaults to 1.6 V, set to 0 to skip.
       \param useRegulatorLDO Whether to use only LDO regulator (true) or DC-DC regulator (false). Defaults to false.
       \returns \ref status_codes
+
+      // mb: added "fast" option to skip module calibration
     */
-    int16_t begin(uint8_t cr, uint8_t syncWord, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO = false);
+    int16_t begin(uint8_t cr, uint8_t syncWord, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO = false, bool fast = false);
 
     /*!
       \brief Initialization method for FSK modem.
@@ -94,8 +96,10 @@ class SX126x: public PhysicalLayer {
       \param tcxoVoltage TCXO reference voltage to be set on DIO3. Defaults to 1.6 V, set to 0 to skip.
       \param useRegulatorLDO Whether to use only LDO regulator (true) or DC-DC regulator (false). Defaults to false.
       \returns \ref status_codes
+
+      // mb: added "fast" option to skip module calibration
     */
-    int16_t beginFSK(float br, float freqDev, float rxBw, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO = false);
+    int16_t beginFSK(float br, float freqDev, float rxBw, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO = false, bool fast = false);
 
     /*!
       \brief Initialization method for BPSK modem.
@@ -142,8 +146,10 @@ class SX126x: public PhysicalLayer {
       \param len Number of bytes to send.
       \param addr Address to send the data to. Will only be added if address filtering was enabled.
       \returns \ref status_codes
+
+      MB: added option of pre-known air time
     */
-    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0) override;
+    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0, uint8_t airtime = 0);
 
     /*!
       \brief Blocking binary receive method.
@@ -153,8 +159,10 @@ class SX126x: public PhysicalLayer {
       \param timeout Reception timeout in milliseconds. If set to 0,
       timeout period will be calculated automatically based on the radio configuration.
       \returns \ref status_codes
+
+      MB: added option of pre-known air time
     */
-    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0) override;
+    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0, uint8_t airtime = 0);
 
     /*!
       \brief Starts direct mode transmission.
@@ -557,6 +565,9 @@ class SX126x: public PhysicalLayer {
     */
     float getRSSI(bool packet);
 
+    // mb: added non-FP version
+    int8_t getRSSIint(void);
+
     /*!
       \brief Gets SNR (Signal to Noise Ratio) of the last received packet. Only available for LoRa modem.
       \returns SNR of the last received packet in dB.
@@ -927,8 +938,8 @@ class SX126x: public PhysicalLayer {
     size_t lrFhssFrameHopsRem = 0;
     size_t lrFhssHopNum = 0;
 
-    int16_t modSetup(float tcxoVoltage, bool useRegulatorLDO, uint8_t modem);
-    int16_t config(uint8_t modem);
+    int16_t modSetup(float tcxoVoltage, bool useRegulatorLDO, uint8_t modem, bool fast=false); // mb: added "fast"
+    int16_t config(uint8_t modem, bool fast=false);     // mb: added "fast"
     bool findChip(const char* verStr);
     int16_t startReceiveCommon(uint32_t timeout = RADIOLIB_SX126X_RX_TIMEOUT_INF, RadioLibIrqFlags_t irqFlags = RADIOLIB_IRQ_RX_DEFAULT_FLAGS, RadioLibIrqFlags_t irqMask = RADIOLIB_IRQ_RX_DEFAULT_MASK);
     int16_t setPacketMode(uint8_t mode, uint8_t len);

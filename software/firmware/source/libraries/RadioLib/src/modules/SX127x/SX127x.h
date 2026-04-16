@@ -633,8 +633,10 @@ class SX127x: public PhysicalLayer {
       \param len Length of binary data to transmit (in bytes).
       \param addr Node address to transmit the packet to. Only used in FSK mode.
       \returns \ref status_codes
+
+      MB: added airtime param, in ms, if known, so as to skip the calculation
     */
-    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0) override;
+    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0, uint8_t airtime = 0);
 
     /*!
       \brief Binary receive method. Will attempt to receive arbitrary binary data up to 255 bytes long using %LoRa or up to 63 bytes using FSK modem.
@@ -644,8 +646,10 @@ class SX127x: public PhysicalLayer {
       \param timeout Reception timeout in milliseconds. If set to 0,
       timeout period will be calculated automatically based on the radio configuration.
       \returns \ref status_codes
+
+      MB: added airtime param, in ms, if known, so as to skip the calculation
     */
-    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0) override;
+    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0, uint8_t airtime = 0);
 
     /*!
       \brief Performs scan for valid %LoRa preamble in the current channel.
@@ -1255,6 +1259,9 @@ class SX127x: public PhysicalLayer {
       \returns \ref status_codes
     */
     int16_t setLowBatteryThreshold(int8_t level, uint32_t pin = RADIOLIB_NC);
+
+    // mb: added non-FP version
+    int8_t getRSSIint(void);
 
 #if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
   protected:
