@@ -1853,7 +1853,6 @@ void tryupdate(TinyGPSCustom &field, int idx)
     char *v  = stgdesc[idx].value;
     int32_t cur_val, cfg_val;
     switch (t) {
-    case STG_HIDDEN:
     case STG_INT1:
     case STG_UINT1:
        cur_val = (t==STG_UINT1? (*(uint8_t*)v) : (*(int8_t*)v));
@@ -1899,10 +1898,10 @@ void tryupdate(TinyGPSCustom &field, int idx)
        }
        break;
     }
-    if (t==STG_INT1 || t==STG_UINT1 || t==STG_HIDDEN) {
+    if (t==STG_INT1 || t==STG_UINT1) {
       snprintf_P(NMEABuffer, sizeof(NMEABuffer),
         PSTR("%s %s %d\r\n"), label, msg, (int) cfg_val);
-    } else if (t==STG_HEX2 || t==STG_HEX6) {
+    } else if (t==STG_HEX2 || t==STG_HEX6 || t==STG_HEX8) {
       snprintf_P(NMEABuffer, sizeof(NMEABuffer),
         PSTR("%s %s %X\r\n"), label, msg, cfg_val);
     } else if (t > STG_VOID) {
@@ -2112,6 +2111,8 @@ void NMEA_Process_SRF_SKV_Sentences()
     if (version0 == '?' || label0 == '?') {   // treat $PSRFS,0,?*xx same as $PSRFS,?*xx
       // reply in the same format as the settings file, including comments
       for (int i=STG_MODE; i<STG_END; i++) {
+         if (hidden_setting(i))
+               continue;
          if (format_setting(i, true) == false)
                continue;
          nmea_cfg_reply(false);  // do not add blank lines between the settings
@@ -2120,10 +2121,10 @@ void NMEA_Process_SRF_SKV_Sentences()
 
     } else if (isdecdigit(&version0)) {
 
-      int i = STG_NONE;
+      int i = STG_VERSION;
       if (label0 != 0xFF && label0 != '\0')
           i = find_setting(S_label.value());
-      if (i == STG_NONE) {
+      if (i == STG_END) {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
             PSTR("%s - no matching label\r\n"), S_label.value());
         nmea_cfg_reply();
@@ -2138,7 +2139,7 @@ void NMEA_Process_SRF_SKV_Sentences()
         if (! query) {
             if (stgdesc[i].type == STG_UINT1)
                 cfg_is_updated = (*((uint8_t *)(stgdesc[i].value)) != atoi(S_value.value()));
-            else if (stgdesc[i].type == STG_INT1 || stgdesc[i].type == STG_HIDDEN)
+            else if (stgdesc[i].type == STG_INT1)
                 cfg_is_updated = (*((int8_t *)(stgdesc[i].value)) != atoi(S_value.value()));
             if (cfg_is_updated)
                 loaded = load_setting(i, S_value.value());

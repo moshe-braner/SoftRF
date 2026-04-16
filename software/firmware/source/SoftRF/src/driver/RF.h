@@ -30,15 +30,11 @@
 #include "GNSS.h"
 #include "../protocol/radio/Legacy.h"
 #include "../protocol/radio/OGNTP.h"
-#include "../protocol/radio/P3I.h"
-#include "../protocol/radio/FANET.h"
 #include "../protocol/radio/ADSL.h"
+#include "../protocol/radio/PAW.h"
+#include "../protocol/radio/FANET.h"
 #include "../protocol/radio/ES1090.h"
 #include "../protocol/radio/UAT978.h"
-
-#define RADIOLIB_MAX_DATA_LENGTH    128
-extern uint8_t RL_txPacket[RADIOLIB_MAX_DATA_LENGTH];
-extern uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 
 #define maxof2(a,b)       (a > b ? a : b)
 #define maxof3(a,b,c)     maxof2(maxof2(a,b),c)
@@ -64,6 +60,11 @@ extern uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 #define MAX_PKT_SIZE 32
 #endif
 #endif
+
+//#define RADIOLIB_MAX_DATA_LENGTH    128
+#define RADIOLIB_MAX_DATA_LENGTH    (2 * MAX_PKT_SIZE)
+extern uint8_t RL_txPacket[RADIOLIB_MAX_DATA_LENGTH];
+extern uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 
 #define RXADDR {0x31, 0xfa , 0xb6} // Address of this device (4 bytes)
 #define TXADDR {0x31, 0xfa , 0xb6} // Address of device to send to (4 bytes)
@@ -183,10 +184,11 @@ extern uint8_t dual_protocol;
 extern const rf_proto_desc_t  *curr_rx_protocol_ptr;
 extern const rf_proto_desc_t  *curr_tx_protocol_ptr;
 
-extern float Vtcxo;
+//extern float Vtcxo;
 
 extern const rfchip_ops_t *rf_chip;
 extern bool use_hardware_manchester;
+extern uint8_t tx_power;
 extern bool receive_active;
 extern volatile bool receive_complete;
 extern bool RF_SX12XX_RST_is_connected;

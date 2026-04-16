@@ -1654,7 +1654,8 @@ void ParseData(void)
 {
     uint8_t rf_protocol = RF_last_protocol;
        // may differ from settings->rf_protocol in dual-protocol mode
-    size_t rx_size = RF_Payload_Size(rf_protocol);
+    //size_t rx_size = RF_Payload_Size(rf_protocol);
+    size_t rx_size = curr_rx_protocol_ptr->payload_size;
     rx_size = rx_size > sizeof(fo_raw) ? sizeof(fo_raw) : rx_size;
 
     if (memcmp(RxBuffer, TxBuffer, rx_size) == 0) {
@@ -1913,12 +1914,15 @@ int Traffic_Count()
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
     if (Container[i].addr) {
       count++;
-      int rssi = Container[i].rssi;
-      if (rssi < 0) {               // not an ADS-B RSSI
-          if (rssi > rssimax)
-              rssimax = rssi;
-      } else {
+      if (Container[i].protocol == RF_PROTOCOL_ADSB_1090
+      ||  Container[i].protocol == RF_PROTOCOL_GDL90) {
           ++adsb_acfts;
+      } else {
+          int rssi = Container[i].rssi;
+          if (rssi < 0) {
+              if (rssi > rssimax)
+                  rssimax = rssi;
+          }
       }
     }
   }

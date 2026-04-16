@@ -213,7 +213,8 @@ void Raw_Transmit_UDP()
 {
     uint8_t rf_protocol = RF_last_protocol;
        // may differ from settings->rf_protocol in dual-protocol mode
-    size_t rx_size = RF_Payload_Size(rf_protocol);
+    //size_t rx_size = RF_Payload_Size(rf_protocol);
+    size_t rx_size = curr_rx_protocol_ptr->payload_size;
     rx_size = rx_size > sizeof(fo_raw) ? sizeof(fo_raw) : rx_size;
     String str = Bin2Hex(fo_raw, rx_size);
     size_t len = str.length();

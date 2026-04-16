@@ -41,82 +41,23 @@ static Module *mod;
 float Vtcxo = 1.6;   // safe default?
 
 bool use_hardware_manchester = false;
+bool prev_lora = false;
 bool receive_active = false;
 volatile bool receive_complete = false;
 uint32_t receive_cb_count = 0;
 static bool transmit_complete = false;
 static float cur_freq;
+static uint8_t pkt_size;
+static uint32_t rssi_timer;
+static uint8_t rssi_period;
+static uint8_t rssi_sample = 0;
 
 void receive_handler(void) {
   receive_complete = true;
 }
 
-uint8_t tx_power = 2;
-
-static uint8_t calc_txpower()
-{
-  uint8_t power = 2;   /* 2 dBm is minimum for RFM95W on PA_BOOST pin */
-
-  if (settings->txpower == RF_TX_POWER_FULL) {
-
-    /* Load regional max. EIRP at first */
-    power = RF_FreqPlan.MaxTxPower;
-
-    if (settings->relay >= RELAY_ONLY) {
-        if (power > 8)  power = 8;
-    }
-
-    if (rf_chip->type == RF_IC_LR11XX) {
-#if 1
-      /*
-       * Enforce Tx power limit until confirmation
-       * that LR11xx is doing well
-       * when antenna is not connected
-       */
-      if (power > 17)  power = 17;
-#else
-      if (power > 22)  power = 22;
-#endif
-
-      uint32_t frequency = RF_FreqPlan.getChanFrequency(0);
-      bool high = (frequency > 1000000000) ; /* above 1GHz */
-      if (high && power > 13) power = 13;
-
-    } else if (rf_chip->type == RF_IC_SX1262) {
-
-      /* SX1262 is unable to give more than 22 dBm */
-      //if (LMIC.txpow > 22)
-      //  LMIC.txpow = 22;
-      // The sx1262 has internal protection against antenna mismatch.
-      // And yet the T-Echo instructions warn against using without an antenna.
-      // But keep is a bit lower ayway
-      if (power > 19)  power = 19;
-
-    } else {
-
-      /* SX1276 is unable to give more than 20 dBm */
-      //if (LMIC.txpow > 20)
-      //  LMIC.txpow = 20;
-    // Most T-Beams have an sx1276, it can give 20 dBm but only safe with a good antenna.
-    // Note that the regional legal limit RF_FreqPlan.MaxTxPower also applies,
-    //   it is only 14 dBm in EU, but 30 in Americas, India & Australia.
-    //if (hw_info.model != SOFTRF_MODEL_PRIME_MK2) {
-        /*
-         * Enforce Tx power limit until confirmation
-         * that RFM95W is doing well
-         * when antenna is not connected
-         */
-        if (power > 17)  power = 17;
-    //}
-    }
-  }
-
-  return power;
-}
-
-#if defined(INCLUDE_SX127X) || defined(INCLUDE_SX126X)
-
 #if defined(INCLUDE_SX127X)
+
 SX1276  *radio_sx1276;
 static bool sx1276_probe(void);
 static void sx1276_setup(const rf_proto_desc_t*, bool);
@@ -134,27 +75,6 @@ const rfchip_ops_t sx1276_ops = {
   sx1276_transmit,
   sx1276_shutdown
 };
-#endif
-
-#if defined(INCLUDE_SX126X)
-SX1262  *radio_sx1262;
-static bool sx1262_probe(void);
-static void sx1262_setup(const rf_proto_desc_t*, bool);
-static void sx1262_setfreq(uint32_t);
-static uint8_t sx1262_receive(uint8_t *packet);
-static int16_t sx1262_transmit(uint8_t *packet, uint8_t length);
-static void sx1262_shutdown(void);
-const rfchip_ops_t sx1262_ops = {
-  RF_IC_SX1262,
-  "SX126x",
-  //sx1262_probe,
-  //sx1262_setup,
-  sx1262_setfreq,
-  sx1262_receive,
-  sx1262_transmit,
-  sx1262_shutdown
-};
-#endif
 
 bool sx1276_probe()
 {
@@ -162,17 +82,17 @@ bool sx1276_probe()
   uint32_t busy = (lmic_pins.busy   == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.busy;
   mod = new Module(lmic_pins.nss, irq, lmic_pins.rst, busy, RadioSPI);
   radio_sx1276 = new SX1276(mod);
-  int state = radio_sx1276->beginFSK();
+  float freq = 0.000001f * (float) RF_FreqPlan.getChanFrequency(0);
+  int state = radio_sx1276->beginFSK(freq);
   if (state == RADIOLIB_ERR_NONE) {
-    Serial.println(F("Found sx1276"));
+    //Serial.println(F("Found sx1276"));
   } else {
-    Serial.print(F("did not find sx1276"));
+    Serial.println(F("did not find sx1276"));
     delete radio_sx1276;
     delete mod;
     return false;
   }
-if (settings->debug_flags != 0)
-  use_hardware_manchester = true;   // only on sx1276 - does not work yet
+  use_hardware_manchester = true;   // only on sx1276
   return true;
 }
 
@@ -180,7 +100,7 @@ static void sx1276_setfreq(uint32_t ifreq)
 {
     if (receive_active) {
       (void) radio_sx1276->finishReceive();
-      (void) radio_sx1276->standby();
+      //(void) radio_sx1276->standby();
       receive_active = false;
     }
 
@@ -192,25 +112,42 @@ static void sx1276_setfreq(uint32_t ifreq)
       return;
     }
 #endif
-    // will also re-set the frequency after begin() in sx1276_setup()
+    // will also re-set the frequency to the stashed cur_freq after begin() in sx1276_setup()
 }
 
 static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 {
   static const rf_proto_desc_t *prev_protocol = NULL;
   static bool prev_tx = false;
+  uint16_t rl_state;
 
-  int rl_state;
+  if (receive_active) {
+      //rl_state = radio_sx1276->standby();
+      rl_state = radio_sx1276->finishReceive();   // does a standby() and clearIrqFlags()
+      if (rl_state != RADIOLIB_ERR_NONE) {
+          Serial.println(F("[sx1276] standby() error!"));
+          return;
+      }
+      receive_active = false;
+  }
+
+  pkt_size = rf_protocol->payload_offset + rf_protocol->payload_size +
+                      rf_protocol->crc_size;
+
+  if (rf_protocol->whitening == RF_WHITENING_MANCHESTER && ! use_hardware_manchester)
+      pkt_size += pkt_size;
+
+  if (pkt_size > RADIOLIB_MAX_DATA_LENGTH)
+      pkt_size = RADIOLIB_MAX_DATA_LENGTH;
+
 
   if (rf_protocol == prev_protocol) {
     // if only frequency changed, that was done by set_protocol_for_slot()
     //   (indirectly) calling rf_chip->setfreq()
-    if (tx == prev_tx) {
-        // nothing changed
+    if (tx == prev_tx)
         return;
-    }
     // same protocol but tx changed, only need to change sync word if FSK
-    if (rf_protocol->modulation_type == RF_MODULATION_TYPE_2FSK) {
+    if (rf_protocol->syncword_skip != 0) {
       uint8_t *syncword = (uint8_t *) rf_protocol->syncword;
       uint8_t syncword_size = rf_protocol->syncword_size;
       if (tx == false) {   // for rx skip some leading sync bytes
@@ -218,6 +155,8 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
           syncword_size -= rf_protocol->syncword_skip;
       }
       rl_state = radio_sx1276->setSyncWord(syncword, (size_t) syncword_size);
+      // rumor has it that setSyncWord() clobbers the packet size setting?
+      //rl_state = radio_sx1276->fixedPacketLengthMode(pkt_size);
     }
     prev_tx = tx;
     return;
@@ -227,6 +166,7 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
   prev_tx = tx;
 
   float br, bw, fdev;
+  uint32_t t0, t1, t2;
 
   switch (rf_protocol->modulation_type)
   {
@@ -240,15 +180,14 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_250KHZ:
       bw = 500.0f; /* BW_500 */
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 125.0f; /* BW_125 */
-      break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 125.0f; /* BW_125 */
+    //  break;
     //case RF_RX_BANDWIDTH_SS_125KHZ:
     default:
       bw = 250.0f; /* BW_250 */
       break;
     }
-
     //rl_state = radio_sx1276->setBandwidth(bw);
 
 #if 0
@@ -262,8 +201,19 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     }
 #endif
 
-    rl_state = radio_sx1276->begin(cur_freq, bw, 7, 5, rf_protocol->syncword[0], tx_power, 8, 0);
-    delay(1);
+    if (! prev_lora) {  // need to switch to LORA (FANET)
+
+if (settings->debug_flags & DEBUG_DEEPER2) {
+Serial.printf("begin(LORA) freq=%.2f, bw=%.1f, syncword=%X, power=%d\r\n",
+cur_freq, bw, rf_protocol->syncword[0], tx_power);
+}
+t0 = millis();
+  //rl_state = radio_sx1276->begin(cur_freq, bw, (uint8_t) 7, (uint8_t) 5, rf_protocol->syncword[0], tx_power, 8, 0);
+  //rl_state = radio_sx1276->begin(cur_freq, bw, 7, 5, rf_protocol->syncword[0], tx_power, 12, 0);
+  //use the "fast" version of begin() that skips the chip reset and probe:
+    rl_state = radio_sx1276->begin(cur_freq, bw, 7, 5, rf_protocol->syncword[0], tx_power, 8, 0, true);
+t1 = millis();
+    //delay(1);
 #if RADIOLIB_DEBUG_BASIC
     if (rl_state == RADIOLIB_ERR_INVALID_BANDWIDTH) {
       Serial.println(F("[sx1276] Selected bandwidth is invalid for this module!"));
@@ -273,12 +223,35 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       return;
     }
 #endif
+// >>> Pawel just calls setActiveModem(RADIOLIB_SX127X_LORA);
 
-    //rl_state = radio_sx1276->setSyncWord((uint8_t) rf_protocol->syncword[0]);
+        //rl_state = radio_sx1276->invertIQ(false);         // already done by begin()
+        rl_state = radio_sx1276->explicitHeader();
+        rl_state = radio_sx1276->setCRC(true);              // this is what Pawel calls
 
-    //rl_state = radio_sx1276->setPreambleLength(8);
+    } else {   // already set up for LORA, don't call begin()
 
-    rl_state = radio_sx1276->setCrcFiltering(false);
+t1 = t0 = millis();
+
+        // frequency was set by set_protocol_for_slot() calling RF_chip_channel()
+        // but call again to be sure?
+        //rl_state = radio_sx1276->setFrequency(cur_freq);
+
+        // these also did not change so no need to re-do:
+        //rl_state = radio_sx1276->setBandwidth(bw);
+        //rl_state = radio_sx1276->setSpreadingFactor((uint8_t) 7); /* SF_7 */
+        //rl_state = radio_sx1276->setCodingRate((uint8_t) 5);      /* CR_5 */
+        //rl_state = radio_sx1276->setPreambleLength((size_t) 8);  // Pawel uses 5
+        //rl_state = radio_sx1276->setSyncWord((uint8_t) rf_protocol->syncword[0]);
+        //rl_state = radio_sx1276->invertIQ(false);
+        //rl_state = radio_sx1276->explicitHeader();
+        //rl_state = radio_sx1276->setCRC(true);
+
+    }  // end of if(! prev_lora)
+
+t2 = millis();
+if (settings->debug_flags & DEBUG_DEEPER2)
+Serial.printf("begin(LORA) %d ms, rest %d ms\r\n", t1-t0, t2-t1);
 
     break;
 
@@ -304,12 +277,12 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
     switch (rf_protocol->deviation)
     {
-    case RF_FREQUENCY_DEVIATION_12_5KHZ:
+    case RF_FREQUENCY_DEVIATION_12_5KHZ:   // for PAW = ADS-L LDR
       fdev = 12.5f;
       break;
-    case RF_FREQUENCY_DEVIATION_25KHZ:
-      fdev = 25.0f;
-      break;
+    //case RF_FREQUENCY_DEVIATION_25KHZ:
+    //  fdev = 25.0f;
+    //  break;
     //case RF_FREQUENCY_DEVIATION_50KHZ:
     default:
       fdev = 50.0f;
@@ -326,12 +299,15 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_200KHZ:
       bw = 467.0f;
       break;
-    case RF_RX_BANDWIDTH_SS_50KHZ:
-      bw = 117.3f;
+    case RF_RX_BANDWIDTH_SS_25KHZ:   // for PAW = ADS-L LDR
+      bw = 58.6f;
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 156.2f;
-      break;
+    //case RF_RX_BANDWIDTH_SS_50KHZ:
+    //  bw = 117.3f;
+    //  break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 156.2f;
+    //  break;
     case RF_RX_BANDWIDTH_SS_166KHZ:
       bw = 312.0f;
       break;
@@ -345,40 +321,48 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     uint16_t preamble = ((uint16_t)(rf_protocol->preamble_size) << 3);
 
     //rl_state = radio_sx1276->setPreambleLength(rf_protocol->preamble_size * 8);
-    ////rl_state = radio_sx1276->setDataShaping(RADIOLIB_SHAPING_0_5);
 
-    rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false);
-    delay(1);
+t1 = t0 = millis();
+    if (prev_lora) {  // need to switch to FSK
+
+  //rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false);
+  //use the "fast" version of begin() that skips the chip reset and probe:
+  rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false, true);
+t1 = millis();
+    //delay(1);
 #if RADIOLIB_DEBUG_BASIC
   if (rl_state == RADIOLIB_ERR_INVALID_BIT_RATE) {
     Serial.println(F("[sx1276] Selected bit rate is invalid for this module!"));
     return;
-  } else if (rl_state != RADIOLIB_ERR_NONE) {
-    Serial.println(F("[sx1276] error selecting bit rate"));
-    return;
   } else if (rl_state == RADIOLIB_ERR_INVALID_FREQUENCY_DEVIATION) {
     Serial.println(F("[sx1276] Selected frequency deviation is invalid for this module!"));
     return;
+  } else if (rl_state != RADIOLIB_ERR_NONE) {
+    Serial.println(F("[sx1276] FSK begin() error!"));
+    return;
   }
 #endif
+    } else {    // already set up for FSK, don't call beginFSK()
 
-    size_t pkt_size = rf_protocol->payload_offset + rf_protocol->payload_size +
-                      rf_protocol->crc_size;
+        // frequency was set by set_protocol_for_slot() calling RF_chip_channel()
+        // but call again to be sure?
+        //rl_state = radio_sx1276->setFrequency(cur_freq);
+
+        rl_state = radio_sx1276->setBitRate(br);
+        rl_state = radio_sx1276->setFrequencyDeviation(fdev);
+        rl_state = radio_sx1276->setRxBandwidth(bw);
+        rl_state = radio_sx1276->setPreambleLength(rf_protocol->preamble_size * 8);
+        rl_state = radio_sx1276->setOutputPower(tx_power);  // may differ between protocols
+
+    }   // end of if(prev_lora)
 
     switch (rf_protocol->whitening)
     {
     case RF_WHITENING_MANCHESTER:
       if (use_hardware_manchester) {
-          //rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_MANCHESTER);
-          // maybe it needs to be RADIOLIB_ENCODING_MANCHESTER_INV
-          //if (rf_protocol->payload_type == RF_PAYLOAD_INVERTED)
-          //    rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_MANCHESTER_INV);
-          //else
-              rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_MANCHESTER);
-          // or maybe it is the PAYLOAD that needs to be inverted?
+          rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_MANCHESTER);
       } else {
           rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_NRZ);
-          pkt_size += pkt_size;
       }
       break;
     //case RF_WHITENING_PN9:
@@ -388,8 +372,6 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       rl_state = radio_sx1276->setEncoding(RADIOLIB_ENCODING_NRZ);
       break;
     }
-
-    rl_state = radio_sx1276->fixedPacketLengthMode(pkt_size);
 
     uint8_t *syncword = (uint8_t *) rf_protocol->syncword;
     uint8_t syncword_size = rf_protocol->syncword_size;
@@ -407,79 +389,127 @@ static void sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
                            syncword[0],
                            syncword[1]
                          };
-      rl_state = radio_sx1276->setSyncWord(sword, 4);
+      rl_state = radio_sx1276->setSyncWord(sword, (size_t) 4);
     } else {
       rl_state = radio_sx1276->setSyncWord((uint8_t *) syncword, (size_t) syncword_size);
-      // - but is setSyncWord() available for sx1276?
     }
+
+    rl_state = radio_sx1276->fixedPacketLengthMode(pkt_size);
+
+    if (rf_protocol->type == RF_PROTOCOL_P3I)
+        radio_sx1276->setDataShaping(RADIOLIB_SHAPING_1_0);
+    else // if (rf_protocol->type == RF_PROTOCOL_ADSL)
+        radio_sx1276->setDataShaping(RADIOLIB_SHAPING_0_5);
+
+    radio_sx1276->setCrcFiltering(false);     // CRC done in software
+    radio_sx1276->setCRC(false);              // this is what Pawel calls
+
+t2 = millis();
+if (settings->debug_flags & DEBUG_DEEPER2)
+Serial.printf("begin(FSK) %d ms, rest %d ms\r\n", t1-t0, t2-t1);
+
     break;
-  }             // end switch (rf_protocol->modulation_type) 
+  }                 // end of switch (rf_protocol->modulation_type) 
+
+  prev_lora = (rf_protocol->type == RF_PROTOCOL_FANET);
 
   /* setRfSwitchTable(); */
 
-  radio_sx1276->setCrcFiltering(false);    // CRC done in software
-
-  radio_sx1276->setOutputPower(tx_power);
 
   radio_sx1276->setPacketReceivedAction(receive_handler);
+
 }
 
 static uint8_t sx1276_receive(uint8_t *packet)
 {
-  if (settings->power_save & POWER_SAVE_NORECEIVE) {
-    return 0;
-  }
-
   int rl_state;
 
   if (!receive_active) {
     sx1276_setup(curr_rx_protocol_ptr, false);
     receive_complete = false;
     rl_state = radio_sx1276->startReceive();
-    if (rl_state == RADIOLIB_ERR_NONE) {
-        receive_active = true;
-//Serial.println("rx started");
+    if (rl_state != RADIOLIB_ERR_NONE) {
+        Serial.println("sx1276 startReceive() error");
+        return 0;
     }
+    receive_active = true;
+    rssi_timer = millis();
+    rssi_period = ((curr_rx_protocol_ptr->air_time + 1) >> 1);
+    rssi_sample = 0;
+    return 0;
+  } else if (!receive_complete) {
+    // - getRSSIint() does an SPI transaction to read the register
+    // - that takes some time, and also
+    // - that may reduce the rx sensitivity?
+    // - so limit to about once-per-airtime/2
+    //    (3 ms for FLR/ADSL/OGNTP, 5 ms for PAW, 18 for FANET)
+    if (curr_rx_protocol_ptr->modulation_type != RF_MODULATION_TYPE_LORA
+            && millis() >= rssi_timer + rssi_period) {
+        rssi_sample = radio_sx1276->getRSSIint();
+        rssi_timer = millis();
+    }
+    return 0;
   }
 
-  if (receive_complete == false)
-      return 0;
+  // a packet has arrived!
 
   receive_complete = false;
   receive_active = false;
   receive_cb_count++;
+  if (rssi_sample != 0 && millis() <= rssi_timer + rssi_period)  // sample was taken recently enough
+      RF_last_rssi = rssi_sample;
 
-  uint8_t length = radio_sx1276->getPacketLength();
+/*
+  uint8_t length = radio_sx1276->getPacketLength();  // wrong value, at least for FSK
   if (length == 0) {
       (void) radio_sx1276->finishReceive();
+      //(void) radio_sx1276->standby();
+Serial.println("sx1276 rx 0 bytes");
       return 0;
   }
+if (curr_rx_protocol_ptr->type == RF_PROTOCOL_FANET && length != pkt_size)
+Serial.printf("sx1276 FANET rx length %d != pkt_size %d\r\n", length, pkt_size);
+*/
 
-  if (length > RADIOLIB_MAX_DATA_LENGTH)
-      length = RADIOLIB_MAX_DATA_LENGTH;
-  rl_state = radio_sx1276->readData(packet, length);
+  //if (length > RADIOLIB_MAX_DATA_LENGTH)
+  //    length = RADIOLIB_MAX_DATA_LENGTH;
+  //rl_state = radio_sx1276->readData(packet, length);
+  rl_state = radio_sx1276->readData(packet, pkt_size);
+  //RF_last_rssi = (int8_t) radio_sx1276->getRSSI(true);  // this function is of type float
+  //RF_last_rssi = radio_sx1276->getRSSIint();            // does not work here for FSK
+  if (curr_rx_protocol_ptr->modulation_type == RF_MODULATION_TYPE_LORA)
+      RF_last_rssi = radio_sx1276->getRSSIint();
   (void) radio_sx1276->finishReceive();
-  if (rl_state != RADIOLIB_ERR_NONE)
+  //(void) radio_sx1276->standby();
+  if (rl_state == RADIOLIB_ERR_CRC_MISMATCH) {
+Serial.println("sx1276 rx CRC error");
       return 0;
-  RF_last_rssi = radio_sx1276->getRSSI(true);
-  return length;
+  }
+  if (rl_state != RADIOLIB_ERR_NONE) {
+Serial.println("sx1276 rx other error");
+      return 0;
+  }
+#if 1
+  Serial.print(F("rcvd "));
+  Serial.print(pkt_size);
+  Serial.print(F(" bytes, getRSSI(): "));
+  Serial.println(RF_last_rssi);
+#endif
+  return pkt_size;
 }
 
 static int16_t sx1276_transmit(uint8_t *packet, uint8_t length)
 {
-  if (receive_active) {
-      (void) radio_sx1276->finishReceive();
-      (void) radio_sx1276->standby();
-      receive_active = false;
-  }
-
   sx1276_setup(curr_tx_protocol_ptr, true);
 
-  int rl_state = radio_sx1276->transmit(packet, (size_t) length);
+  //int rl_state = radio_sx1276->transmit(packet, (size_t) length);
+  // use mb: modified SX127x::transmit() to accept known air_time
+  //   (save the CPU time computing the air time again for each transmit)
+  int rl_state = radio_sx1276->transmit(packet, (size_t) length,
+                    (uint8_t) 0, (uint8_t) curr_tx_protocol_ptr->air_time);
 
   return (rl_state);
 }
-
 
 static void sx1276_shutdown()
 {
@@ -488,7 +518,29 @@ static void sx1276_shutdown()
   RadioSPI.end();
 }
 
+#endif   // sx1276
+
 /******************************************************/
+
+#if defined(INCLUDE_SX126X)
+
+SX1262  *radio_sx1262;
+static bool sx1262_probe(void);
+static void sx1262_setup(const rf_proto_desc_t*, bool);
+static void sx1262_setfreq(uint32_t);
+static uint8_t sx1262_receive(uint8_t *packet);
+static int16_t sx1262_transmit(uint8_t *packet, uint8_t length);
+static void sx1262_shutdown(void);
+const rfchip_ops_t sx1262_ops = {
+  RF_IC_SX1262,
+  "SX126x",
+  //sx1262_probe,
+  //sx1262_setup,
+  sx1262_setfreq,
+  sx1262_receive,
+  sx1262_transmit,
+  sx1262_shutdown
+};
 
 bool sx1262_probe()
 {
@@ -498,19 +550,22 @@ bool sx1262_probe()
   case SOFTRF_MODEL_BADGE:
   case SOFTRF_MODEL_PRIME_MK2:
   default:
-    Vtcxo = 1.6;
+    Vtcxo = 1.6;   // already the default
     break;
   }
 #endif
-  uint32_t irq  = (lmic_pins.dio[0] == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.dio[0];
+  // on the sx1262 the IRQ is done via DIO1 not DIO0
+  // this needs to be set up in ESP32.cpp and nRF52.cpp
+  uint32_t irq  = (lmic_pins.dio[1] == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.dio[1];
   uint32_t busy = (lmic_pins.busy   == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.busy;
   mod = new Module(lmic_pins.nss, irq, lmic_pins.rst, busy, RadioSPI);
   radio_sx1262 = new SX1262(mod);
-  int state = radio_sx1262->beginFSK();
+  float freq = 0.000001f * (float) RF_FreqPlan.getChanFrequency(0);
+  int state = radio_sx1262->beginFSK(freq);
   if (state == RADIOLIB_ERR_NONE) {
-    Serial.println(F("Found sx1262"));
+    //Serial.println(F("Found sx1262"));
   } else {
-    Serial.print(F("did not find sx1262"));
+    Serial.println(F("did not find sx1262"));
     delete radio_sx1262;
     delete mod;
     return false;
@@ -522,10 +577,12 @@ static void sx1262_setfreq(uint32_t ifreq)
 {
     if (receive_active) {
       (void) radio_sx1262->finishReceive();
+      //(void) radio_sx1262->standby();
       receive_active = false;
     }
 
-    int rl_state = radio_sx1262->setFrequency(0.000001f * (float) ifreq);
+    cur_freq = 0.000001f * (float) ifreq;
+    int rl_state = radio_sx1262->setFrequency(cur_freq);
 #if RADIOLIB_DEBUG_BASIC
     if (rl_state == RADIOLIB_ERR_INVALID_FREQUENCY) {
       Serial.println(F("[sx1262] Selected frequency is invalid for this module!"));
@@ -538,14 +595,36 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 {
   static const rf_proto_desc_t *prev_protocol = NULL;
   static bool prev_tx = false;
+  uint16_t rl_state;
 
-  int rl_state;
+  if (receive_active) {
+      //rl_state = radio_sx1262->standby();
+      rl_state = radio_sx1262->finishReceive();   // does a standby() and clearIrqStatus()
+      if (rl_state != RADIOLIB_ERR_NONE) {
+          Serial.println(F("[sx1262] standby() error!"));
+          return;
+      }
+      receive_active = false;
+  }
+
+  pkt_size = rf_protocol->payload_offset + rf_protocol->payload_size +
+                      rf_protocol->crc_size;
+
+  if (rf_protocol->whitening == RF_WHITENING_MANCHESTER /* && ! use_hardware_manchester */ )
+      pkt_size += pkt_size;
+
+  if (pkt_size > RADIOLIB_MAX_DATA_LENGTH)
+      pkt_size = RADIOLIB_MAX_DATA_LENGTH;
+
+//Serial.print(F("[sx1262] setting up PacketLength="));
+//Serial.println(pkt_size);
 
   if (rf_protocol == prev_protocol) {    // no need to re-setup everything
     if (tx == prev_tx)
         return;
-    // only tx changed, only need to change sync word if FSK
-    if (rf_protocol->modulation_type == RF_MODULATION_TYPE_2FSK) {
+    // same protocol but tx changed, only need to change sync word if FSK
+    if (rf_protocol->modulation_type == RF_MODULATION_TYPE_2FSK
+         && rf_protocol->syncword_skip != 0) {
       uint8_t *syncword = (uint8_t *) rf_protocol->syncword;
       uint8_t syncword_size = rf_protocol->syncword_size;
       if (tx == false) {   // for rx skip some leading sync bytes
@@ -553,35 +632,30 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
           syncword_size -= rf_protocol->syncword_skip;
       }
       rl_state = radio_sx1262->setSyncWord(syncword, (size_t) syncword_size);
+      rl_state = radio_sx1262->fixedPacketLengthMode(pkt_size);
     }
     prev_tx = tx;
     return;
   }
-  
+
   prev_protocol = rf_protocol;
   prev_tx = tx;
+
+  float br, bw, fdev;
+  uint32_t t0, t1, t2;
 
   switch (rf_protocol->modulation_type)
   {
   case RF_MODULATION_TYPE_LORA:
-#if 0
-    rl_state = radio_sx1262->begin(434.0f, 125.0f, 9, 7, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 10, 8, Vtcxo, false);
-#else
-    rl_state = radio_sx1262->setModem(RADIOLIB_MODEM_LORA);
-    delay(1);
-    rl_state = radio_sx1262->setTCXO(Vtcxo);
-#endif
-
-    float br, fdev, bw;
 
     switch (RF_FreqPlan.Bandwidth)
     {
     case RF_RX_BANDWIDTH_SS_125KHZ:
       bw = 250.0f; /* BW_250 */
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 125.0f; /* BW_125 */
-      break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 125.0f; /* BW_125 */
+    //  break;
     case RF_RX_BANDWIDTH_SS_250KHZ:
       bw = 500.0f; /* BW_500 */
       break;
@@ -590,16 +664,9 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       bw = 250.0f; /* BW_250 */
       break;
     }
+    //rl_state = radio_sx1262->setBandwidth(bw);
 
-    rl_state = radio_sx1262->setBandwidth(bw);
-
-#if RADIOLIB_DEBUG_BASIC
-    if (rl_state == RADIOLIB_ERR_INVALID_BANDWIDTH) {
-      Serial.println(F("[sx1262] Selected bandwidth is invalid for this module!"));
-      return;
-    }
-#endif
-
+#if 0
     //switch (rf_protocol->type)
     {
     //case RF_PROTOCOL_FANET:
@@ -608,25 +675,66 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       rl_state = radio_sx1262->setCodingRate(5);      /* CR_5 */
       //break;
     }
+#endif
 
-    rl_state = radio_sx1262->setSyncWord((uint8_t) rf_protocol->syncword[0]);
-    rl_state = radio_sx1262->setPreambleLength(8);
-    rl_state = radio_sx1262->explicitHeader();
-    rl_state = radio_sx1262->setCRC(0);
+    if (! prev_lora) {  // need to switch to LORA (FANET)
+
+t0 = millis();
+    //rl_state = radio_sx1262->begin(cur_freq, bw, (uint8_t)7, (uint8_t)5,
+    //               rf_protocol->syncword[0], tx_power, (uint16_t)8, Vtcxo, false);
+                 //rf_protocol->syncword[0], tx_power, (uint16_t)12, Vtcxo, false);
+    //use the "fast" version of begin() that skips the chip calibration:
+    rl_state = radio_sx1262->begin(cur_freq, bw, (uint8_t)7, (uint8_t)5,
+                   rf_protocol->syncword[0], tx_power, (uint16_t)8, Vtcxo, false, true);
+t1 = millis();
+    //delay(1);
+#if RADIOLIB_DEBUG_BASIC
+    if (rl_state == RADIOLIB_ERR_INVALID_BANDWIDTH) {
+      Serial.println(F("[sx1262] Selected bandwidth is invalid for this module!"));
+      return;
+    } else if (rl_state != RADIOLIB_ERR_NONE) {
+      Serial.println(F("[sx1262] LORA begin() error!"));
+      return;
+    }
+#endif
+
+// Pawel says: "it turns out all this setup must be done again for SX1262, otherwise it does not work"
+// but it may be because he does not call begin(), only config(RADIOLIB_SX126X_PACKET_TYPE_LORA)
+//   - config() does "calibration" which takes time
+
+        //rl_state = radio_sx1262->invertIQ(false);       // already done by begin()
+        rl_state = radio_sx1262->explicitHeader();
+        //rl_state = radio_sx1262->setCRC((uint8_t) 2);   // this is what begin() does
+
+    } else {   // already set up for LORA, don't call begin()
+
+t1 = t0 = millis();
+
+        // frequency was set by set_protocol_for_slot() calling RF_chip_channel()
+        // but call again to be sure?
+        //rl_state = radio_sx1276->setFrequency(cur_freq);
+
+        // these also did not change so no need to re-do:
+        //rl_state = radio_sx1262->setBandwidth(bw);
+        //rl_state = radio_sx1262->setSpreadingFactor((uint8_t) 7); /* SF_7 */
+        //rl_state = radio_sx1262->setCodingRate((uint8_t) 5);      /* CR_5 */
+        //rl_state = radio_sx1262->setPreambleLength((size_t) 8);
+        //rl_state = radio_sx1262->setSyncWord((uint8_t) rf_protocol->syncword[0], (uint8_t) 0x44);
+        //rl_state = radio_sx1262->invertIQ(false);
+        //rl_state = radio_sx1262->explicitHeader();
+        //rl_state = radio_sx1262->setCRC((uint8_t) 2);     // this is what begin() does
+
+    }  // end of if(! prev_lora)
+
+t2 = millis();
+if (settings->debug_flags & DEBUG_DEEPER2)
+Serial.printf("begin(LORA) %d ms, rest %d ms\r\n", t1-t0, t2-t1);
 
     break;
 
   case RF_MODULATION_TYPE_2FSK:
   case RF_MODULATION_TYPE_PPM: /* TBD */
   default:
-
-#if 0
-    rl_state = radio_sx1262->beginFSK(4.8f, 5.0f, 156.2f, 16, Vtcxo);
-#else
-    rl_state = radio_sx1262->setModem(RADIOLIB_MODEM_FSK);
-    delay(1);
-    rl_state = radio_sx1262->setTCXO(Vtcxo);
-#endif
 
     switch (rf_protocol->bitrate)
     {
@@ -638,39 +746,22 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       br = 100.0f;
       break;
     }
-    rl_state = radio_sx1262->setBitRate(br);
-
-#if RADIOLIB_DEBUG_BASIC
-  if (rl_state == RADIOLIB_ERR_INVALID_BIT_RATE) {
-    Serial.println(F("[sx1262] Selected bit rate is invalid for this module!"));
-    return;
-  } else if (rl_state != RADIOLIB_ERR_NONE) {
-    Serial.println(F("[sx1262] error selecting bit rate"));
-    return;
-  }
-#endif
+    //rl_state = radio_sx1262->setBitRate(br);
 
     switch (rf_protocol->deviation)
     {
     case RF_FREQUENCY_DEVIATION_12_5KHZ:
       fdev = 12.5f;
       break;
-    case RF_FREQUENCY_DEVIATION_25KHZ:
-      fdev = 25.0f;
-      break;
+    //case RF_FREQUENCY_DEVIATION_25KHZ:
+    //  fdev = 25.0f;
+    //  break;
     //case RF_FREQUENCY_DEVIATION_50KHZ:
     default:
       fdev = 50.0f;
       break;
     }
-    rl_state = radio_sx1262->setFrequencyDeviation(fdev);
-
-#if RADIOLIB_DEBUG_BASIC
-  if (rl_state == RADIOLIB_ERR_INVALID_FREQUENCY_DEVIATION) {
-    Serial.println(F("[sx1262] Selected frequency deviation is invalid for this module!"));
-    return;
-  }
-#endif
+    //rl_state = radio_sx1262->setFrequencyDeviation(fdev);
 
     switch (rf_protocol->bandwidth)
     {
@@ -681,12 +772,15 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_200KHZ:
       bw = 467.0f;
       break;
-    case RF_RX_BANDWIDTH_SS_50KHZ:
-      bw = 117.3f;
+    case RF_RX_BANDWIDTH_SS_25KHZ:
+      bw = 58.6f;
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 156.2f;
-      break;
+    //case RF_RX_BANDWIDTH_SS_50KHZ:
+    //  bw = 117.3f;
+    //  break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 156.2f;
+    //  break;
     case RF_RX_BANDWIDTH_SS_166KHZ:
       bw = 312.0f;
       break;
@@ -695,51 +789,49 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
       bw = 234.3f;
       break;
     }
-    rl_state = radio_sx1262->setRxBandwidth(bw);
+    //rl_state = radio_sx1262->setRxBandwidth(bw);
 
-    rl_state = radio_sx1262->setPreambleLength(rf_protocol->preamble_size * 8);
-    rl_state = radio_sx1262->setDataShaping(RADIOLIB_SHAPING_0_5);
+    uint16_t preamble_size;
+    if (rf_protocol->type == RF_PROTOCOL_P3I)
+        preamble_size = (tx ? (((uint16_t)rf_protocol->preamble_size) << 3) : 16);   // what Pawel does
+    else
+        preamble_size = (tx ? (((uint16_t)rf_protocol->preamble_size) << 3) : 0);    // what Pawel does
 
-#if 0
-    switch (rf_protocol->crc_type)
-    {
-    case RF_CHECKSUM_TYPE_CCITT_FFFF:
-    case RF_CHECKSUM_TYPE_CCITT_0000:
-    case RF_CHECKSUM_TYPE_CCITT_1D02:
-    case RF_CHECKSUM_TYPE_CRC8_107:
-    case RF_CHECKSUM_TYPE_RS:
-      /* CRC is driven by software */
-      rl_state = radio_sx1262->setCRC(0);
-      break;
-    case RF_CHECKSUM_TYPE_GALLAGER:
-    case RF_CHECKSUM_TYPE_CRC_MODES:
-    case RF_CHECKSUM_TYPE_NONE:
-    default:
-      rl_state = radio_sx1262->setCRC(0);
-      break;
-    }
-#else
-    rl_state = radio_sx1262->setCRC(0);
+t1 = t0 = millis();
+    if (prev_lora) {  // need to switch to FSK
+
+    //rl_state = radio_sx1262->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble_size, Vtcxo, false);
+    //use the "fast" version of begin() that skips the chip calibration:
+    rl_state = radio_sx1262->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble_size, Vtcxo, false, true);
+t1 = millis();
+    //delay(1);
+#if RADIOLIB_DEBUG_BASIC
+  if (rl_state == RADIOLIB_ERR_INVALID_BIT_RATE) {
+    Serial.println(F("[sx1262] Selected bit rate is invalid for this module!"));
+    return;
+  } else if (rl_state == RADIOLIB_ERR_INVALID_FREQUENCY_DEVIATION) {
+    Serial.println(F("[sx1262] Selected frequency deviation is invalid for this module!"));
+    return;
+  } else if (rl_state != RADIOLIB_ERR_NONE) {
+    Serial.println(F("[sx1262] FSK begin() error!"));
+    return;
+  }
 #endif
 
-    size_t pkt_size = rf_protocol->payload_offset + rf_protocol->payload_size +
-                      rf_protocol->crc_size;
+    } else {    // already set up for FSK, don't call beginFSK()
 
-    switch (rf_protocol->whitening)
-    {
-    case RF_WHITENING_MANCHESTER:
-      pkt_size += pkt_size;
-      break;
-    //case RF_WHITENING_PN9:
-    //case RF_WHITENING_NONE:
-    //case RF_WHITENING_NICERF:
-    default:
-      break;
-    }
+        // frequency was set by set_protocol_for_slot() calling RF_chip_channel()
+        // but call again to be sure?
+        //rl_state = radio_sx1262->setFrequency(cur_freq);
 
-    rl_state = radio_sx1262->setWhitening(false);
+        // may have switched to a different protocol within FSK, so set these:
+        rl_state = radio_sx1262->setBitRate(br);
+        rl_state = radio_sx1262->setFrequencyDeviation(fdev);
+        rl_state = radio_sx1262->setRxBandwidth(bw);
+        rl_state = radio_sx1262->setPreambleLength(preamble_size);
+        rl_state = radio_sx1262->setOutputPower(tx_power);  // may differ between protocols
 
-    rl_state = radio_sx1262->fixedPacketLengthMode(pkt_size);
+    }   // end of if(prev_lora)
 
     uint8_t *syncword = (uint8_t *) rf_protocol->syncword;
     uint8_t syncword_size = rf_protocol->syncword_size;
@@ -757,66 +849,132 @@ static void sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
                            syncword[0],
                            syncword[1]
                          };
-      rl_state = radio_sx1262->setSyncWord(sword, 4);
+      rl_state = radio_sx1262->setSyncWord(sword,  (size_t) 4);
     } else {
       rl_state = radio_sx1262->setSyncWord((uint8_t *) syncword, (size_t) syncword_size);
     }
+
+    rl_state = radio_sx1262->setEncoding((uint8_t) 0);   // NRZ - only software Manchester on sx1262
+   // rl_state = radio_sx1262->setEncoding(RADIOLIB_ENCODING_NRZ)
+    //rl_state = radio_sx1262->setWhitening(false);   // equivalent
+
+    rl_state = radio_sx1262->fixedPacketLengthMode(pkt_size);
+
+    if (rf_protocol->type == RF_PROTOCOL_P3I)
+        radio_sx1262->setDataShaping(RADIOLIB_SHAPING_1_0);
+    else // if (rf_protocol->type == RF_PROTOCOL_ADSL)
+        radio_sx1262->setDataShaping(RADIOLIB_SHAPING_0_5);
+
+    rl_state = radio_sx1262->setCRC(0,0);  // CRC done in software
+
+t2 = millis();
+if (settings->debug_flags & DEBUG_DEEPER2)
+Serial.printf("begin(FSK) %d ms, rest %d ms\r\n", t1-t0, t2-t1);
+
     break;
   }             // end switch (rf_protocol->modulation_type) 
 
   /* setRfSwitchTable(); */
 
-  radio_sx1262->setOutputPower(tx_power);
+  rl_state = radio_sx1262->setRxBoostedGainMode(true,false);
+#if RADIOLIB_DEBUG_BASIC
+  if (rl_state != RADIOLIB_ERR_NONE)
+    Serial.println(F("[sx1262] setRxBoostedGainMode() error!"));
+#endif
 
-  rl_state = radio_sx1262->setRxBoostedGainMode(true);
+  prev_lora = (rf_protocol->type == RF_PROTOCOL_FANET);
 
   radio_sx1262->setPacketReceivedAction(receive_handler);
 }
 
 static uint8_t sx1262_receive(uint8_t *packet)
 {
-  if (settings->power_save & POWER_SAVE_NORECEIVE) {
-    return 0;
-  }
-
   int rl_state;
 
   if (!receive_active) {
     sx1262_setup(curr_rx_protocol_ptr, false);
     receive_complete = false;
     rl_state = radio_sx1262->startReceive();
-    if (rl_state == RADIOLIB_ERR_NONE)
-        receive_active = true;
+    if (rl_state != RADIOLIB_ERR_NONE) {
+        Serial.println("sx1262 startReceive() error");
+        return 0;
+    }
+    receive_active = true;
+/*
+    rssi_timer = millis();
+    rssi_period = ((curr_rx_protocol_ptr->air_time + 1) >> 1);
+    rssi_sample = 0;
+*/
+    return 0;
+  } else if (!receive_complete) {
+/*
+    if (curr_rx_protocol_ptr->modulation_type != RF_MODULATION_TYPE_LORA
+               && millis() >= rssi_timer + rssi_period) {
+        rssi_sample = radio_sx1262->getRSSIint();
+        rssi_timer = millis();
+    }
+*/
+    return 0;
   }
 
-  if (receive_complete == false)
-      return 0;
+  // a packet has arrived!
 
   receive_complete = false;
   receive_active = false;
   receive_cb_count++;
+/*
+  if (rssi_sample != 0 && millis() <= rssi_timer + rssi_period)  // sample was taken recently enough
+      RF_last_rssi = rssi_sample;
+*/
 
-  uint8_t length = radio_sx1262->getPacketLength();
+/*
+  uint8_t length = radio_sx1262->getPacketLength();   // value is always 255 for FSK
   if (length == 0) {
       (void) radio_sx1262->finishReceive();
+      //(void) radio_sx1262->standby();
+Serial.println("sx1262 rx 0 bytes");
       return 0;
   }
+*/
 
-  if (length > RADIOLIB_MAX_DATA_LENGTH)
-      length = RADIOLIB_MAX_DATA_LENGTH;
-  rl_state = radio_sx1262->readData(packet, length);
-  (void) radio_sx1262->finishReceive();
-  if (rl_state != RADIOLIB_ERR_NONE)
+  //if (length > RADIOLIB_MAX_DATA_LENGTH)
+  //    length = RADIOLIB_MAX_DATA_LENGTH;
+  //RF_last_rssi = radio_sx1262->getRSSI(true);  // this function is of type float
+  RF_last_rssi = radio_sx1262->getRSSIint();
+/*
+  if (curr_rx_protocol_ptr->modulation_type == RF_MODULATION_TYPE_LORA) {
+      RF_last_rssi = radio_sx1262->getRSSIint();
+  } else {
+      int8_t pkt_rssi = radio_sx1262->getRSSIint();
+      if (pkt_rssi != RF_last_rssi)
+          Serial.printf("[sx1262] pkt_rssi %d != RF_last_rssi %d\r\n", pkt_rssi, RF_last_rssi);
+  }
+*/
+  //rl_state = radio_sx1262->readData(packet, length);
+  rl_state = radio_sx1262->readData(packet, pkt_size);   // calls clearIrqStatus()
+  //(void) radio_sx1262->finishReceive();   // does a standby() and clearIrqStatus()
+  (void) radio_sx1262->standby();
+  if (rl_state != RADIOLIB_ERR_NONE) {
+Serial.println("sx1262 rx readData() error");
       return 0;
-  RF_last_rssi = radio_sx1262->getRSSI(true);
-  return length;
+  }
+#if RADIOLIB_DEBUG_BASIC
+  Serial.print(F("rcvd "));
+  Serial.print(pkt_size);
+  Serial.print(F(" bytes, getRSSI(): "));
+  Serial.println(RF_last_rssi);
+#endif
+  return pkt_size;
 }
 
 static int16_t sx1262_transmit(uint8_t *packet, uint8_t length)
 {
-  sx1262_setup(curr_tx_protocol_ptr, true);
+  sx1262_setup(curr_tx_protocol_ptr, true);  // does finishReceive() & standby()
 
-  int rl_state = radio_sx1262->transmit(packet, (size_t) length);
+  uint16_t rl_state = radio_sx1262->transmit(packet, (size_t) length);
+                    // , (uint8_t) 0, (uint8_t) curr_tx_protocol_ptr->air_time);
+  // use mb: later use modified SX1262::transmit() to accept known air_time
+  //   (save the CPU time computing the air time again for each transmit)
 
   return (rl_state);
 }
@@ -828,7 +986,7 @@ static void sx1262_shutdown()
   RadioSPI.end();
 }
 
-#endif /* EXCLUDE_SX12XX */
+#endif // sx1262
 
 /******************************************************/
 
@@ -1060,6 +1218,7 @@ bool lr1110_probe()
     break;
 
   case SOFTRF_MODEL_POCKET:
+    // Elecrow Thinknode M3
     Vtcxo = 3.3;
     break;
 
@@ -1073,11 +1232,12 @@ bool lr1110_probe()
   uint32_t busy = (lmic_pins.busy   == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.busy;
   mod = new Module(lmic_pins.nss, irq, lmic_pins.rst, busy, RadioSPI);
   radio_lr11xx = new LR1110(mod);
-  int state = radio_lr11xx->beginGFSK(4.8, 5.0, 156.2, 16, Vtcxo);
+  float freq = 0.000001f * (float) RF_FreqPlan.getChanFrequency(0);
+  int state = radio_lr11xx->beginGFSK(freq, 4.8, 5.0, 156.2, 10, 16, Vtcxo);
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("Found LR1110"));
   } else {
-    Serial.print(F("did not find LR1110"));
+    Serial.println(F("did not find LR1110"));
     delete radio_lr11xx;
     delete mod;
     return false;
@@ -1102,11 +1262,12 @@ bool lr1121_probe()
     Vtcxo = 1.6;
     break;
   }
-  int state = radio_lr11xx->beginGFSK(4.8, 5.0, 156.2, 16, Vtcxo);
+  float freq = 0.000001f * (float) RF_FreqPlan.getChanFrequency(0);
+  int state = radio_lr11xx->beginGFSK(freq, 4.8, 5.0, 156.2, 10, 16, Vtcxo);
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("Found LR1121"));
   } else {
-    Serial.print(F("did not find LR1121"));
+    Serial.println(F("did not find LR1121"));
     delete radio_lr11xx;
     delete mod;
     return false;
@@ -1201,9 +1362,9 @@ static void lr11xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_125KHZ:
       bw = high ? 406.25f  : 250.0f; /* BW_250 */
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = high ? 203.125f : 125.0f; /* BW_125 */
-      break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = high ? 203.125f : 125.0f; /* BW_125 */
+    //  break;
     case RF_RX_BANDWIDTH_SS_250KHZ:
       bw = high ? 812.5f   : 500.0f; /* BW_500 */
       break;
@@ -1303,12 +1464,12 @@ static void lr11xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_125KHZ:
       bw = 234.3f;
       break;
-    case RF_RX_BANDWIDTH_SS_50KHZ:
-      bw = 117.3f;
-      break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 156.2f;
-      break;
+    //case RF_RX_BANDWIDTH_SS_50KHZ:
+    //  bw = 117.3f;
+    //  break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 156.2f;
+    //  break;
     case RF_RX_BANDWIDTH_SS_100KHZ:
       bw = 234.3f;
       break;
@@ -1443,10 +1604,6 @@ static void lr11xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
 static uint8_t lr11xx_receive(uint8_t *packet)
 {
-  if (settings->power_save & POWER_SAVE_NORECEIVE) {
-    return 0;
-  }
-
   int rl_state;
 
   if (!receive_active) {
@@ -1576,11 +1733,12 @@ static bool lr2021_probe()
   uint32_t busy = (lmic_pins.busy   == LMIC_UNUSED_PIN) ? RADIOLIB_NC : lmic_pins.busy;
   mod = new Module(lmic_pins.nss, irq, lmic_pins.rst, busy, RadioSPI);
   radio_lr20xx = new LR2021(mod);
-  int state = radio_lr20xx->beginGFSK(434.0f, 4.8f, 5.0f, 153.8f, 10, 16, Vtcxo);
+  float freq = 0.000001f * (float) RF_FreqPlan.getChanFrequency(0);
+  int state = radio_lr20xx->beginGFSK(freq, 4.8f, 5.0f, 153.8f, 10, 16, Vtcxo);
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("Found LR2021"));
   } else {
-    Serial.print(F("did not find LR2021"));
+    Serial.println(F("did not find LR2021"));
     delete radio_lr20xx;
     delete mod;
     return false;
@@ -1648,9 +1806,9 @@ static void lr20xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_125KHZ:
       bw = high ? 406.0f : 250.0f; /* BW_250 */
       break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = high ? 203.0f : 125.0f; /* BW_125 */
-      break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = high ? 203.0f : 125.0f; /* BW_125 */
+    //  break;
     case RF_RX_BANDWIDTH_SS_250KHZ:
       bw = high ? 812.0f : 500.0f; /* BW_500 */
       break;
@@ -1912,12 +2070,12 @@ static void lr20xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
     case RF_RX_BANDWIDTH_SS_125KHZ:
       bw = 307.7f;
       break;
-    case RF_RX_BANDWIDTH_SS_50KHZ:
-      bw = 119.0f;
-      break;
-    case RF_RX_BANDWIDTH_SS_62KHZ:
-      bw = 153.8f;
-      break;
+    //case RF_RX_BANDWIDTH_SS_50KHZ:
+    //  bw = 119.0f;
+    //  break;
+    //case RF_RX_BANDWIDTH_SS_62KHZ:
+    //  bw = 153.8f;
+    //  break;
     case RF_RX_BANDWIDTH_SS_100KHZ:
       bw = 238.1f;
       break;
@@ -2017,10 +2175,6 @@ static void lr20xx_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
 static uint8_t lr20xx_receive(uint8_t *packet)
 {
-  if (settings->power_save & POWER_SAVE_NORECEIVE) {
-    return 0;
-  }
-
   int rl_state;
 
   if (!receive_active) {
@@ -2117,7 +2271,6 @@ bool rf_chips_probe()
     if (rf_chip && rf_chip->name) {
       Serial.print(rf_chip->name);
       Serial.println(F(" RFIC is detected."));
-      tx_power = calc_txpower();
       //rf_chip->setup();
       return true;
     }

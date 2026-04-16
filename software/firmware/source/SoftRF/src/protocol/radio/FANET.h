@@ -109,7 +109,7 @@ typedef struct {
 #endif
 } __attribute__((packed)) fanet_packet_t;
 
-#define FANET_PAYLOAD_SIZE    sizeof(fanet_packet_t)
+#define FANET_PAYLOAD_SIZE    sizeof(fanet_packet_t)  // 16
 #define FANET_HEADER_SIZE     4
 
 #define FANET_AIR_TIME        36   /* in ms */

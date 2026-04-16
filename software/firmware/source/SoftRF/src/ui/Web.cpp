@@ -696,8 +696,8 @@ void handleSettings() {
      RF_PROTOCOL_LATEST, "Latest",
     (settings->rf_protocol == RF_PROTOCOL_OGNTP ? "selected" : ""),
      RF_PROTOCOL_OGNTP, ogntp_proto_desc.name,
-    (settings->rf_protocol == RF_PROTOCOL_P3I ? "selected" : ""),
-     RF_PROTOCOL_P3I, p3i_proto_desc.name,
+    (settings->rf_protocol == RF_PROTOCOL_PAW ? "selected" : ""),
+     RF_PROTOCOL_P3I, paw_proto_desc.name,
     (settings->rf_protocol == RF_PROTOCOL_FANET ? "selected" : ""),
      RF_PROTOCOL_FANET, fanet_proto_desc.name,
     (settings->rf_protocol == RF_PROTOCOL_ADSL ? "selected" : ""),
@@ -742,7 +742,7 @@ void handleSettings() {
 <option %s value='%d'>IN (866 MHz)</option>\
 <option %s value='%d'>KR (920.9 MHz)</option>\
 <option %s value='%d'>IL (916.2 MHz)</option>\
-<option %s value='%d'>UK P3I (869.52)</option>\
+<option %s value='%d'>PAW (869.52)</option>\
 </select>\
 </td>\
 </tr>\
@@ -1160,11 +1160,11 @@ void handleAdvStgs() {
       char buf[64];
       if (stgdesc[i].type == STG_VOID)
           continue;
-      if (stgdesc[i].type == STG_HIDDEN)   // only accessible via editing the file
+      if (hidden_setting(i))     // only accessible via editing the file
           continue;
       if (format_setting(i, false, false, buf, 64) == false)
           continue;
-      const char *w = stgdesc[i].label;
+      const char *w = &stgdesc[i].label[2];
       int comma = strlen(w);
       const char *v = &buf[comma+1];
       if (buf[comma] != ',')  // should not happen
@@ -1487,7 +1487,7 @@ void handleRoot() {
 void handleInput() {
   Serial.println(F("Settings from web page:"));
   for ( uint8_t i = 0; i < server.args(); i++ ) {
-    if (server.argName(i).equals(stgdesc[STG_PSK].label)) {
+    if (server.argName(i).equals(&stgdesc[STG_PSK].label[2])) {
         if (! server.arg(i).equals("********")) {
             strncpy(settings->psk, server.arg(i).c_str(), sizeof(settings->psk)-1);
             settings->psk[sizeof(settings->psk)-1] = '\0';
@@ -1518,7 +1518,7 @@ void handleInput() {
         Serial.print(",");
         Serial.print(q);
         int i = find_setting(p);
-        if (i == STG_NONE)
+        if (i == STG_END)
             Serial.print("  - no matching label");
         if (load_setting(i,q) == false)
             Serial.print("  - error");

@@ -25,7 +25,7 @@ enum
 {
 	RF_PROTOCOL_NONE      = 0,
 	RF_PROTOCOL_OGNTP     = 1,    /* Open Glider Network tracker */
-	RF_PROTOCOL_P3I       = 2,    /* PilotAware */
+	RF_PROTOCOL_P3I       = 2,    /* PilotAware = ADS-L LDR O-Band */
 	RF_PROTOCOL_ADSB_1090 = 3,    /* ADS-B 1090ES */
 	RF_PROTOCOL_ADSB_UAT  = 4,    /* ADS-B UAT */
 	RF_PROTOCOL_FANET     = 5,    /* Skytraxx */
@@ -34,6 +34,8 @@ enum
 	RF_PROTOCOL_ADSL      = 8,    /* ADS-L on OGNTP frequency */
 	RF_PROTOCOL_GDL90     = 9     /* from external device */
 };
+
+#define RF_PROTOCOL_PAW RF_PROTOCOL_P3I
 
 enum
 {
@@ -101,6 +103,7 @@ enum
 
 enum
 {
+	RF_RX_BANDWIDTH_SS_25KHZ,
 	RF_RX_BANDWIDTH_SS_50KHZ,
 	RF_RX_BANDWIDTH_SS_62KHZ,
 	RF_RX_BANDWIDTH_SS_100KHZ,

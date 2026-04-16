@@ -858,7 +858,8 @@ void bridge()
 
   if(success)
   {
-    size_t rx_size = RF_Payload_Size(settings->rf_protocol);
+    //size_t rx_size = RF_Payload_Size(settings->rf_protocol);
+    size_t rx_size = curr_rx_protocol_ptr->payload_size;
     rx_size = rx_size > sizeof(fo_raw) ? sizeof(fo_raw) : rx_size;
 
     memset(fo_raw, 0, sizeof(fo_raw));
@@ -889,7 +890,8 @@ void watchout()
   success = RF_Receive();
 
   if (success) {
-    size_t rx_size = RF_Payload_Size(settings->rf_protocol);
+    //size_t rx_size = RF_Payload_Size(settings->rf_protocol);
+    size_t rx_size = curr_rx_protocol_ptr->payload_size;
     rx_size = rx_size > sizeof(fo_raw) ? sizeof(fo_raw) : rx_size;
 
     memset(fo_raw, 0, sizeof(fo_raw));

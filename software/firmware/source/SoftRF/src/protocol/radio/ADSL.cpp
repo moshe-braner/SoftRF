@@ -47,10 +47,10 @@ const rf_proto_desc_t adsl_proto_desc = {
   .syncword_skip   = ADSL_SYNCWORD_SKIP,
   .net_id          = 0x0000, /* not in use */
   .payload_type    = RF_PAYLOAD_INVERTED,
-  .payload_size    = ADSL_PAYLOAD_SIZE,
+  .payload_size    = ADSL_PAYLOAD_SIZE + ADSL_CRC_SIZE,
   .payload_offset  = 0,
   .crc_type        = ADSL_CRC_TYPE,
-  .crc_size        = ADSL_CRC_SIZE,
+  .crc_size        = 0,   // ADSL_CRC_SIZE included within payload_size
 
   .bitrate         = RF_BITRATE_100KBPS,
   .deviation       = RF_FREQUENCY_DEVIATION_50KHZ,
@@ -70,9 +70,9 @@ const rf_proto_desc_t adsl_proto_desc = {
   .slot1           = {800, 1200}
 };
 
-static GPS_Position pos;
-static ADSL_Packet  r __attribute__((aligned(sizeof(uint32_t)))); /* Rx */
-static ADSL_Packet  t __attribute__((aligned(sizeof(uint32_t)))); /* Tx */
+GPS_Position pos;
+ADSL_Packet  adsl_r __attribute__((aligned(sizeof(uint32_t)))); /* Rx */
+ADSL_Packet  adsl_t __attribute__((aligned(sizeof(uint32_t)))); /* Tx */
 
 void adsl_init()
 {
@@ -88,22 +88,22 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
 
   uint8_t *ptr = (uint8_t *) pkt;
 
-  r.Init();
-  r.Version = *ptr;
+  adsl_r.Init();
+  adsl_r.Version = *ptr;
   ptr += sizeof(ADSL_Packet::Version);
 
   for (int Idx=0; Idx<5; Idx++) {
-    r.Word[Idx] = r.get4bytes(ptr + Idx * sizeof(r.Word[0]));
+    adsl_r.Word[Idx] = adsl_r.get4bytes(ptr + Idx * sizeof(adsl_r.Word[0]));
   }
 
-  r.Descramble();
+  adsl_r.Descramble();
 
-  if (r.Type != 0x02)   // not iConspicuity
+  if (adsl_r.Type != 0x02)   // not iConspicuity
       return false;
 
   fop->protocol  = RF_PROTOCOL_ADSL;
 
-  fop->addr      = r.getAddress();
+  fop->addr      = adsl_r.getAddress();
 
   if (fop->addr == settings->ignore_id)
       return false;                  /* ID told in settings to ignore */
@@ -138,25 +138,25 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   }
   fop->last_crc = RF_last_crc;
 
-  fop->latitude  = r.FNTtoFloat(r.getLat());
-  fop->longitude = r.FNTtoFloat(r.getLon());
-  fop->altitude  = (float) r.getAlt();
+  fop->latitude  = adsl_r.FNTtoFloat(adsl_r.getLat());
+  fop->longitude = adsl_r.FNTtoFloat(adsl_r.getLon());
+  fop->altitude  = (float) adsl_r.getAlt();
   fop->pressure_altitude = 0; /* TBD */
-  fop->aircraft_type = r.getAcftTypeOGN();
-  fop->course    = (45.0/0x40) * r.getTrack();
-  fop->speed     = (0.25/ _GPS_MPS_PER_KNOT) * r.getSpeed();
-  fop->vs        = (0.125 * _GPS_FEET_PER_METER * 60.0) * r.getClimb();
-  fop->hdop      = r.getHorAccur();
+  fop->aircraft_type = adsl_r.getAcftTypeOGN();
+  fop->course    = (45.0/0x40) * adsl_r.getTrack();
+  fop->speed     = (0.25/ _GPS_MPS_PER_KNOT) * adsl_r.getSpeed();
+  fop->vs        = (0.125 * _GPS_FEET_PER_METER * 60.0) * adsl_r.getClimb();
+  fop->hdop      = adsl_r.getHorAccur();
 
-  fop->addr_type = r.getAddrTypeOGN();
+  fop->addr_type = adsl_r.getAddrTypeOGN();
   fop->timestamp = (uint32_t) RF_time;      // this_aircraft->timestamp;
   fop->gnsstime_ms = millis();
 
-  fop->airborne = (r.FlightState != 1);    // >>> ads-l.h lacks a method to read the "flight state" field?
+  fop->airborne = (adsl_r.FlightState != 1);    // >>> ads-l.h lacks a method to read the "flight state" field?
 
   fop->stealth   = 0;
   fop->no_track  = 0;
-  fop->relayed   = r.getRelay();
+  fop->relayed   = adsl_r.getRelay();
 
   return true;
 }
@@ -183,15 +183,15 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
   pos.Sec     = second;
   pos.FracSec = 0;    // gnss.time.centisecond() is empty
 
-  t.Init();   // this implicitly sets the "type" to 0x02 i.e. iConspicuity
+  adsl_t.Init();   // this implicitly sets the "type" to 0x02 i.e. iConspicuity
 
-  t.setAddress(aircraft->addr);
+  adsl_t.setAddress(aircraft->addr);
 
   uint8_t aircraft_type = aircraft->aircraft_type;
 
   if (aircraft != &ThisAircraft) {   // relaying another aircraft
-      t.setAddrTypeOGN(aircraft->addr_type);
-      t.setRelay(1);
+      adsl_t.setAddrTypeOGN(aircraft->addr_type);
+      adsl_t.setRelay(1);
   } else {
       // if not airborne, transmit only once in 8 seconds
       if (ThisAircraft.airborne == 0 && ThisAircraft.timestamp < ThisAircraft.positiontime + 8 && (! test_mode))
@@ -200,26 +200,26 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
       uint8_t addr_type = settings->id_method;
       if (addr_type == ADDR_TYPE_FANET || addr_type == ADDR_TYPE_OVERRIDE)
           addr_type = ADDR_TYPE_FLARM;
-      t.setAddrTypeOGN(addr_type);
-      t.setRelay(0);
+      adsl_t.setAddrTypeOGN(addr_type);
+      adsl_t.setRelay(0);
       if (landed_out_mode)
           aircraft_type = AIRCRAFT_TYPE_UNKNOWN;        // mark this aircraft as landed-out
   }
 
   if (aircraft_type == AIRCRAFT_TYPE_WINCH) {
       aircraft_type = AIRCRAFT_TYPE_STATIC;
-      t.FlightState = 2;   // pretend to be airborne (with variable altitude)
+      adsl_t.FlightState = 2;   // pretend to be airborne (with variable altitude)
   } else {
-      t.FlightState = (aircraft->airborne? 2 : 1);   // >>> t.Meta.FlightState ?
+      adsl_t.FlightState = (aircraft->airborne? 2 : 1);   // >>> adsl_t.Meta.FlightState ?
   }
 
-  t.setAcftTypeOGN((int16_t) aircraft_type);
+  adsl_t.setAcftTypeOGN((int16_t) aircraft_type);
 
-  pos.Encode(t);
-  t.Scramble();
-  t.setCRC();
+  pos.Encode(adsl_t);
+  adsl_t.Scramble();
+  adsl_t.setCRC();
 
-  memcpy((void *) pkt, &t.Version, t.Length);
+  memcpy((void *) pkt, &adsl_t.Version, adsl_t.Length);
 
-  return (t.Length);
+  return (adsl_t.Length);
 }

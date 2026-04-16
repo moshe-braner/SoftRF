@@ -50,6 +50,11 @@ class FreqPlan
         { ChanSepar=400000; Channels= 1; }
         switch (Plan)
         {
+          case RF_BAND_EU:
+            BaseFreq   = 868200000;
+            Bandwidth  = RF_RX_BANDWIDTH_SS_125KHZ; // BW250
+            MaxTxPower = 14;
+            break;
           case RF_BAND_US:
           case RF_BAND_AU:
           case RF_BAND_NZ: /* ISM 915-928 MHz, https://www.rsm.govt.nz/assets/Uploads/documents/pibs/table-of-radio-spectrum-usage-in-new-zealand-pib-21.pdf */
@@ -73,8 +78,9 @@ class FreqPlan
             Bandwidth  = RF_RX_BANDWIDTH_SS_62KHZ;  // BW125
             MaxTxPower = 15;
             break;
-          case RF_BAND_EU:
-          case RF_BAND_RU:
+          //case RF_BAND_EU:
+          //case RF_BAND_RU:
+          //case RF_BAND_UK:
           default:
             BaseFreq   = 868200000;
             Bandwidth  = RF_RX_BANDWIDTH_SS_125KHZ; // BW250
@@ -82,12 +88,16 @@ class FreqPlan
             break;
         }
         break;
-      case RF_PROTOCOL_LEGACY:
-      case RF_PROTOCOL_OGNTP:
-      case RF_PROTOCOL_ADSL:
+      //case RF_PROTOCOL_LEGACY:
+      //case RF_PROTOCOL_LATEST:
+      //case RF_PROTOCOL_OGNTP:
+      //case RF_PROTOCOL_ADSL:
       default:
         switch (Plan)
         {
+          case RF_BAND_EU:
+            { BaseFreq=868200000; ChanSepar=200000; Channels= 2; MaxTxPower = 14; } // Europe
+            break;
           case RF_BAND_US:
             { BaseFreq=902200000; ChanSepar=400000; Channels=65; MaxTxPower = 30; } // USA, 902-928 MHz
             break;
@@ -113,7 +123,7 @@ class FreqPlan
           case RF_BAND_KR:
             { BaseFreq=920900000; ChanSepar=200000; Channels= 1; MaxTxPower = 23; } // South Korea
             break;
-          case RF_BAND_EU:
+          //case RF_BAND_EU:
           default: /* AUTO, UK */
             { BaseFreq=868200000; ChanSepar=200000; Channels= 2; MaxTxPower = 14; } // Europe
             break;

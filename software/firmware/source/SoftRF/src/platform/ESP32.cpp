@@ -759,6 +759,7 @@ static void ESP32_setup()
     lmic_pins.busy = SOC_GPIO_PIN_TBEAM_RF_BUSY_V08;
 
     lmic_pins.dio[0] = SOC_GPIO_PIN_DIO0;
+    lmic_pins.dio[1] = SOC_GPIO_PIN_TBEAM_RF_DIO1_V08;   // for sx1262
 
     /* use middle button on T-Beam v1.x to turn off transmissions in winch mode */
     if (hw_info.model == SOFTRF_MODEL_PRIME_MK2) {

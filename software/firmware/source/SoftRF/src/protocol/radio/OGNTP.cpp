@@ -40,10 +40,10 @@ const rf_proto_desc_t ogntp_proto_desc = {
   .syncword_skip   = OGNTP_SYNCWORD_SKIP,
   .net_id          = 0x0000, /* not in use */
   .payload_type    = RF_PAYLOAD_INVERTED,
-  .payload_size    = OGNTP_PAYLOAD_SIZE,
+  .payload_size    = OGNTP_PAYLOAD_SIZE + OGNTP_CRC_SIZE,
   .payload_offset  = 0,
   .crc_type        = OGNTP_CRC_TYPE,
-  .crc_size        = OGNTP_CRC_SIZE,
+  .crc_size        = 0,   // ADSL_CRC_SIZE included within payload_size
 
   .bitrate         = RF_BITRATE_100KBPS,
   .deviation       = RF_FREQUENCY_DEVIATION_50KHZ,
