@@ -307,11 +307,11 @@ uint32_t FILESYS_free_kb()
   uint32_t free_kb = FILESYS.freeClusterCount();   // clusters
 Serial.print("FATFS freeClusterCount: ");
 Serial.println(free_kb);
-  uint32_t blocks = FILESYS.blocksPerCluster();
-Serial.print("FATFS.blocksPerCluster(): ");
-Serial.println(blocks);
-  free_kb *= blocks;
-  free_kb >>= 1;          // kbytes - assumes block = 512 bytes
+  uint32_t bytes = FILESYS.bytesPerCluster();
+Serial.print("FATFS.bytesPerCluster(): ");
+Serial.println(bytes);
+  free_kb *= bytes;
+  free_kb >>= 10;          // convert bytes to kbytes
   return free_kb;
 }
 

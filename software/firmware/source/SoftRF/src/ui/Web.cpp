@@ -389,8 +389,10 @@ void settingsupload()
 
 void settingsbackup()
 {
+    if (! SPIFFS_is_mounted)
+        return;
     if (! SPIFFS.exists("/settings.txt"))
-        save_settings_to_file();
+        save_settings_to_file(false);
     if (! SPIFFS.exists("/settings.txt")) {
         server.send(500, textplain, "failed to write settings.txt");
         return;
@@ -398,7 +400,7 @@ void settingsbackup()
     if (SPIFFS.exists("/settingb.txt"))
         SPIFFS.remove("/settingb.txt");
     SPIFFS.rename("/settings.txt","/settingb.txt");
-    save_settings_to_file();
+    save_settings_to_file(false);
     if (! SPIFFS.exists("/settings.txt")) {     // save_settings_to_file() failed
         SPIFFS.rename("/settingb.txt","/settings.txt");
         server.send(500, textplain, "failed to make a copy of settings.txt");
@@ -439,7 +441,7 @@ void settingsswap()
         return;
     }
     if (! SPIFFS.exists("/settings.txt"))
-        save_settings_to_file();
+        save_settings_to_file(true);
     if (! SPIFFS.exists("/settings.txt")) {
         SPIFFS.rename("/settingb.txt","/settings.txt");
         settingsreboot(500, "no settings.txt and cannot create one, restored settingb.txt");
@@ -1533,7 +1535,7 @@ void handleInput() {
   if (SPIFFS.exists("/settingb.txt"))
       SPIFFS.remove("/settingb.txt");
   SPIFFS.rename("/settings.txt","/settingb.txt");
-  save_settings_to_file();   // this also shows the new settings
+  save_settings_to_file(true);   // this also shows the new settings
   if (! SPIFFS.exists("/settings.txt")) {   // saving the file failed
       SPIFFS.rename("/settingb.txt","/settings.txt");
       server.send(500, textplain, "cannot save the new settings file");

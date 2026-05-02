@@ -21,22 +21,22 @@
 
 #define isTimeToBattery()         (millis() - Battery_TimeMarker > 5000)
 
-#define BATTERY_FULL_LIPO         4.2
-#define BATTERY_FULL_LIFE         3.6
+#define BATTERY_FULL_LIPO         4.2f
+#define BATTERY_FULL_LIFE         3.6f
 
-#define BATTERY_THRESHOLD_INVALID 1.8
+#define BATTERY_THRESHOLD_INVALID 1.8f
 
-#define BATTERY_THRESHOLD_NIMHX2  2.3
-#define BATTERY_THRESHOLD_LIPO    3.5
-#define BATTERY_THRESHOLD_LIFE    3.0
-#define BATTERY_THRESHOLD_NIZNX2  3.0
-#define BATTERY_THRESHOLD_USB     4.95
+#define BATTERY_THRESHOLD_NIMHX2  2.3f
+#define BATTERY_THRESHOLD_LIPO    3.5f
+#define BATTERY_THRESHOLD_LIFE    3.0f
+#define BATTERY_THRESHOLD_NIZNX2  3.0f
+#define BATTERY_THRESHOLD_USB     4.95f
 
-#define BATTERY_CUTOFF_NIMHX2     2.1
-#define BATTERY_CUTOFF_LIPO       3.2
-#define BATTERY_CUTOFF_LIFE       2.8
-#define BATTERY_CUTOFF_NIZNX2     2.9
-#define BATTERY_CUTOFF_USB        4.9
+#define BATTERY_CUTOFF_NIMHX2     2.1f
+#define BATTERY_CUTOFF_LIPO       3.2f
+#define BATTERY_CUTOFF_LIFE       2.8f
+#define BATTERY_CUTOFF_NIZNX2     2.9f
+#define BATTERY_CUTOFF_USB        4.9f
 
 enum
 {
@@ -45,6 +45,8 @@ enum
 	POWER_SAVE_GNSS      = 2,
 	POWER_SAVE_NORECEIVE = 4
 };
+
+#define POWER_SAVE_BT POWER_SAVE_WIFI
 
 enum
 {

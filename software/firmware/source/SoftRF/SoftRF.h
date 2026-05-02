@@ -35,7 +35,7 @@
 #include <raspi/raspi.h>
 #endif /* RASPBERRY_PI */
 
-#define SOFTRF_FIRMWARE_VERSION "MB200"
+#define SOFTRF_FIRMWARE_VERSION "MB201"
 #define SOFTRF_IDENT            "SoftRF"
 #define SOFTRF_USB_FW_VERSION   0x0101
 
@@ -191,10 +191,10 @@ typedef struct CONTAINER {
     int8_t    maxrssi;
 
     /* ADS-B (ES, UAT, GDL90) specific data */
-    uint8_t   callsign[10];    /* size of mdb.callsign + 1 */
     uint32_t  positiontime;
     uint32_t  velocitytime;
     uint32_t  mode_s_time;
+    uint8_t   callsign[33];    // to fit FANET "name" field - was 10 = size of mdb.callsign + 1
 
 } container_t;
 
@@ -259,6 +259,10 @@ typedef struct hardware_info {
     byte  imu;
     byte  mag;
     byte  pmu;
+    byte  audio;
+    byte  touch;
+    byte  haptic;
+    byte  camera;
 } hardware_info_t;
 
 typedef struct IODev_ops_struct {
@@ -279,7 +283,7 @@ typedef struct DB_ops_struct {
 
 enum
 {
-	SOFTRF_MODE_NORMAL,
+	SOFTRF_MODE_NORMAL,      // 0
 	SOFTRF_MODE_WATCHOUT,
 	SOFTRF_MODE_BRIDGE,
 	SOFTRF_MODE_RELAY,
@@ -288,9 +292,11 @@ enum
 	SOFTRF_MODE_UAV,
 	SOFTRF_MODE_RECEIVER,
 	SOFTRF_MODE_CASUAL,
-	SOFTRF_MODE_GPSBRIDGE,
+	SOFTRF_MODE_GPSBRIDGE,   // 9
 	SOFTRF_MODE_MORENMEA     // obsolete
 };
+
+#define SOFTRF_MODE_EEPROM 16     // avoid flash file system
 
 enum
 {
@@ -298,6 +304,7 @@ enum
 	SOFTRF_MODEL_PRIME_MK2, // Lilygo T-Beam (not "Supreme")
 	SOFTRF_MODEL_BADGE,     // Lilygo T-Echo
 	SOFTRF_MODEL_CARD,      // Seeed Studios T1000-E
+	SOFTRF_MODEL_HANDHELD,  // Elecrow Thinknode M1
 	SOFTRF_MODEL_POCKET,    // Elecrow Thinknode M3
 // models not supported by this version of SoftRF:
 	SOFTRF_MODEL_UNKNOWN,
@@ -327,7 +334,6 @@ enum
 	SOFTRF_MODEL_INK,
 	SOFTRF_MODEL_COZY,
 	SOFTRF_MODEL_NEO,
-	SOFTRF_MODEL_HANDHELD,
 	SOFTRF_MODEL_GIZMO,
 	SOFTRF_MODEL_NANO,
 	SOFTRF_MODEL_DECENT,
@@ -343,6 +349,7 @@ enum
 {
 	SOFTRF_SHUTDOWN_NONE,
 	SOFTRF_SHUTDOWN_DEFAULT,
+	SOFTRF_SHUTDOWN_RESET,
 	SOFTRF_SHUTDOWN_DEBUG,
 	SOFTRF_SHUTDOWN_ABORT,
 	SOFTRF_SHUTDOWN_WATCHDOG,
@@ -389,6 +396,41 @@ enum
 	MAG_QMC6310N,
 	MAG_BMM150,
 };
+
+enum
+{
+	AUDIO_NONE,
+	AUDIO_PWM, /* or PDM */
+	AUDIO_MAX98357,
+	AUDIO_NS4168,
+	AUDIO_ES8311,
+};
+
+enum
+{
+	TOUCH_NONE,
+	TOUCH_FT5206,
+	TOUCH_TTP223,
+	TOUCH_FT6336,
+	TOUCH_GT911,
+	TOUCH_JD9365TG, /* HI8561 */
+	TOUCH_GT9895,
+};
+
+enum
+{
+	HAPTIC_NONE,
+	HAPTIC_DRV2605,
+	HAPTIC_AW86224,
+};
+
+enum
+{
+	CAMERA_NONE,
+	CAMERA_OV5647,
+	CAMERA_OV2710,
+};
+
 
 static inline uint32_t DevID_Mapper(uint32_t id)
 {

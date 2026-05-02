@@ -454,7 +454,7 @@ struct rst_info {
 //#define EXCLUDE_GNSS_AT65     /* 'fake Neo-6/8' on some 2018 T-Beam boards */
 #define EXCLUDE_GNSS_SONY
 #define EXCLUDE_GNSS_MTK
-
+#define EXCLUDE_GNSS_AG33
 
 #define EXCLUDE_CC13XX
 //#define EXCLUDE_SOFTRF_HEARTBEAT

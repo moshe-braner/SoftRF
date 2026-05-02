@@ -25,17 +25,16 @@ void  Buzzer_loop()        {}
 void  Buzzer_fini()        {}
 #else
 
-#if !defined(ESP32)
-void  Buzzer_setup()       {}
-bool  Buzzer_Notify(int8_t level, bool multi_alarm) {return false;}
-void  Buzzer_loop()        {}
-void  Buzzer_fini()        {}
-#else
-
 #include "Buzzer.h"
-#include "Strobe.h"
 #include "Settings.h"
+#include "Strobe.h"
+
+#if defined(ESP32)
+#include <toneAC.h>
 #include "OLED.h"
+static uint8_t buzzer1pin = SOC_UNUSED_PIN;
+static uint8_t buzzer2pin = SOC_UNUSED_PIN;
+#endif
 
 /* need this for the alarm levels enum: */
 #include "../protocol/radio/Legacy.h"
@@ -51,21 +50,11 @@ static bool double_beep = false;
 static uint16_t BuzzerToneHz = 0;    /* variable tone */
 static uint16_t BuzzerBeepMS = 0;    /* how long each beep */
 
-#include <toneAC.h>
-
-static uint8_t buzzer1pin = SOC_UNUSED_PIN;
-static uint8_t buzzer2pin = SOC_UNUSED_PIN;
-
 void ext_buzzer(bool state)
 {
+#if defined(ESP32)
   if (buzzer1pin != SOC_UNUSED_PIN)
       digitalWrite(buzzer1pin, state? HIGH : LOW);
-#if 0
-if (state)
-Serial.print("buzzer on  at ");
-else
-Serial.print("buzzer off at ");
-Serial.println(millis());
 #endif
 }
 
@@ -76,6 +65,7 @@ void Buzzer_setup(void)
   if (settings->volume == BUZZER_OFF)
       return;
 
+#if defined(ESP32)
   buzzer1pin = SOC_GPIO_PIN_BUZZER;
   if (buzzer1pin == SOC_UNUSED_PIN) {
       settings->volume = BUZZER_OFF;
@@ -118,8 +108,11 @@ void Buzzer_setup(void)
           return;
       }
       toneAC_setup(buzzer2pin, buzzer1pin);
-      volume = (settings->volume == BUZZER_VOLUME_LOW ? 8 : 10);
   }
+#endif
+  // for nRF52 the buzzer pin is chosen in nRF52.cpp nrf52_setup()
+
+  volume = (settings->volume == BUZZER_VOLUME_LOW ? 8 : 10);
   BuzzerToneHz = 0;
   BuzzerBeepMS = 0;
   BuzzerBeeps = 0;
@@ -175,8 +168,8 @@ bool Buzzer_Notify(int8_t alarm_level, bool multi_alarm)
   if (settings->volume == BUZZER_EXT) {
     ext_buzzer(true);
   } else {
-    int duration = 0;           // forever, until turned off
-    bool background = true;    // return to main thread while sounding tone
+    unsigned long duration = 0;  // forever, until turned off
+    uint8_t background = 1;       // return to main thread while sounding tone
     toneAC(BuzzerToneHz, volume, duration, background);
   }
   BuzzerState = 1;
@@ -217,7 +210,7 @@ void Buzzer_loop(void)
         if (settings->volume == BUZZER_EXT)
           ext_buzzer(true);
         else
-          toneAC(BuzzerToneHz, volume, 0, true);
+          toneAC(BuzzerToneHz, volume, 0, 1);
         BuzzerState = 1;
         --BuzzerBeeps;
         ++BuzzerBeep;
@@ -259,7 +252,9 @@ void Buzzer_loop(void)
                multalarm = true;
           Buzzer_Notify(level, multalarm);
       } else {
+#if defined(USE_OLED)
           OLED_no_msg();
+#endif
           do_alarm_demo = false;
       }
   }
@@ -267,15 +262,19 @@ void Buzzer_loop(void)
 
 void Buzzer_fini(void)
 {
-  if (settings->volume == BUZZER_OFF)
-      return;
-  if (settings->volume == BUZZER_EXT)
-    ext_buzzer(false);
-  else
-    noToneAC();
   BuzzerTimeMarker = 0;
-}
 
-#endif  /* ESP32 */
+  /* if (settings->volume == BUZZER_OFF)
+      return;  */
+
+  if (settings->volume == BUZZER_EXT) {
+      ext_buzzer(false);
+      return;
+  }
+
+  // play descending tones to signal shutdown
+  toneAC(640, volume, 250, 0);
+  toneAC(440, volume, 250, 0);
+}
 
 #endif  /* EXCLUDE_BUZZER */

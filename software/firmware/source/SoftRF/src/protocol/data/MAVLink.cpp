@@ -15,13 +15,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "../../system/SoC.h"
  
 #if !defined(EXCLUDE_MAVLINK)
 
 #include <TimeLib.h>
 #include <TinyGPS++.h>
 
-#include "../../system/SoC.h"
 #include "../../system/Time.h"
 #include "MAVLink.h"
 #include "GDL90.h"

@@ -55,7 +55,7 @@ void closeNMEAlog();
 void NMEA_fini();
 void NMEA_Export(void);
 void NMEA_Position(void);
-void NMEA_Out(uint8_t, const char *, size_t, bool);
+void NMEA_Out(uint8_t dest, const char *buf, size_t size, bool nl, bool pause=false);
 void NMEA_Outs(uint16_t, const char *, unsigned int, bool);
 void NMEAOutC(int nmeatype);   // with checksum
 void NMEAOutD(void);           // without checksum

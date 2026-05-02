@@ -1442,10 +1442,15 @@ void nRF52_Bluetooth_setup()
       BT_name += String(SoC->getChipId() & 0x00FFFFFFU, HEX);
   }
 
+#if 0
   // Setup the BLE LED to be enabled on CONNECT
   // Note: This is actually the default behavior, but provided
   // here in case you want to control this LED manually via PIN 19
-  Bluefruit.autoConnLed(LED_BLUE == SOC_GPIO_LED_BLE ? true : false);
+  if (hw_info.model == SOFTRF_MODEL_BADGE)
+      Bluefruit.autoConnLed(LED_BLUE == SOC_GPIO_LED_BLE ? true : false);
+  else
+#endif
+      Bluefruit.autoConnLed(false);
 
   // Config the peripheral connection with maximum bandwidth
   // more SRAM required by SoftDevice
@@ -1509,34 +1514,6 @@ void nRF52_Bluetooth_setup()
  End of Adafruit licensed text
 *********************************************************************/
 
-static void nRF52_Bluetooth_loop()
-{
-  // notify changed value
-  // bluetooth stack will go into congestion, if too many packets are sent
-  if ( Bluefruit.connected()              &&
-       bleuart_HM10.notifyEnabled()       &&
-       (millis() - BLE_Notify_TimeMarker > 10)) { /* < 18000 baud */
-    bleuart_HM10.flushTXD();
-
-    BLE_Notify_TimeMarker = millis();
-  }
-
-#if defined(BLE_SENSORS)
-  if (isTimeToBattery()) {
-    blebas.write(Battery_charge());
-  }
-
-  if (Bluefruit.connected() && isTimeToSensBox()) {
-    uint8_t sens_status = isValidFix() ? GNSS_STATUS_3D_MOVING : GNSS_STATUS_NONE;
-    blesens.notify_nav (sens_status);
-    blesens.notify_move(sens_status);
-    blesens.notify_gps2(sens_status);
-    blesens.notify_sys (sens_status);
-    BLE_SensBox_TimeMarker = millis();
-  }
-#endif
-}
-
 static void nRF52_Bluetooth_fini()
 {
   BTactive = false;   // until next reboot
@@ -1586,6 +1563,57 @@ static int nRF52_Bluetooth_available()
 
   return rval;
 }
+
+
+#define POWER_SAVING_BT_CHECK    60000UL /* 1 minute */
+#define POWER_SAVING_BT_TIMEOUT 600000UL /* 10 minutes */
+
+static uint32_t BT_Active_Time_ms = 0;
+
+static void nRF52_Bluetooth_loop()
+{
+  if (! BTactive)
+      return;
+
+  if (settings->power_save & POWER_SAVE_BT) {
+
+      if ((millis() - BT_Active_Time_ms) > POWER_SAVING_BT_CHECK) {
+          if (Bluefruit.connected())
+              BT_Active_Time_ms = millis();
+      }
+      if ((millis() - BT_Active_Time_ms) > POWER_SAVING_BT_TIMEOUT) {
+          nRF52_Bluetooth_fini();
+          Serial.println(F("$PSRFS,BT_OFF"));
+          return;
+      }
+  }
+
+  // notify changed value
+  // bluetooth stack will go into congestion, if too many packets are sent
+  if ( Bluefruit.connected()              &&
+       bleuart_HM10.notifyEnabled()       &&
+       (millis() - BLE_Notify_TimeMarker > 10)) { /* < 18000 baud */
+    bleuart_HM10.flushTXD();
+
+    BLE_Notify_TimeMarker = millis();
+  }
+
+#if defined(BLE_SENSORS)
+  if (isTimeToBattery()) {
+    blebas.write(Battery_charge());
+  }
+
+  if (Bluefruit.connected() && isTimeToSensBox()) {
+    uint8_t sens_status = isValidFix() ? GNSS_STATUS_3D_MOVING : GNSS_STATUS_NONE;
+    blesens.notify_nav (sens_status);
+    blesens.notify_move(sens_status);
+    blesens.notify_gps2(sens_status);
+    blesens.notify_sys (sens_status);
+    BLE_SensBox_TimeMarker = millis();
+  }
+#endif
+}
+
 
 static int nRF52_Bluetooth_read()
 {

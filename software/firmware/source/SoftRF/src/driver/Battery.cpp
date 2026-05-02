@@ -39,6 +39,8 @@ void Battery_setup()
 
 float Battery_voltage()
 {
+  if (Battery_voltage_cache < SoC->Battery_param(BATTERY_PARAM_CUTOFF))
+      Battery_voltage_cache = SoC->Battery_param(BATTERY_PARAM_VOLTAGE);
   return Battery_voltage_cache;
 }
 
@@ -60,10 +62,9 @@ uint8_t Battery_charge() {
 }
 
 /*
- * When set to run on external power but with a battery installed, allow running
- * on the battery as long as still airborne.  Shut down after at least an hour
- * of operation, once external power is turned off, and battery voltage is
- * somewhat down.  For now only implemented for T-Beam (and partially for T-Echo).
+ * When set to run on external power but with a battery installed, allow running on the
+ * battery as long as still airborne.  Shut down after at least an hour of operation,
+ * once external power is turned off, and battery voltage is somewhat down.
  */
 static bool had_ext_power = false;
 static bool follow_ext_power_shutoff(float voltage)
@@ -74,9 +75,11 @@ static bool follow_ext_power_shutoff(float voltage)
 //      return false;
 #if defined(ESP32)
     if (ESP32_onExternalPower())
+#elif defined(ARDUINO_ARCH_NRF52)  || defined(ARDUINO_ARCH_NRF52840)
+    if (nRF52_onExternalPower())
 #else
-    if (voltage >= 4.1)
-    // not great since after full charge it might be >4.1 witout ext power
+    if (voltage >= 4.1f)
+    // not great since after full charge it might be >4.1 without ext power
     // - but if settings->power_ext is off then no problem
 #endif
     {

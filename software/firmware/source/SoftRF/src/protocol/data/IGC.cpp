@@ -318,6 +318,9 @@ void FlightLog_setup()
 #if defined(ARDUINO_ARCH_NRF52)
 void FlightLog_decomp()
 {
+    if (hw_info.model == SOFTRF_MODEL_POCKET)    // no file system
+        return;
+
     // if there are xxxxxxxx.IGX files, decompress them (if there is enough space)
     Serial.println(F("Looking for .IGX files..."));
     File root = IGCFILESYS.open("/");
@@ -332,7 +335,6 @@ void FlightLog_decomp()
     for (; file; file=root.openNextFile()) {
         if (file.isDirectory())
             continue;
-        //strncpy(&fn[1], file.name(), 19);
         file.getName(fn+1,19);
         Serial.println(fn);
         if (strlen(fn) != 13)   // including the '/'
@@ -898,15 +900,17 @@ bool eraseOldestFlightLog()
     if (! root)
         return false;
     File file = root.openNextFile();
+    char fn[20];
     String file_name;
     while(file) {
-        file_name = file.name();
-        Serial.println(file_name);
+        file.getName(fn,sizeof(fn));
+        Serial.println(fn);
+        file_name = fn;
         if (file_name.endsWith(".IGC") || file_name.endsWith(".igc")
         ||  file_name.endsWith(".IGZ") || file_name.endsWith(".igz")) {
             ++found;
-            if (strcmp(oldestlog.c_str(), file.name()) > 0) {
-                oldestlog = file.name();
+            if (strcmp(oldestlog.c_str(), fn) > 0) {
+                oldestlog = fn;
                 Serial.print(F("Candidate oldest log: "));
                 Serial.println(oldestlog);
             }

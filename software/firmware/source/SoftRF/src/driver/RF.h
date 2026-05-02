@@ -78,7 +78,7 @@ enum
   RF_IC_CC13XX,
   RF_DRV_OGN,
   RF_IC_SX1262,
-  RF_IC_LR11XX,
+  RF_IC_LR1110,
   RF_IC_LR2021
 };
 
@@ -202,7 +202,9 @@ extern int8_t RF_last_rssi;
 extern int8_t which_rx_try;
 extern uint8_t RF_last_protocol;
 
-extern uint32_t rx_packets_counter, tx_packets_counter;
+extern uint32_t rx_packets_counter;
+extern uint32_t tx_packets_counter;
+extern uint32_t adsb_packets_counter;
 extern uint32_t receive_cb_count;
 
 /* #define TIMETEST */

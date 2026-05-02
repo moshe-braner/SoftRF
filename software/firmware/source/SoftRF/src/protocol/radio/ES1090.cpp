@@ -80,8 +80,6 @@ static uint8_t ac_type_table[16] =
     AIRCRAFT_TYPE_HELICOPTER  // 0xF rotorcraft
 };
 
-uint32_t adsb_packets_counter = 0;
-
 // data structures for collecting statistics on RSSI vs. distance
 
 #define ZONESTATSVERSION 1

@@ -42,6 +42,10 @@
 #endif
 #endif
 
+#if defined(USE_EPAPER)
+#include "driver/EPD.h"
+#endif
+
 #if defined(FILESYS)
 //#include "SPIFFS.h"
 File AlarmLog;
@@ -125,8 +129,8 @@ ufo_t fo;                                       // fewer fields
 void EmptyContainer(container_t *p) { memset(p, 0, sizeof(CONTAINER)); }
 void EmptyFO(ufo_t *p) { memset(p, 0, sizeof(UFO)); }
 
-char fo_callsign[10];
-uint8_t fo_raw[34];
+uint8_t fo_raw[34] __attribute__((aligned(sizeof(uint32_t))));
+char fo_callsign[33];
 traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 int max_alarm_level = ALARM_LEVEL_NONE;
 int8_t maxrssi;
@@ -1433,7 +1437,7 @@ void CopyTraffic(container_t *cip, ufo_t *fop, const char *callsign)
     if (callsign) {
         if ((callsign[0]      != '\0' && callsign[0]      != ' ')
         &&  (cip->callsign[0] == '\0' || cip->callsign[0] == ' ')) {
-            strncpy((char *) cip->callsign, callsign, 8);
+            strncpy((char *) cip->callsign, callsign, sizeof(cip->callsign));
             cip->callsign[8] = '\0';
             cip->callsign[9] = '\0';
         }
@@ -1821,6 +1825,11 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
         }
       }
     }
+
+#if defined(USE_EPAPER)
+    if (alarmcount)
+        screen_saver_timer = millis();
+#endif
 
     if (sound_alarm_level > ALARM_LEVEL_CLOSE) {   // implies mfop != NULL
       // use alarmcount to modify the sounds

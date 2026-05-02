@@ -30,9 +30,7 @@
 static uint32_t prev_tx_packets_counter = 0;
 static uint32_t prev_rx_packets_counter = 0;
 
-#define isTimeToToggle() (millis() - status_LED_TimeMarker > 300)
 static int status_LED = SOC_UNUSED_PIN;
-static unsigned long status_LED_TimeMarker = 0;
 
 // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
@@ -58,8 +56,11 @@ void LED_setup() {
   if (status_LED != SOC_UNUSED_PIN) {
     pinMode(status_LED, OUTPUT);
     /* Indicate positive power supply */
-    //digitalWrite(status_LED, LED_STATE_ON);
+#if defined(ESP32)
     digitalWrite(status_LED, ((hw_info.revision < 8)? HIGH : LOW));
+#else
+    digitalWrite(status_LED, LED_STATE_ON);
+#endif
   }
 }
 
@@ -210,6 +211,7 @@ void LED_DisplayTraffic() {
 
 void LED_loop() {
 
+#if defined(ESP32)
   if (hw_info.model == SOFTRF_MODEL_PRIME_MK2) {
     if (hw_info.revision >= 8)
       return;
@@ -217,19 +219,179 @@ void LED_loop() {
       return;    // pin 14 is connected to the LED on the v0.7
     if (settings->volume != BUZZER_OFF)
       return;
-  }
-
-  if (status_LED != SOC_UNUSED_PIN) {
     if (Battery_voltage() > Battery_threshold() ) {
-      /* Indicate positive power supply */
-      if (digitalRead(status_LED) != LED_STATE_ON) {
-        digitalWrite(status_LED, LED_STATE_ON);
-      }
+        /* Indicate positive power supply */
+        if (led_status != LED_STATE_ON)
+            digitalWrite(status_LED, LED_STATE_ON);
     } else {
-      if (isTimeToToggle()) {
-        digitalWrite(status_LED, !digitalRead(status_LED) ? HIGH : LOW);  // toggle state
-        status_LED_TimeMarker = millis();
-      }
+        digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
     }
   }
+
+#else  // nRF52
+  if (status_LED == SOC_UNUSED_PIN)
+      return;
+
+  if (USBMSC_flag) {
+      //uint8_t USBMSC_LED = SOC_GPIO_LED_USBMSC;   // red LED in all models
+      //if (USBMSC_LED != SOC_UNUSED_PIN)
+      //    digitalWrite(USBMSC_LED, LED_STATE_ON);
+      // - was turned on in nRF52_msc_write_cb()
+      // - let it stay on until USBMSC is done
+      //if (hw_info.model == SOFTRF_MODEL_CARD)            // T1000E
+      //    digitalWrite(SOC_GPIO_LED_T1000_GREEN, LOW);   // off
+      // - let green & red LEDs both operate, even though co-located on T1000E & M3 & T-Echo
+      return;
+  }
+
+  if (hw_info.model == SOFTRF_MODEL_BADGE) {   // T-Echo
+#if 0
+      // only use status_LED = green
+      if (! isValidFix()) {
+          // make the LED blink fast if no GPS fix
+          digitalWrite(status_LED, (millis() & 0x080)? HIGH : LOW);
+      } else if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(status_LED, LOW);   // LED_STATE_ON = LOW
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+#endif
+#if 0
+      // red LED shows power status, blue or green LED shows GPS fix status
+      // - but it turns out the red is co-located with the blue & green
+      // - the other red is controlled by the USB power connection?
+      uint8_t power_LED = SOC_GPIO_LED_TECHO_LED_RED;
+      if (Battery_voltage() > Battery_threshold() ) {
+          //digitalWrite(power_LED, LOW);   // LED_STATE_ON = LOW
+          // make the LED light up in short flashes to show power is OK
+          digitalWrite(power_LED, ((millis() & 0x0700) == 0x0700)? LOW : HIGH);
+          // (red will stay on while connected as mass storage device)
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(power_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+      uint8_t green_LED = SOC_GPIO_LED_TECHO_LED_GREEN;  // pins depend on hw_info.revision
+      uint8_t blue_LED  = SOC_GPIO_LED_TECHO_LED_BLUE;
+      if (isValidFix()) {
+          digitalWrite(blue_LED, LOW);   // LED_STATE_ON = LOW
+          digitalWrite(green_LED, HIGH);
+      } else {
+          // make the LED blink fast if no GPS fix
+          digitalWrite(green_LED, (millis() & 0x080)? HIGH : LOW);
+          digitalWrite(blue_LED, HIGH);
+      }
+#endif
+#if 1
+      // color scheme for RGB LED, same as M3:
+      uint8_t red_LED   = SOC_GPIO_LED_TECHO_LED_RED;  // pins depend on hw_info.revision
+      uint8_t green_LED = SOC_GPIO_LED_TECHO_LED_GREEN;
+      uint8_t blue_LED  = SOC_GPIO_LED_TECHO_LED_BLUE;
+      if (status_LED == red_LED)        // from booting
+          digitalWrite(red_LED, HIGH);  // turn it off
+      // blue if GNSS fix, else green - turn off the other LED
+      if (isValidFix()) {
+          status_LED = blue_LED;
+          digitalWrite(green_LED, HIGH);
+      } else {
+          status_LED = green_LED;
+          digitalWrite(blue_LED, HIGH);
+      }
+      if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(status_LED, LOW);
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+#endif
+  }
+
+  if (hw_info.model == SOFTRF_MODEL_HANDHELD) {   // M1
+#if 0
+      status_LED = SOC_GPIO_LED_M1_BLUE;
+      // red during boot, blue later - turn off the red LED
+      digitalWrite(SOC_GPIO_LED_M1_RED, HIGH);   // LED_STATE_ON = LOW
+      if (! isValidFix()) {
+          // make the LED blink fast if no GPS fix
+          digitalWrite(status_LED, (millis() & 0x080)? HIGH : LOW);
+      } else if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(status_LED, LOW);   // LED_STATE_ON = LOW
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+#endif
+#if 0
+      status_LED = (isValidFix()? SOC_GPIO_LED_M1_BLUE : SOC_GPIO_LED_M1_RED);
+      // blue if GNSS fix, else red - turn off the other LED
+      if (status_LED == SOC_GPIO_LED_M1_BLUE)
+          digitalWrite(SOC_GPIO_LED_M1_RED, HIGH);   // LED_STATE_ON = LOW
+      else
+          digitalWrite(SOC_GPIO_LED_M1_BLUE, HIGH);
+      if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(status_LED, LOW);   // LED_STATE_ON = LOW
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+#endif
+#if 1
+      // separate red LED shows power status
+      // blue LED within red/blue combo LED shows GPS fix status
+      // (red will light during booting and while mass storage device is accessed)
+      if (Battery_voltage() > Battery_threshold() ) {
+          //digitalWrite(SOC_GPIO_LED_M1_RED_PWR, HIGH);
+          // make the LED light up in short flashes to show power is OK
+          //digitalWrite(SOC_GPIO_LED_M1_RED_PWR, ((millis() & 0x0700) == 0x0700)? HIGH : LOW);
+          // or just leave it off, as the other LED shows power is on,
+          // so use the separate LED to show that external power is connected:
+          digitalWrite(SOC_GPIO_LED_M1_RED_PWR, digitalRead(SOC_GPIO_PIN_M1_VUSB_SEN)? HIGH : LOW);
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(SOC_GPIO_LED_M1_RED_PWR, (millis() & 0x0200)? HIGH : LOW);
+      }
+      if (isValidFix()) {
+          digitalWrite(SOC_GPIO_LED_M1_BLUE, LOW);   // LED_STATE_ON = LOW
+      } else {
+          // make the LED blink fast if no GPS fix
+          digitalWrite(SOC_GPIO_LED_M1_BLUE, (millis() & 0x080)? HIGH : LOW);
+      }
+#endif
+  }
+
+  if (hw_info.model == SOFTRF_MODEL_POCKET) {   // M3
+      if (status_LED == SOC_GPIO_LED_M3_RED)        // from booting
+          digitalWrite(SOC_GPIO_LED_M3_RED, HIGH);  // turn it off
+      // blue if GNSS fix, else green - turn off the other LED
+      uint8_t green_LED = SOC_GPIO_LED_M3_GREEN;
+      uint8_t blue_LED  = SOC_GPIO_LED_M3_BLUE;
+      if (isValidFix()) {
+          status_LED = blue_LED;
+          digitalWrite(green_LED, HIGH);   // LED_STATE_ON = LOW
+      } else {
+          status_LED = green_LED;
+          digitalWrite(blue_LED, HIGH);
+      }
+      if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(status_LED, LOW);
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(status_LED, (millis() & 0x0200)? HIGH : LOW);
+      }
+  }
+
+  if (hw_info.model == SOFTRF_MODEL_CARD) {       // T1000E
+      status_LED = SOC_GPIO_LED_T1000_GREEN;      // was red during boot
+      digitalWrite(SOC_GPIO_LED_T1000_RED, LOW);  // switch to green, turn red off
+      if (! isValidFix()) {
+          // make the LED blink fast if no GPS fix
+          digitalWrite(SOC_GPIO_LED_T1000_GREEN, (millis() & 0x080)? HIGH : LOW);
+      } else if (Battery_voltage() > Battery_threshold() ) {
+          digitalWrite(SOC_GPIO_LED_T1000_GREEN, HIGH);   // LED_STATE_ON = HIGH
+      } else {
+          // make the LED blink slowly if battery is low
+          digitalWrite(SOC_GPIO_LED_T1000_GREEN, (millis() & 0x0200)? HIGH : LOW);
+      }
+  }
+#endif
 }

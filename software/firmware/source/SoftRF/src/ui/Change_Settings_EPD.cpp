@@ -268,10 +268,10 @@ void EPD_chgconf_save()
     settings->aircraft_id = id;
     ui->units       = units[unit].code;
     ui->orientation = directions[direction].code;
-    SoC->WDT_fini();
-    if (SoC->Bluetooth_ops) { SoC->Bluetooth_ops->fini(); }
+    //SoC->WDT_fini();
+    //if (SoC->Bluetooth_ops) { SoC->Bluetooth_ops->fini(); }
     //EEPROM_store();
-    save_settings_to_file();
+    save_settings_to_file(true);
 }
 
 /*

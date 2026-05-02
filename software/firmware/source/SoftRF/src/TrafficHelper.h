@@ -105,8 +105,8 @@ float InvCosLat(void);
 
 extern container_t Container[MAX_TRACKING_OBJECTS];  // EmptyContainer;
 extern ufo_t fo;  // EmptyFO;
-extern char fo_callsign[10];
 extern uint8_t fo_raw[34];
+extern char fo_callsign[33];
 extern traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 extern int max_alarm_level;
 extern bool alarm_ahead;

@@ -93,6 +93,8 @@ unsigned long EPDTimeMarker = 0;
 static unsigned long EPD_anti_ghosting_timer = 0;
 static uint8_t anti_ghosting_minutes = 0;
 static bool screen_off = false;
+bool screen_saver = false;
+uint32_t screen_saver_timer = 0;  // when last button pushed
 int EPD_view_mode = 0;
 int EPD_prev_view = 0;
 bool EPD_vmode_updated = true;
@@ -120,7 +122,14 @@ bool EPD_setup(bool splash_screen)
 
   display->init( /* 38400 */ );
 
-  display->setRotation((3 + ui->rotate) & 0x3); /* 270 deg. is default angle */
+  // Default TECHO orientation used 270deg baseline.
+  // Handheld (M1) physically rotated 90deg CW.
+  // Apply +1 rotation step when on M1 board.
+  uint8_t base_rot = 3; // legacy default
+  if (hw_info.model == SOFTRF_MODEL_HANDHELD) {
+    base_rot = (base_rot + 1) & 0x3; // rotate +90 deg for M1
+  }
+  display->setRotation((base_rot + ui->rotate) & 0x3);
   display->setTextColor(GxEPD_BLACK);
   display->setTextWrap(false);
 
@@ -132,7 +141,26 @@ bool EPD_setup(bool splash_screen)
 
   display->fillScreen(GxEPD_WHITE);
 
-  if (hw_info.model == SOFTRF_MODEL_BADGE) {
+  if (hw_info.model == SOFTRF_MODEL_HANDHELD) {
+
+    // Simplified centered splash when partner strings removed
+
+    x = (display->width()  - tbw1) / 2;
+    y = (display->height() + tbh1) / 2; // baseline so text is vertically centered
+    display->setCursor(x, y);
+    display->print(EPD_SoftRF_text1);
+
+    // Version / HW line at bottom
+    char buf[32];
+    snprintf(buf, sizeof(buf), "HW:%d SW:%s", hw_info.revision, SOFTRF_FIRMWARE_VERSION);
+    display->setFont(&FreeMonoBold9pt7b);
+    display->getTextBounds(buf, 0, 0, &tbx4, &tby4, &tbw4, &tbh4);
+    x = (display->width() - tbw4) / 2;
+    y = display->height() - tbh4;
+    display->setCursor(x, y);
+    display->print(buf);
+
+  } else if (hw_info.model == SOFTRF_MODEL_BADGE) {
 
     x = (display->width()  - tbw1) / 2;
     y = (display->height() + tbh1) / 2 - tbh3;
@@ -183,6 +211,7 @@ bool EPD_setup(bool splash_screen)
   EPD_POWEROFF;
 
   rval = display->probe();
+  //rval = true;
 
   EPD_status_setup();
   EPD_radar_setup();
@@ -468,6 +497,13 @@ void EPD_loop()
   if (screen_off)    // in screen-saver mode
       return;
 
+  if (ui->antighost == ANTI_GHOSTING_OFF) {   // auto screen-save
+    if (millis() > screen_saver_timer + 600000) {    // no buttonpush for 10 minutes
+      nRF52_Display_blank();
+      return;
+    }
+  }
+
   switch (hw_info.display)
   {
   case DISPLAY_EPD_1_54:
@@ -547,7 +583,7 @@ void EPD_loop()
   }
 }
 
-void EPD_fini(int reason, bool screen_saver)
+void EPD_fini(int reason, bool blank_screen)
 {
   int16_t  tbx, tby;
   uint16_t tbw, tbh;
@@ -565,7 +601,7 @@ void EPD_fini(int reason, bool screen_saver)
       while (EPD_update_in_progress != EPD_UPDATE_NONE) delay(100);
 //      while (!SoC->Display_lock()) { delay(10); }
 #endif
-    if (screen_saver) {
+    if (blank_screen) {
       const char *msg_line;
 
       display->setFont(&FreeMonoBold12pt7b);

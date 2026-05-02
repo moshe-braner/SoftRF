@@ -157,7 +157,10 @@ void setup()
   delay(2000);
 #elif defined(USE_TINYUSB) && defined(USBCON)
   for (int i=0; i < 20; i++) {if (Serial) break; else delay(100);}
+  for (int i=0; i < 20; i++) {if (Serial1) break; else delay(100);}
+  delay(500);
 #endif
+  Serial.println("USB Serial alive");
 
 #if LOGGER_IS_ENABLED
   Logger_setup();
@@ -247,14 +250,18 @@ void setup()
   Serial.printf("\r\nID_method: %d, chip_ID: %06X, settings_ID: %06X, used_ID: %06X\r\n\r\n",
   settings->id_method, chip_id, settings->aircraft_id, ThisAircraft.addr);
 
+  // if both battery & USB power, shut down and just charge
+#if defined(ESP32)
+  ESP32_charge_mode();
+#endif
+#if defined(ARDUINO_ARCH_NRF52)
+  nRF52_charge_mode();
+#endif
+
   SoC->Button_setup();
 
   // do this before Baro_setup - Wire.begin() happens there
   hw_info.display = SoC->Display_setup();
-
-#if defined(ESP32)
-  ESP32_charge_mode();  // if both battery & USB power, shut down and just charge
-#endif
 
 Serial.println(F("calling Baro_setup()..."));
   // do this before Filesys_setup since this tickles pins 13,2
@@ -301,6 +308,7 @@ Serial.println(ESP.getFreePsram());
 #endif /* EXCLUDE_MAVLINK */
   {
     hw_info.gnss = GNSS_setup();
+Serial.println(F("... GNSS_setup() returned"));
     ThisAircraft.aircraft_type = settings->acft_type;
   }
   ThisAircraft.protocol = settings->rf_protocol;
@@ -308,19 +316,24 @@ Serial.println(ESP.getFreePsram());
   ThisAircraft.no_track = settings->no_track;
 
   Battery_setup();
+Serial.println(F("... Battery_setup() returned"));
   Traffic_setup();
+Serial.println(F("... Traffic_setup() returned"));
 
   SoC->swSer_enableRx(false);
 
   WiFi_setup();
+Serial.println(F("... WiFi_setup() returned"));
 
   if (SoC->USB_ops) {
      SoC->USB_ops->setup();
   }
+Serial.println(F("... USB_ops->setup() returned"));
 
   if (SoC->Bluetooth_ops) {
      SoC->Bluetooth_ops->setup();
   }
+Serial.println(F("... Bluetooth_ops->setup() returned"));
 
   OTA_setup();
   Web_setup();
@@ -332,6 +345,7 @@ Serial.println(ESP.getFreePsram());
 #endif
 
   LED_setup();   // moved here to allow Serial2 to grab pin 4
+Serial.println(F("... LED_setup() returned"));
 
 #if defined(ENABLE_TTN)
   TTN_setup();
@@ -424,19 +438,22 @@ void shutparts()
 #endif
   SERIAL_FLUSH();
   SoC->swSer_enableRx(false);
+  Buzzer_fini();
+Serial.println("Buzzer_fini() returned");
 #if defined(ESP32)
   Voice_fini();
-  Buzzer_fini();
   Strobe_fini();
   Web_fini();
   NMEA_fini();
   WiFi_fini();
 #endif
   RF_Shutdown();
+Serial.println("RF_Shutdown() returned");
   if (SoC->USB_ops)
      SoC->USB_ops->fini();
   if (settings->mode != SOFTRF_MODE_UAV)
     GNSS_fini();
+Serial.println("GNSS_fini() returned");
   delay(1000);
 }
 
@@ -445,7 +462,9 @@ void shutdown(int reason)
 //Serial.println("shutdown()...");
   shutparts();
   SoC->Display_fini(reason);
+Serial.println("Display_fini() returned");
   SoC->Button_fini();
+Serial.println("Button_fini() returned");
   SoC_fini(reason);
 }
 
@@ -562,7 +581,7 @@ Serial.println("Tentative GNSS fix");
             gnss.date.year(), gnss.date.month(), gnss.date.day(),
             gnss.time.hour(), gnss.time.minute(), gnss.time.second());
         (void) leap_seconds_valid();    // computes leap_seconds_correction
-        if (settings->volume != BUZZER_OFF && settings->volume != BUZZER_EXT) {
+        if ( /* settings->volume != BUZZER_OFF && */ settings->volume != BUZZER_EXT) {
           SoC->Buzzer_tone(440, 333);
           SoC->Buzzer_tone(640, 333);
         }
@@ -793,10 +812,11 @@ if (rx_success) which_rx_try = 2;
   if (isTimeToExport()) {
     NMEA_Export();
     GDL90_Export();
-
+#if !defined(EXCLUDE_D1090)
     if (validfix) {
       D1090_Export();
     }
+#endif
     ExportTimeMarker = millis();
   }
 
@@ -1009,7 +1029,9 @@ void txrx_test()
 #endif
     NMEA_Export();
     GDL90_Export();
+#if !defined(EXCLUDE_D1090)
     D1090_Export();
+#endif
     ExportTimeMarker = millis();
   }
 #if DEBUG_TIMING

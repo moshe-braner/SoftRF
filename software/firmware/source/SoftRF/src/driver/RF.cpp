@@ -63,6 +63,8 @@ uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 
 uint32_t tx_packets_counter = 0;
 uint32_t rx_packets_counter = 0;
+uint32_t adsb_packets_counter = 0;
+
 static uint32_t invalid_manchester_packets = 0;
 static uint8_t  invalid_manchester_counter = 0;
 
@@ -108,7 +110,7 @@ protocol_duo protocol_duos[] = {
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_LEGACY, "T+L"},
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_OGNTP,  "T+O"},
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_ADSL,   "T+A"},
-  {RF_PROTOCOL_LATEST, RF_PROTOCOL_FANET,  "TFa"},
+  {RF_PROTOCOL_LATEST, RF_PROTOCOL_FANET,  "T+F"},
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_P3I,    "T+P"},
   {RF_PROTOCOL_OGNTP,  RF_PROTOCOL_LEGACY, "O+L"},
   {RF_PROTOCOL_OGNTP,  RF_PROTOCOL_LATEST, "O+T"},
@@ -217,7 +219,7 @@ static void calc_txpower()
         if (tx_power > 8)  tx_power = 8;
     }
 
-    if (rf_chip->type == RF_IC_LR11XX) {
+    if (rf_chip->type == RF_IC_LR1110) {
 #if 1
       /*
        * Enforce Tx power limit until confirmation
@@ -338,7 +340,6 @@ static bool receive()
   //   if packet arrived return its size
   uint8_t size = rf_chip->receive(RL_rxPacket);     // includes the CRC bytes
 
-  // SX1276 is in SLEEP after IRQ handler, Force it to enter RX mode
   //receive_active = false;
 
 #if 1
@@ -355,6 +356,11 @@ Serial.println(Bin2Hex((byte *)RL_rxPacket, size));
 
   if (size == 0)
       return false;
+
+  // for reasons unknown, RadioLib returned RSSIs much lower than BASICMAC
+  // for now fudge it:
+  if (RF_last_rssi < -30)
+      RF_last_rssi += 30;
 
   unsigned crc_type = curr_rx_protocol_ptr->crc_type;
 //  if (curr_rx_protocol_ptr == &flr_adsl_proto_desc)
@@ -495,7 +501,7 @@ Serial.println("invalid Manchester");
     }
   }
 
-#if 1
+#if 0
 Serial.print("After bit-shifting and Manchester decoding, size: ");
 Serial.println(size);
 Serial.println(Bin2Hex((byte *)RxBuffer, size));
@@ -899,16 +905,12 @@ RF_FreqPlan.Plan, RF_FreqPlan.Protocol, prev_protocol, channel, frequency);
 
 byte RF_setup(void)
 {
-  /* "AUTO" and "UK" freqs now mapped to EU */
-  if (settings->band == RF_BAND_AUTO)
-      settings->band == RF_BAND_EU;
+  // resurrected the option of auto-band:
+  //if (settings->band == RF_BAND_AUTO)
+  //    settings->band == RF_BAND_EU;
+  // "UK" freqs now mapped to EU:
   if (settings->band == RF_BAND_UK)
       settings->band == RF_BAND_EU;
-  /* Supersede EU plan with UK when PAW is selected */
-    if (rf_chip
-            && settings->band == RF_BAND_EU
-            && (settings->rf_protocol == RF_PROTOCOL_P3I || settings->altprotocol == RF_PROTOCOL_P3I))
-      settings->band == RF_BAND_UK;
 
   if (settings->altprotocol == settings->rf_protocol
         //|| ! in_family(settings->rf_protocol)
@@ -1347,20 +1349,11 @@ void set_protocol_for_slot()
 void RF_loop()
 {
   if (!RF_ready) {
-#if 0
     if (RF_FreqPlan.Plan == RF_BAND_AUTO) {
-      if (ThisAircraft.latitude || ThisAircraft.longitude) {
-        settings->band = RF_FreqPlan.calcPlan((int32_t)(ThisAircraft.latitude  * 600000),
-                                              (int32_t)(ThisAircraft.longitude * 600000));
+        if (settings->band == RF_BAND_AUTO)
+            return;   // band is not known yet
+        // if settings->band was AUTO, changed in SoftRF.ino after GNSS fix
         RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
-        calc_txpower();
-        RF_ready = true;
-      }
-    }
-#endif
-    if (RF_FreqPlan.Plan == RF_BAND_AUTO && settings->band != RF_BAND_AUTO) {
-      // if settings->band was AUTO, changed in SoftRF.ino after GNSS fix
-      RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
     }
     RF_ready = true;
   }
