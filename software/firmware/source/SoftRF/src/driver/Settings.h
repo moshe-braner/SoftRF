@@ -256,7 +256,7 @@ enum stgidx {
     STG_EPD_AGHOST,
     STG_EPD_TEAM,
 //#endif
-    STG_FANET_CS,
+    STG_CALLSIGN,
     STG_FANET_SOS,
     STG_DEBUG_FLAGS,
     STG_END
@@ -273,7 +273,8 @@ enum stgtyp {
     STG_STR   = 1        // strings' "type" value actually equals their length
 };
 
-#define STG_HIDDEN 0xFF  // not visible in web page
+#define STG_HIDDEN   0x7F
+#define STG_SAVEHIDE 0xFF  // hidden but saved to EEPROM
 
 bool hidden_setting(uint8_t index);
 
@@ -384,7 +385,7 @@ typedef struct Settings {
     uint8_t  antighost;
     uint32_t team;
 //#endif
-    char     fanet_cs[32];
+    char     callsign[33];
     uint8_t  fanet_sos;
 
 } settings_t;
@@ -454,10 +455,10 @@ void Settings_setup(void);
 void Settings_defaults();
 int  find_setting(const char *label, bool shorthand=false);
 bool load_setting(const int index, const char *value);
-void load_settings(void);
+bool load_settings(void);
 bool format_setting(const int index, const bool comment=true, bool shorthand=false, char *buf=NMEABuffer, size_t size=sizeof(NMEABuffer));
 void show_settings_serial(void);
-void save_settings_to_file(void);
+void save_settings_to_file(bool reboot);
 bool load_settings_from_file(void);
 const char *settings_message(const char *msg=NULL, const char *submsg=NULL, const int val=0);
 void do_test_mode(void);
@@ -472,6 +473,7 @@ extern uint8_t settings_used;
 extern settings_t *settings;
 extern setting_struct stgdesc[STG_END];
 extern const char * stgcomment[STG_END];
+//extern bool use_eeprom;
 extern uint32_t baudrates[];
 extern bool do_alarm_demo;
 extern bool test_mode;
