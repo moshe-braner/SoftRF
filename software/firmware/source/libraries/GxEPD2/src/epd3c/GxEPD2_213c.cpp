@@ -12,7 +12,7 @@
 
 #include "GxEPD2_213c.h"
 
-GxEPD2_213c::GxEPD2_213c(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
+GxEPD2_213c::GxEPD2_213c(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
   GxEPD2_EPD(cs, dc, rst, busy, LOW, 20000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate)
 {
 }
@@ -250,7 +250,7 @@ void GxEPD2_213c::drawImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_
 }
 
 void GxEPD2_213c::drawImagePart(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
-                               int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+                                int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
   writeImagePart(bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
   refresh(x, y, w, h);
@@ -263,7 +263,7 @@ void GxEPD2_213c::drawImage(const uint8_t* black, const uint8_t* color, int16_t 
 }
 
 void GxEPD2_213c::drawImagePart(const uint8_t* black, const uint8_t* color, int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
-                               int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+                                int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
   writeImagePart(black, color, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
   refresh(x, y, w, h);
@@ -283,14 +283,18 @@ void GxEPD2_213c::refresh(bool partial_update_mode)
 
 void GxEPD2_213c::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
 {
-  x -= x % 8; // byte boundary
-  w -= x % 8; // byte boundary
+  // intersection with screen
+  int16_t w1 = x < 0 ? w + x : w; // reduce
+  int16_t h1 = y < 0 ? h + y : h; // reduce
   int16_t x1 = x < 0 ? 0 : x; // limit
   int16_t y1 = y < 0 ? 0 : y; // limit
-  int16_t w1 = x + w < int16_t(WIDTH) ? w : int16_t(WIDTH) - x; // limit
-  int16_t h1 = y + h < int16_t(HEIGHT) ? h : int16_t(HEIGHT) - y; // limit
-  w1 -= x1 - x;
-  h1 -= y1 - y;
+  w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
+  h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
+  if ((w1 <= 0) || (h1 <= 0)) return;
+  // make x1, w1 multiple of 8
+  w1 += x1 % 8;
+  if (w1 % 8 > 0) w1 += 8 - w1 % 8;
+  x1 -= x1 % 8;
   _Init_Part();
   if (usePartialUpdateWindow) _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
@@ -344,9 +348,12 @@ void GxEPD2_213c::_PowerOn()
 
 void GxEPD2_213c::_PowerOff()
 {
-  _writeCommand(0x02); // power off
-  _waitWhileBusy("_PowerOff", power_off_time);
-  _power_is_on = false;
+  if (_power_is_on)
+  {
+    _writeCommand(0x02); // power off
+    _waitWhileBusy("_PowerOff", power_off_time);
+    _power_is_on = false;
+  }
 }
 
 void GxEPD2_213c::_InitDisplay()
@@ -360,8 +367,8 @@ void GxEPD2_213c::_InitDisplay()
   //_waitWhileBusy("_wakeUp Power On");
   _writeCommand(0X00);
   _writeData(0x8f);
-  _writeCommand(0X50);
-  _writeData(0x37); //VCOM AND DATA INTERVAL SETTING
+  _writeCommand(0x50); //VCOM AND DATA INTERVAL SETTING
+  _writeData(0x77);    //WBmode:VBDF 17|D7 VBDW 97 VBDB 57   WBRmode:VBDF F7 VBDW 77 VBDB 37  VBDR B7
   _writeCommand(0x61); //resolution setting
   _writeData (0x68);   //source 104
   _writeData (0x00);
@@ -377,8 +384,9 @@ void GxEPD2_213c::_Init_Full()
 void GxEPD2_213c::_Init_Part()
 {
   _InitDisplay();
-  _writeCommand(0X50);
-  _writeData(0xF7);    //WBmode:VBDF 17|D7 VBDW 97 VBDB 57   WBRmode:VBDF F7 VBDW 77 VBDB 37  VBDR B7
+  _writeCommand(0x50); //VCOM AND DATA INTERVAL SETTING
+  _writeData(0x77);    //WBmode:VBDF 17|D7 VBDW 97 VBDB 57   WBRmode:VBDF F7 VBDW 77 VBDB 37  VBDR B7
+  //_writeData(0xF7);    //WBmode:VBDF 17|D7 VBDW 97 VBDB 57   WBRmode:VBDF F7 VBDW 77 VBDB 37  VBDR B7
   _PowerOn();
 }
 

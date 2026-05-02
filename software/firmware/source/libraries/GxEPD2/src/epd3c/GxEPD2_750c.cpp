@@ -12,7 +12,7 @@
 
 #include "GxEPD2_750c.h"
 
-GxEPD2_750c::GxEPD2_750c(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
+GxEPD2_750c::GxEPD2_750c(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
   GxEPD2_EPD(cs, dc, rst, busy, LOW, 40000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate)
 {
 }
@@ -25,10 +25,12 @@ void GxEPD2_750c::clearScreen(uint8_t value)
   _writeCommand(0x91); // partial in
   _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _writeCommand(0x10);
+  _startTransfer();
   for (uint32_t i = 0; i < uint32_t(WIDTH) * uint32_t(HEIGHT) / 2; i++)
   {
-    _writeData(value);
+    _transfer(value);
   }
+  _endTransfer();
   _Update_Part();
   _writeCommand(0x92); // partial out
 }
@@ -40,10 +42,12 @@ void GxEPD2_750c::clearScreen(uint8_t black_value, uint8_t color_value)
   _writeCommand(0x91); // partial in
   _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _writeCommand(0x10);
+  _startTransfer();
   for (uint32_t i = 0; i < uint32_t(WIDTH) * uint32_t(HEIGHT) / 8; i++)
   {
     _send8pixel(~black_value, ~color_value);
   }
+  _endTransfer();
   _Update_Part();
   _writeCommand(0x92); // partial out
 }
@@ -56,10 +60,12 @@ void GxEPD2_750c::writeScreenBuffer(uint8_t value)
   _writeCommand(0x91); // partial in
   _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _writeCommand(0x10);
+  _startTransfer();
   for (uint32_t i = 0; i < uint32_t(WIDTH) * uint32_t(HEIGHT) / 2; i++)
   {
-    _writeData(value);
+    _transfer(value);
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
 }
 
@@ -70,10 +76,12 @@ void GxEPD2_750c::writeScreenBuffer(uint8_t black_value, uint8_t color_value)
   _writeCommand(0x91); // partial in
   _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _writeCommand(0x10);
+  _startTransfer();
   for (uint32_t i = 0; uint32_t(WIDTH) * uint32_t(HEIGHT) / 8; i++)
   {
     _send8pixel(~black_value, ~color_value);
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
 }
 
@@ -102,6 +110,7 @@ void GxEPD2_750c::writeImage(const uint8_t* black, const uint8_t* color, int16_t
   _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
   _writeCommand(0x10);
+  _startTransfer();
   for (int16_t i = 0; i < h1; i++)
   {
     for (int16_t j = 0; j < w1 / 8; j++)
@@ -147,6 +156,7 @@ void GxEPD2_750c::writeImage(const uint8_t* black, const uint8_t* color, int16_t
       _send8pixel(~black_data, ~color_data);
     }
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
@@ -184,6 +194,7 @@ void GxEPD2_750c::writeImagePart(const uint8_t* black, const uint8_t* color, int
   _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
   _writeCommand(0x10);
+  _startTransfer();
   for (int16_t i = 0; i < h1; i++)
   {
     for (int16_t j = 0; j < w1 / 8; j++)
@@ -230,6 +241,7 @@ void GxEPD2_750c::writeImagePart(const uint8_t* black, const uint8_t* color, int
     yield();
 #endif
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
@@ -256,6 +268,7 @@ void GxEPD2_750c::writeNative(const uint8_t* data1, const uint8_t* data2, int16_
     _writeCommand(0x91); // partial in
     _setPartialRamArea(x1, y1, w1, h1);
     _writeCommand(0x10);
+    _startTransfer();
     for (int16_t i = 0; i < h1; i++)
     {
       for (int16_t j = 0; j < w1 / 2; j++)
@@ -276,9 +289,10 @@ void GxEPD2_750c::writeNative(const uint8_t* data1, const uint8_t* data2, int16_
           data = data1[idx];
         }
         if (invert) data = ~data;
-        _writeData(data);
+        _transfer(data);
       }
     }
+    _endTransfer();
     _writeCommand(0x92); // partial out
     delay(1); // yield() to avoid WDT on ESP8266 and ESP32
   }
@@ -324,14 +338,18 @@ void GxEPD2_750c::refresh(bool partial_update_mode)
 
 void GxEPD2_750c::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
 {
-  x -= x % 8; // byte boundary
-  w -= x % 8; // byte boundary
+  // intersection with screen
+  int16_t w1 = x < 0 ? w + x : w; // reduce
+  int16_t h1 = y < 0 ? h + y : h; // reduce
   int16_t x1 = x < 0 ? 0 : x; // limit
   int16_t y1 = y < 0 ? 0 : y; // limit
-  int16_t w1 = x + w < int16_t(WIDTH) ? w : int16_t(WIDTH) - x; // limit
-  int16_t h1 = y + h < int16_t(HEIGHT) ? h : int16_t(HEIGHT) - y; // limit
-  w1 -= x1 - x;
-  h1 -= y1 - y;
+  w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
+  h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
+  if ((w1 <= 0) || (h1 <= 0)) return;
+  // make x1, w1 multiple of 8
+  w1 += x1 % 8;
+  if (w1 % 8 > 0) w1 += 8 - w1 % 8;
+  x1 -= x1 % 8;
   _Init_Part();
   _setPartialRamArea(x1, y1, w1, h1);
   _Update_Part();
@@ -371,7 +389,7 @@ void GxEPD2_750c::_send8pixel(uint8_t black_data, uint8_t color_data)
     else t |= 0x03; // white
     black_data <<= 1;
     color_data <<= 1;
-    _writeData(t);
+    _transfer(t);
   }
 }
 
@@ -406,9 +424,12 @@ void GxEPD2_750c::_PowerOn()
 
 void GxEPD2_750c::_PowerOff()
 {
-  _writeCommand(0x02); // power off
-  _waitWhileBusy("_PowerOff", power_off_time);
-  _power_is_on = false;
+  if (_power_is_on)
+  {
+    _writeCommand(0x02); // power off
+    _waitWhileBusy("_PowerOff", power_off_time);
+    _power_is_on = false;
+  }
 }
 
 void GxEPD2_750c::_InitDisplay()

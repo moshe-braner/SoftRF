@@ -1,7 +1,7 @@
 // Display Library for SPI e-paper panels from Dalian Good Display and boards from Waveshare.
-// Requires HW SPI and Adafruit_GFX. Caution: these e-papers require 3.3V supply AND data lines!
+// Requires HW SPI and Adafruit_GFX. Caution: the e-paper panels require 3.3V supply AND data lines!
 //
-// based on Demo Example from Good Display: http://www.e-paper-display.com/download_list/downloadcategoryid=34&isMode=false.html
+// Display Library based on Demo Example from Good Display: https://www.good-display.com/companyfile/32/
 //
 // Author: Jean-Marc Zingg
 //
@@ -11,17 +11,8 @@
 
 #ifndef _GxEPD2_3C_H_
 #define _GxEPD2_3C_H_
-
-#include <Adafruit_GFX.h>
-#include "GxEPD2_EPD.h"
-#include "epd3c/GxEPD2_154c.h"
-#include "epd3c/GxEPD2_213c.h"
-#include "epd3c/GxEPD2_290c.h"
-#include "epd3c/GxEPD2_270c.h"
-#include "epd3c/GxEPD2_420c.h"
-#include "epd3c/GxEPD2_583c.h"
-#include "epd3c/GxEPD2_750c.h"
-#include "epd3c/GxEPD2_750c_Z08.h"
+// uncomment next line to use class GFX of library GFX_Root instead of Adafruit_GFX
+//#include <GFX.h>
 
 #ifndef ENABLE_GxEPD2_GFX
 // default is off
@@ -30,25 +21,123 @@
 
 #if ENABLE_GxEPD2_GFX
 #include "GxEPD2_GFX.h"
+#define GxEPD2_GFX_BASE_CLASS GxEPD2_GFX
+#elif defined(_GFX_H_)
+#define GxEPD2_GFX_BASE_CLASS GFX
+#else
+#include <Adafruit_GFX.h>
+#define GxEPD2_GFX_BASE_CLASS Adafruit_GFX
+#endif
+
+#include "GxEPD2_EPD.h"
+
+// for __has_include see https://en.cppreference.com/w/cpp/preprocessor/include
+// see also https://gcc.gnu.org/onlinedocs/cpp/_005f_005fhas_005finclude.html
+// #if !defined(__has_include) || __has_include("epd/GxEPD2_102.h") is not portable!
+
+#if defined __has_include
+#  if __has_include("GxEPD2.h")
+#    // __has_include can be used
+#  else
+#    // __has_include doesn't work for us, include anyway
+#    undef __has_include
+#    define __has_include(x) true
+#  endif
+#else
+#  // no __has_include, include anyway
+#  define __has_include(x) true
+#endif
+
+#if __has_include("epd3c/GxEPD2_154c.h")
+#include "epd3c/GxEPD2_154c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_154_Z90c.h")
+#include "epd3c/GxEPD2_154_Z90c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_213c.h")
+#include "epd3c/GxEPD2_213c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_213_Z19c.h")
+#include "epd3c/GxEPD2_213_Z19c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_213_Z98c.h")
+#include "epd3c/GxEPD2_213_Z98c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_290c.h")
+#include "epd3c/GxEPD2_290c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_290_Z13c.h")
+#include "epd3c/GxEPD2_290_Z13c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_290_C90c.h")
+#include "epd3c/GxEPD2_290_C90c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_266c.h")
+#include "epd3c/GxEPD2_266c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_270c.h")
+#include "epd3c/GxEPD2_270c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_420c.h")
+#include "epd3c/GxEPD2_420c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_420c_Z21.h")
+#include "epd3c/GxEPD2_420c_Z21.h"
+#endif
+#if __has_include("gdey3c/GxEPD2_420c_GDEY042Z98.h")
+#include "gdey3c/GxEPD2_420c_GDEY042Z98.h"
+#endif
+#if __has_include("gdey3c/GxEPD2_579c_GDEY0579Z93.h")
+#include "gdey3c/GxEPD2_579c_GDEY0579Z93.h"
+#endif
+#if __has_include("epd3c/GxEPD2_583c.h")
+#include "epd3c/GxEPD2_583c.h"
+#endif
+#if __has_include("gdeq3c/GxEPD2_583c_GDEQ0583Z31.h")
+#include "gdeq3c/GxEPD2_583c_GDEQ0583Z31.h"
+#endif
+#if __has_include("epd3c/GxEPD2_583c_Z83.h")
+#include "epd3c/GxEPD2_583c_Z83.h"
+#endif
+#if __has_include("epd3c/GxEPD2_750c.h")
+#include "epd3c/GxEPD2_750c.h"
+#endif
+#if __has_include("epd3c/GxEPD2_750c_Z08.h")
+#include "epd3c/GxEPD2_750c_Z08.h"
+#endif
+#if __has_include("epd3c/GxEPD2_750c_Z90.h")
+#include "epd3c/GxEPD2_750c_Z90.h"
+#endif
+#if __has_include("epd3c/GxEPD2_750c_GDEW075Z08.h")
+#include "epd3c/GxEPD2_750c_GDEW075Z08.h"
+#endif
+#if __has_include("gdey3c/GxEPD2_750c_GDEY075Z08.h")
+#include "gdey3c/GxEPD2_750c_GDEY075Z08.h"
+#endif
+#if __has_include("gdey3c/GxEPD2_1160c_GDEY116Z91.h")
+#include "gdey3c/GxEPD2_1160c_GDEY116Z91.h"
+#endif
+#if __has_include("epd3c/GxEPD2_1248c.h")
+#include "epd3c/GxEPD2_1248c.h"
+#endif
+#if __has_include("gdem3c/GxEPD2_1330c_GDEM133Z91.h")
+#include "gdem3c/GxEPD2_1330c_GDEM133Z91.h"
 #endif
 
 template<typename GxEPD2_Type, const uint16_t page_height>
-#if ENABLE_GxEPD2_GFX
-class GxEPD2_3C : public GxEPD2_GFX
-#else
-class GxEPD2_3C : public Adafruit_GFX
-#endif
+class GxEPD2_3C : public GxEPD2_GFX_BASE_CLASS
 {
   public:
     GxEPD2_Type epd2;
 #if ENABLE_GxEPD2_GFX
-    GxEPD2_3C(GxEPD2_Type epd2_instance) : epd2(epd2_instance), GxEPD2_GFX(epd2, GxEPD2_Type::WIDTH, GxEPD2_Type::HEIGHT)
+    GxEPD2_3C(GxEPD2_Type epd2_instance) : GxEPD2_GFX_BASE_CLASS(epd2, GxEPD2_Type::WIDTH_VISIBLE, GxEPD2_Type::HEIGHT), epd2(epd2_instance)
 #else
-    GxEPD2_3C(GxEPD2_Type epd2_instance) : Adafruit_GFX(GxEPD2_Type::WIDTH, GxEPD2_Type::HEIGHT), epd2(epd2_instance)
+    GxEPD2_3C(GxEPD2_Type epd2_instance) : GxEPD2_GFX_BASE_CLASS(GxEPD2_Type::WIDTH_VISIBLE, GxEPD2_Type::HEIGHT), epd2(epd2_instance)
 #endif
     {
       _page_height = page_height;
       _pages = (HEIGHT / _page_height) + ((HEIGHT % _page_height) > 0);
+      _mirror = false;
       _using_partial_mode = false;
       _current_page = 0;
       setFullWindow();
@@ -94,17 +183,17 @@ class GxEPD2_3C : public Adafruit_GFX
       x -= _pw_x;
       y -= _pw_y;
       // clip to (partial) window
-      if ((x < 0) || (x >= _pw_w) || (y < 0) || (y >= _pw_h)) return;
+      if ((x < 0) || (x >= int16_t(_pw_w)) || (y < 0) || (y >= int16_t(_pw_h))) return;
       // adjust for current page
       y -= _current_page * _page_height;
       // check if in current page
-      if ((y < 0) || (y >= _page_height)) return;
-      uint16_t i = x / 8 + y * (_pw_w / 8);
+      if ((y < 0) || (y >= int16_t(_page_height))) return;
+      uint32_t i = x / 8 + uint32_t(y) * uint32_t(_pw_w / 8);
       _black_buffer[i] = (_black_buffer[i] | (1 << (7 - x % 8))); // white
       _color_buffer[i] = (_color_buffer[i] | (1 << (7 - x % 8)));
       if (color == GxEPD_WHITE) return;
       else if (color == GxEPD_BLACK) _black_buffer[i] = (_black_buffer[i] & (0xFF ^ (1 << (7 - x % 8))));
-      else if (color == GxEPD_RED) _color_buffer[i] = (_color_buffer[i] & (0xFF ^ (1 << (7 - x % 8))));
+      else if ((color == GxEPD_RED) || (color == GxEPD_YELLOW)) _color_buffer[i] = (_color_buffer[i] & (0xFF ^ (1 << (7 - x % 8))));
     }
 
     void init(uint32_t serial_diag_bitrate = 0) // = 0 : disabled
@@ -118,13 +207,32 @@ class GxEPD2_3C : public Adafruit_GFX
     // init method with additional parameters:
     // initial false for re-init after processor deep sleep wake up, if display power supply was kept
     // only relevant for b/w displays with fast partial update
+    // reset_duration = 20 is default; a value of 2 may help with "clever" reset circuit of newer boards from Waveshare
     // pulldown_rst_mode true for alternate RST handling to avoid feeding 5V through RST pin
-    void init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_rst_mode = false)
+    void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 20, bool pulldown_rst_mode = false)
     {
-      epd2.init(serial_diag_bitrate, initial, pulldown_rst_mode);
+      epd2.init(serial_diag_bitrate, initial, reset_duration, pulldown_rst_mode);
       _using_partial_mode = false;
       _current_page = 0;
       setFullWindow();
+    }
+
+    // init method with additional parameters:
+    // SPIClass& spi: either SPI or alternate HW SPI channel
+    // SPISettings spi_settings: e.g. for higher SPI speed selection
+    void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration, bool pulldown_rst_mode, SPIClass& spi, SPISettings spi_settings)
+    {
+      epd2.selectSPI(spi, spi_settings);
+      epd2.init(serial_diag_bitrate, initial, reset_duration, pulldown_rst_mode);
+      _using_partial_mode = false;
+      _current_page = 0;
+      setFullWindow();
+    }
+
+    // release SPI and control pins
+    void end() 
+    {
+      epd2.end();
     }
 
     void fillScreen(uint16_t color) // 0x0 black, >0x0 white, to buffer
@@ -133,8 +241,8 @@ class GxEPD2_3C : public Adafruit_GFX
       uint8_t red = 0xFF;
       if (color == GxEPD_WHITE);
       else if (color == GxEPD_BLACK) black = 0x00;
-      else if (color == GxEPD_RED) red = 0x00;
-      for (uint16_t x = 0; x < sizeof(_black_buffer); x++)
+      else if ((color == GxEPD_RED) || (color == GxEPD_YELLOW)) red = 0x00;
+      for (uint32_t x = 0; x < sizeof(_black_buffer); x++)
       {
         _black_buffer[x] = black;
         _color_buffer[x] = red;
@@ -144,7 +252,7 @@ class GxEPD2_3C : public Adafruit_GFX
     // display buffer content to screen, useful for full screen buffer
     void display(bool partial_update_mode = false)
     {
-      epd2.writeImage(_black_buffer, _color_buffer, 0, 0, WIDTH, _page_height);
+      epd2.writeImage(_black_buffer, _color_buffer, 0, 0, GxEPD2_Type::WIDTH, _page_height);
       epd2.refresh(partial_update_mode);
       if (!partial_update_mode) epd2.powerOff();
     }
@@ -162,8 +270,20 @@ class GxEPD2_3C : public Adafruit_GFX
       w = gx_uint16_min(w, width() - x);
       h = gx_uint16_min(h, height() - y);
       _rotate(x, y, w, h);
-      epd2.writeImagePart(_black_buffer, _color_buffer, x, y, WIDTH, _page_height, x, y, w, h);
+      epd2.writeImagePart(_black_buffer, _color_buffer, x, y, GxEPD2_Type::WIDTH, _page_height, x, y, w, h);
       epd2.refresh(x, y, w, h);
+    }
+
+    void displayWindowBW(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+    {
+      x = gx_uint16_min(x, width());
+      y = gx_uint16_min(y, height());
+      w = gx_uint16_min(w, width() - x);
+      h = gx_uint16_min(h, height() - y);
+      _rotate(x, y, w, h);
+      epd2.writeImagePartToCurrent(_black_buffer, x, y, GxEPD2_Type::WIDTH, _page_height, x, y, w, h);
+      epd2.refresh_bw(x, y, w, h);
+      epd2.writeImagePartToPrevious(_black_buffer, x, y, GxEPD2_Type::WIDTH, _page_height, x, y, w, h);
     }
 
     void setFullWindow()
@@ -171,7 +291,7 @@ class GxEPD2_3C : public Adafruit_GFX
       _using_partial_mode = false;
       _pw_x = 0;
       _pw_y = 0;
-      _pw_w = WIDTH;
+      _pw_w = GxEPD2_Type::WIDTH;
       _pw_h = HEIGHT;
     }
 
@@ -210,7 +330,7 @@ class GxEPD2_3C : public Adafruit_GFX
       {
         //Serial.print("  nextPage("); Serial.print(_pw_x); Serial.print(", "); Serial.print(_pw_y); Serial.print(", ");
         //Serial.print(_pw_w); Serial.print(", "); Serial.print(_pw_h); Serial.print(") P"); Serial.println(_current_page);
-        uint16_t page_ye = _current_page < (_pages - 1) ? page_ys + _page_height : HEIGHT;
+        uint16_t page_ye = _current_page < int16_t(_pages - 1) ? page_ys + _page_height : HEIGHT;
         uint16_t dest_ys = _pw_y + page_ys; // transposed
         uint16_t dest_ye = gx_uint16_min(_pw_y + _pw_h, _pw_y + page_ye);
         if (dest_ye > dest_ys)
@@ -226,7 +346,7 @@ class GxEPD2_3C : public Adafruit_GFX
           //Serial.print(dest_ys); Serial.print(".."); Serial.println(dest_ye);
         }
         _current_page++;
-        if (_current_page == _pages)
+        if (_current_page == int16_t(_pages))
         {
           _current_page = 0;
           if (!_second_phase)
@@ -245,9 +365,9 @@ class GxEPD2_3C : public Adafruit_GFX
       }
       else // full update
       {
-        epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
+        epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, GxEPD2_Type::WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
         _current_page++;
-        if (_current_page == _pages)
+        if (_current_page == int16_t(_pages))
         {
           _current_page = 0;
           if ((epd2.panel == GxEPD2::GDEW0154Z04) && (_pages > 1))
@@ -261,6 +381,88 @@ class GxEPD2_3C : public Adafruit_GFX
             }
             else epd2.refresh(true); // partial update after second phase
           } else epd2.refresh(false); // full update after only phase
+          epd2.powerOff();
+          return false;
+        }
+        fillScreen(GxEPD_WHITE);
+        return true;
+      }
+    }
+
+    bool nextPageToPrevious() {return false;}; // no-op in this class
+
+    bool nextPageBW()
+    {
+      if (1 == _pages)
+      {
+        if (_using_partial_mode)
+        {
+          epd2.writeImageToCurrent(_black_buffer, _pw_x, _pw_y, _pw_w, _pw_h);
+          epd2.refresh_bw(_pw_x, _pw_y, _pw_w, _pw_h);
+          epd2.writeImageToPrevious(_black_buffer, _pw_x, _pw_y, _pw_w, _pw_h);
+          epd2.writeImageToCurrent(_black_buffer, _pw_x, _pw_y, _pw_w, _pw_h);
+        }
+        else // full update
+        {
+          epd2.writeImage(_black_buffer, 0, 0, GxEPD2_Type::WIDTH, HEIGHT);
+          epd2.refresh(false);
+          epd2.writeImageToPrevious(_black_buffer, 0, 0, GxEPD2_Type::WIDTH, HEIGHT);
+          epd2.powerOff();
+        }
+        return false;
+      }
+      uint16_t page_ys = _current_page * _page_height;
+      if (_using_partial_mode)
+      {
+        //Serial.print("  nextPage("); Serial.print(_pw_x); Serial.print(", "); Serial.print(_pw_y); Serial.print(", ");
+        //Serial.print(_pw_w); Serial.print(", "); Serial.print(_pw_h); Serial.print(") P"); Serial.println(_current_page);
+        uint16_t page_ye = _current_page < (_pages - 1) ? page_ys + _page_height : HEIGHT;
+        uint16_t dest_ys = _pw_y + page_ys; // transposed
+        uint16_t dest_ye = gx_uint16_min(_pw_y + _pw_h, _pw_y + page_ye);
+        if (dest_ye > dest_ys)
+        {
+          //Serial.print("writeImage("); Serial.print(_pw_x); Serial.print(", "); Serial.print(dest_ys); Serial.print(", ");
+          //Serial.print(_pw_w); Serial.print(", "); Serial.print(dest_ye - dest_ys); Serial.println(")");
+          epd2.writeImageToCurrent(_black_buffer, _pw_x, dest_ys, _pw_w, dest_ye - dest_ys);
+          if (_second_phase)  epd2.writeImageToPrevious(_black_buffer, _pw_x, dest_ys, _pw_w, dest_ye - dest_ys);
+        }
+        else
+        {
+          //Serial.print("writeImage("); Serial.print(_pw_x); Serial.print(", "); Serial.print(dest_ys); Serial.print(", ");
+          //Serial.print(_pw_w); Serial.print(", "); Serial.print(dest_ye - dest_ys); Serial.print(") skipped ");
+          //Serial.print(dest_ys); Serial.print(".."); Serial.println(dest_ye);
+        }
+        _current_page++;
+        if (_current_page == _pages)
+        {
+          _current_page = 0;
+          if (!_second_phase)
+          {
+            epd2.refresh_bw(_pw_x, _pw_y, _pw_w, _pw_h);
+            _second_phase = true;
+            fillScreen(GxEPD_WHITE);
+            return true;
+          }
+          return false;
+        }
+        fillScreen(GxEPD_WHITE);
+        return true;
+      }
+      else // full update
+      {
+        if (!_second_phase) epd2.writeImage(_black_buffer, 0, page_ys, GxEPD2_Type::WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
+        else epd2.writeImageToPrevious(_black_buffer, 0, page_ys, GxEPD2_Type::WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
+        _current_page++;
+        if (_current_page == _pages)
+        {
+          _current_page = 0;
+          if (!_second_phase)
+          {
+            epd2.refresh(false); // full update after first phase
+            _second_phase = true;
+            fillScreen(GxEPD_WHITE);
+            return true;
+          }
           epd2.powerOff();
           return false;
         }
@@ -297,7 +499,7 @@ class GxEPD2_3C : public Adafruit_GFX
           uint16_t page_ys = _current_page * _page_height;
           fillScreen(GxEPD_WHITE);
           drawCallback(pv);
-          epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
+          epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, GxEPD2_Type::WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
         }
         if (epd2.panel == GxEPD2::GDEW0154Z04)
         { // GxEPD2_154c paged workaround: write color part
@@ -306,7 +508,7 @@ class GxEPD2_3C : public Adafruit_GFX
             uint16_t page_ys = _current_page * _page_height;
             fillScreen(GxEPD_WHITE);
             drawCallback(pv);
-            epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
+            epd2.writeImage(_black_buffer, _color_buffer, 0, page_ys, GxEPD2_Type::WIDTH, gx_uint16_min(_page_height, HEIGHT - page_ys));
           }
         }
         epd2.refresh(false); // full update
@@ -389,7 +591,7 @@ class GxEPD2_3C : public Adafruit_GFX
       epd2.drawImage(bitmap, x, y, w, h, invert, mirror_y, pgm);
     }
     void drawImagePart(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
-                        int16_t x, int16_t y, int16_t w, int16_t h, bool invert = false, bool mirror_y = false, bool pgm = false)
+                       int16_t x, int16_t y, int16_t w, int16_t h, bool invert = false, bool mirror_y = false, bool pgm = false)
     {
       epd2.drawImagePart(bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
     }
@@ -402,12 +604,12 @@ class GxEPD2_3C : public Adafruit_GFX
       epd2.drawImage(black, color, x, y, w, h, false, false, false);
     }
     void drawImagePart(const uint8_t* black, const uint8_t* color, int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
-                        int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+                       int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
     {
       epd2.drawImagePart(black, color, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
     }
     void drawImagePart(const uint8_t* black, const uint8_t* color, int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
-                        int16_t x, int16_t y, int16_t w, int16_t h)
+                       int16_t x, int16_t y, int16_t w, int16_t h)
     {
       epd2.drawImagePart(black, color, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, false, false, false);
     }

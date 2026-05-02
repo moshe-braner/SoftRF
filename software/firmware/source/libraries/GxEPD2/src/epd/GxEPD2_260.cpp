@@ -13,7 +13,7 @@
 
 #include "GxEPD2_260.h"
 
-GxEPD2_260::GxEPD2_260(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
+GxEPD2_260::GxEPD2_260(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
   GxEPD2_EPD(cs, dc, rst, busy, LOW, 10000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate)
 {
 }
@@ -46,6 +46,16 @@ void GxEPD2_260::writeScreenBuffer(uint8_t value)
 
 void GxEPD2_260::writeImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
+  _writeImage(0x13, bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_260::writeImageToPrevious(const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
+  _writeImage(0x10, bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_260::_writeImage(uint8_t command, const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
   if (_initial_write) writeScreenBuffer(); // initial full screen buffer clean
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
   int16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
@@ -63,7 +73,8 @@ void GxEPD2_260::writeImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_
   if (!_using_partial_mode) _Init_Part();
   _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
-  _writeCommand(0x13);
+  _writeCommand(command);
+  _startTransfer();
   for (int16_t i = 0; i < h1; i++)
   {
     for (int16_t j = 0; j < w1 / 8; j++)
@@ -84,14 +95,27 @@ void GxEPD2_260::writeImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_
         data = bitmap[idx];
       }
       if (invert) data = ~data;
-      _writeData(data);
+      _transfer(data);
     }
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
 
 void GxEPD2_260::writeImagePart(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
+                                int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
+  _writeImagePart(0x13, bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_260::writeImagePartToPrevious(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
+    int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
+  _writeImagePart(0x10, bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_260::_writeImagePart(uint8_t command, const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
                                 int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
   if (_initial_write) writeScreenBuffer(); // initial full screen buffer clean
@@ -117,7 +141,8 @@ void GxEPD2_260::writeImagePart(const uint8_t bitmap[], int16_t x_part, int16_t 
   if (!_using_partial_mode) _Init_Part();
   _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
-  _writeCommand(0x13);
+  _writeCommand(command);
+  _startTransfer();
   for (int16_t i = 0; i < h1; i++)
   {
     for (int16_t j = 0; j < w1 / 8; j++)
@@ -138,9 +163,10 @@ void GxEPD2_260::writeImagePart(const uint8_t bitmap[], int16_t x_part, int16_t 
         data = bitmap[idx];
       }
       if (invert) data = ~data;
-      _writeData(data);
+      _transfer(data);
     }
   }
+  _endTransfer();
   _writeCommand(0x92); // partial out
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
@@ -221,14 +247,18 @@ void GxEPD2_260::refresh(bool partial_update_mode)
 void GxEPD2_260::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
 {
   if (_initial_refresh) return refresh(false); // initial update needs be full update
-  x -= x % 8; // byte boundary
-  w -= x % 8; // byte boundary
+  // intersection with screen
+  int16_t w1 = x < 0 ? w + x : w; // reduce
+  int16_t h1 = y < 0 ? h + y : h; // reduce
   int16_t x1 = x < 0 ? 0 : x; // limit
   int16_t y1 = y < 0 ? 0 : y; // limit
-  int16_t w1 = x + w < int16_t(WIDTH) ? w : int16_t(WIDTH) - x; // limit
-  int16_t h1 = y + h < int16_t(HEIGHT) ? h : int16_t(HEIGHT) - y; // limit
-  w1 -= x1 - x;
-  h1 -= y1 - y;
+  w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
+  h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
+  if ((w1 <= 0) || (h1 <= 0)) return; 
+  // make x1, w1 multiple of 8
+  w1 += x1 % 8;
+  if (w1 % 8 > 0) w1 += 8 - w1 % 8;
+  x1 -= x1 % 8;
   if (!_using_partial_mode) _Init_Part();
   if (usePartialUpdateWindow) _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);

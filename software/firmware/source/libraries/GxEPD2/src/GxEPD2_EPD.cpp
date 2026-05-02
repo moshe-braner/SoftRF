@@ -1,7 +1,7 @@
 // Display Library for SPI e-paper panels from Dalian Good Display and boards from Waveshare.
-// Requires HW SPI and Adafruit_GFX. Caution: these e-papers require 3.3V supply AND data lines!
+// Requires HW SPI and Adafruit_GFX. Caution: the e-paper panels require 3.3V supply AND data lines!
 //
-// based on Demo Example from Good Display: http://www.e-paper-display.com/download_list/downloadcategoryid=34&isMode=false.html
+// Display Library based on Demo Example from Good Display: https://www.good-display.com/companyfile/32/
 //
 // Author: Jean-Marc Zingg
 //
@@ -14,42 +14,35 @@
 #if defined(ESP8266) || defined(ESP32)
 #include <pgmspace.h>
 #else
-#if !defined(RASPBERRY_PI)
 #include <avr/pgmspace.h>
-#if defined(ARDUINO_ARCH_NRF52)
-extern SPIClass SPI1;
-#define SPI SPI1
-#endif /* ARDUINO_ARCH_NRF52 */
-#else
-#define SPI SPI0
-#endif /* RASPBERRY_PI */
 #endif
 
-GxEPD2_EPD::GxEPD2_EPD(int8_t cs, int8_t dc, int8_t rst, int8_t busy, int8_t busy_level, uint32_t busy_timeout,
+GxEPD2_EPD::GxEPD2_EPD(int16_t cs, int16_t dc, int16_t rst, int16_t busy, int16_t busy_level, uint32_t busy_timeout,
                        uint16_t w, uint16_t h, GxEPD2::Panel p, bool c, bool pu, bool fpu) :
   WIDTH(w), HEIGHT(h), panel(p), hasColor(c), hasPartialUpdate(pu), hasFastPartialUpdate(fpu),
   _cs(cs), _dc(dc), _rst(rst), _busy(busy), _busy_level(busy_level), _busy_timeout(busy_timeout), _diag_enabled(false),
-
-#ifdef RASPBERRY_PI
-  _spi_settings(BCM2835_SPI_CLOCK_DIVIDER_64, BCM2835_SPI_BIT_ORDER_MSBFIRST, BCM2835_SPI_MODE0)
-#else
-  _spi_settings(4000000, MSBFIRST, SPI_MODE0)
-#endif
+  _pSPIx(&SPI), _spi_settings(4000000, MSBFIRST, SPI_MODE0)
 {
   _initial_write = true;
   _initial_refresh = true;
   _power_is_on = false;
   _using_partial_mode = false;
   _hibernating = false;
-  _timeout_expired = false;
+  _timeout_expired = false;            // added by Linar?
+  _init_display_done = false;
+  _reset_duration = 10;
+  _busy_callback = 0;
+  _busy_callback_parameter = 0;
+  _sck = -1;
+  _mosi = -1;
 }
 
 void GxEPD2_EPD::init(uint32_t serial_diag_bitrate)
 {
-  init(serial_diag_bitrate, true, false);
+  init(serial_diag_bitrate, true, 10, false);
 }
 
-void GxEPD2_EPD::init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_rst_mode)
+void GxEPD2_EPD::init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration, bool pulldown_rst_mode)
 {
   _initial_write = initial;
   _initial_refresh = initial;
@@ -57,7 +50,9 @@ void GxEPD2_EPD::init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_
   _power_is_on = false;
   _using_partial_mode = false;
   _hibernating = false;
-  _timeout_expired = false;
+  _timeout_expired = false;            // added by Linar?
+  _init_display_done = false;
+  _reset_duration = reset_duration;
   if (serial_diag_bitrate > 0)
   {
     Serial.begin(serial_diag_bitrate);
@@ -65,20 +60,54 @@ void GxEPD2_EPD::init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_
   }
   if (_cs >= 0)
   {
-    digitalWrite(_cs, HIGH);
+    digitalWrite(_cs, HIGH); // preset (less glitch for any analyzer)
     pinMode(_cs, OUTPUT);
+    digitalWrite(_cs, HIGH); // set (needed e.g. for RP2040)
+  }
+  _reset();
+  _pSPIx->begin(); // may steal _rst pin (Waveshare Pico-ePaper-2.9)
+  if (_rst >= 0)
+  {
+    digitalWrite(_rst, HIGH); // preset (less glitch for any analyzer)
+    pinMode(_rst, OUTPUT);
+    digitalWrite(_rst, HIGH); // set (needed e.g. for RP2040)
+  }
+  if (_cs >= 0)
+  {
+    digitalWrite(_cs, HIGH); // preset (less glitch for any analyzer)
+    pinMode(_cs, OUTPUT);
+    digitalWrite(_cs, HIGH); // set (needed e.g. for RP2040)
   }
   if (_dc >= 0)
   {
-    digitalWrite(_dc, HIGH);
+    digitalWrite(_dc, HIGH); // preset (less glitch for any analyzer)
     pinMode(_dc, OUTPUT);
+    digitalWrite(_dc, HIGH); // set (needed e.g. for RP2040)
   }
-  _reset();
   if (_busy >= 0)
   {
     pinMode(_busy, INPUT);
   }
-  SPI.begin();
+}
+
+void GxEPD2_EPD::end()
+{
+  _pSPIx->end();
+  if (_cs >= 0) pinMode(_cs, INPUT);
+  if (_dc >= 0) pinMode(_dc, INPUT);
+  if (_rst >= 0) pinMode(_rst, INPUT);
+}
+
+void GxEPD2_EPD::setBusyCallback(void (*busyCallback)(const void*), const void* busy_callback_parameter)
+{
+  _busy_callback = busyCallback;
+  _busy_callback_parameter = busy_callback_parameter;
+}
+
+void GxEPD2_EPD::selectSPI(SPIClass& spi, SPISettings spi_settings)
+{
+  _pSPIx = &spi;
+  _spi_settings = spi_settings;
 }
 
 void GxEPD2_EPD::_reset()
@@ -89,25 +118,21 @@ void GxEPD2_EPD::_reset()
     {
       digitalWrite(_rst, LOW);
       pinMode(_rst, OUTPUT);
-      delay(20);
-#if defined(RASPBERRY_PI)
-      pinMode(_rst, INPUT);
-      //  with a pullup
-      bcm2835_gpio_set_pud(_rst, BCM2835_GPIO_PUD_UP);
-#else
+      digitalWrite(_rst, LOW);
+      delay(_reset_duration);
       pinMode(_rst, INPUT_PULLUP);
-#endif
-      delay(200);
+      delay(_reset_duration > 10 ? _reset_duration : 10);
     }
     else
     {
-      digitalWrite(_rst, HIGH);
+      digitalWrite(_rst, HIGH); // NEEDED for Waveshare "clever" reset circuit, power controller before reset pulse, preset (less glitch for any analyzer)
       pinMode(_rst, OUTPUT);
-      delay(20);
+      digitalWrite(_rst, HIGH); // NEEDED for Waveshare "clever" reset circuit, power controller before reset pulse, set (needed e.g. for RP2040)
+      delay(10); // NEEDED for Waveshare "clever" reset circuit, at least delay(2);
       digitalWrite(_rst, LOW);
-      delay(20);
+      delay(_reset_duration);
       digitalWrite(_rst, HIGH);
-      delay(200);
+      delay(_reset_duration > 10 ? _reset_duration : 10);
     }
     _hibernating = false;
   }
@@ -122,14 +147,21 @@ void GxEPD2_EPD::_waitWhileBusy(const char* comment, uint16_t busy_time)
     while (1)
     {
       if (digitalRead(_busy) != _busy_level) break;
-      delay(1);
+      if (_busy_callback) _busy_callback(_busy_callback_parameter);
+      else delay(1);
+      if (digitalRead(_busy) != _busy_level) break;
       if (micros() - start > _busy_timeout)
       {
-        _timeout_expired = true;
-//        Serial.println("Busy Timeout!");
+        //Serial.println("Busy Timeout!");
+        _timeout_expired = true;            // added by Linar?
         break;
       }
+#if defined(ESP8266) || defined(ESP32)
+      yield(); // avoid wdt
+#endif
     }
+
+#if 0  // this was in Linar's code, why?
 #if defined(ESP8266) || defined(ARDUINO_ARCH_NRF52)
     if (micros() - start < 20) {
       _timeout_expired = true;
@@ -139,6 +171,8 @@ void GxEPD2_EPD::_waitWhileBusy(const char* comment, uint16_t busy_time)
       _timeout_expired = true;
     }
 #endif /* ESP8266 or ESP32 */
+#endif
+
     if (comment)
     {
 #if !defined(DISABLE_DIAGNOSTIC_OUTPUT)
@@ -158,98 +192,184 @@ void GxEPD2_EPD::_waitWhileBusy(const char* comment, uint16_t busy_time)
 
 void GxEPD2_EPD::_writeCommand(uint8_t c)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_dc >= 0) digitalWrite(_dc, LOW);
   if (_cs >= 0) digitalWrite(_cs, LOW);
-  SPI.transfer(c);
+  _pSPIx->transfer(c);
   if (_cs >= 0) digitalWrite(_cs, HIGH);
   if (_dc >= 0) digitalWrite(_dc, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeData(uint8_t d)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_cs >= 0) digitalWrite(_cs, LOW);
-  SPI.transfer(d);
+  _pSPIx->transfer(d);
   if (_cs >= 0) digitalWrite(_cs, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeData(const uint8_t* data, uint16_t n)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_cs >= 0) digitalWrite(_cs, LOW);
   for (uint16_t i = 0; i < n; i++)
   {
-    SPI.transfer(*data++);
+    _pSPIx->transfer(*data++);
   }
   if (_cs >= 0) digitalWrite(_cs, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeDataPGM(const uint8_t* data, uint16_t n, int16_t fill_with_zeroes)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_cs >= 0) digitalWrite(_cs, LOW);
   for (uint16_t i = 0; i < n; i++)
   {
-    SPI.transfer(pgm_read_byte(&*data++));
+    _pSPIx->transfer(pgm_read_byte(&*data++));
   }
   while (fill_with_zeroes > 0)
   {
-    SPI.transfer(0x00);
+    _pSPIx->transfer(0x00);
     fill_with_zeroes--;
   }
   if (_cs >= 0) digitalWrite(_cs, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeDataPGM_sCS(const uint8_t* data, uint16_t n, int16_t fill_with_zeroes)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   for (uint8_t i = 0; i < n; i++)
   {
     if (_cs >= 0) digitalWrite(_cs, LOW);
-    SPI.transfer(pgm_read_byte(&*data++));
+    _pSPIx->transfer(pgm_read_byte(&*data++));
     if (_cs >= 0) digitalWrite(_cs, HIGH);
   }
   while (fill_with_zeroes > 0)
   {
     if (_cs >= 0) digitalWrite(_cs, LOW);
-    SPI.transfer(0x00);
+    _pSPIx->transfer(0x00);
     fill_with_zeroes--;
     if (_cs >= 0) digitalWrite(_cs, HIGH);
   }
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeCommandData(const uint8_t* pCommandData, uint8_t datalen)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_dc >= 0) digitalWrite(_dc, LOW);
   if (_cs >= 0) digitalWrite(_cs, LOW);
-  SPI.transfer(*pCommandData++);
+  _pSPIx->transfer(*pCommandData++);
   if (_dc >= 0) digitalWrite(_dc, HIGH);
   for (uint8_t i = 0; i < datalen - 1; i++)  // sub the command
   {
-    SPI.transfer(*pCommandData++);
+    _pSPIx->transfer(*pCommandData++);
   }
   if (_cs >= 0) digitalWrite(_cs, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
 
 void GxEPD2_EPD::_writeCommandDataPGM(const uint8_t* pCommandData, uint8_t datalen)
 {
-  SPI.beginTransaction(_spi_settings);
+  _pSPIx->beginTransaction(_spi_settings);
   if (_dc >= 0) digitalWrite(_dc, LOW);
   if (_cs >= 0) digitalWrite(_cs, LOW);
-  SPI.transfer(pgm_read_byte(&*pCommandData++));
+  _pSPIx->transfer(pgm_read_byte(&*pCommandData++));
   if (_dc >= 0) digitalWrite(_dc, HIGH);
   for (uint8_t i = 0; i < datalen - 1; i++)  // sub the command
   {
-    SPI.transfer(pgm_read_byte(&*pCommandData++));
+    _pSPIx->transfer(pgm_read_byte(&*pCommandData++));
   }
   if (_cs >= 0) digitalWrite(_cs, HIGH);
-  SPI.endTransaction();
+  _pSPIx->endTransaction();
 }
+
+void GxEPD2_EPD::_startTransfer()
+{
+  _pSPIx->beginTransaction(_spi_settings);
+  if (_cs >= 0) digitalWrite(_cs, LOW);
+}
+
+void GxEPD2_EPD::_transfer(uint8_t value)
+{
+  _pSPIx->transfer(value);
+}
+
+void GxEPD2_EPD::_endTransfer()
+{
+  if (_cs >= 0) digitalWrite(_cs, HIGH);
+  _pSPIx->endTransaction();
+}
+
+void GxEPD2_EPD::init(int16_t sck, int16_t mosi, uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration, bool pulldown_rst_mode)
+{
+  _sck = sck;
+  _mosi = mosi;
+  init(serial_diag_bitrate, initial, reset_duration, pulldown_rst_mode);
+}
+
+uint8_t GxEPD2_EPD::_readData()
+{
+  uint8_t data = 0;
+  if ((_sck >= 0) && (_mosi >= 0))
+  {
+    _pSPIx->end();
+    digitalWrite(_sck, LOW);
+    pinMode(_sck, OUTPUT);
+    digitalWrite(_sck, LOW);
+    pinMode(_mosi, INPUT);
+    if (_cs >= 0) digitalWrite(_cs, LOW);
+    for (int i = 0; i < 8; i++)
+    {
+      data <<= 1;
+      digitalWrite(_sck, HIGH);
+      data |= digitalRead(_mosi);
+      digitalWrite(_sck, LOW);
+    }
+    if (_cs >= 0) digitalWrite(_cs, HIGH);
+    _pSPIx->begin();
+  }
+  return data;
+}
+
+void GxEPD2_EPD::_readData(uint8_t* data, uint16_t n)
+{
+  if ((_sck >= 0) && (_mosi >= 0))
+  {
+    _pSPIx->end();
+    digitalWrite(_sck, LOW);
+    pinMode(_sck, OUTPUT);
+    digitalWrite(_sck, LOW);
+    pinMode(_mosi, INPUT);
+    if (_cs >= 0) digitalWrite(_cs, LOW);
+    for (uint8_t i = 0; i < n; i++)
+    {
+      *data = 0;
+      for (int i = 0; i < 8; i++)
+      {
+        *data <<= 1;
+        digitalWrite(_sck, HIGH);
+        *data |= digitalRead(_mosi);
+        digitalWrite(_sck, LOW);
+      }
+      data++;
+    }
+    if (_cs >= 0) digitalWrite(_cs, HIGH);
+    _pSPIx->begin();
+  }
+}
+
+// added by Linar (?) for each module - moved here
+bool GxEPD2_EPD::probe()
+{
+  if (_timeout_expired) {
+    return false;
+  } else {
+    return true;
+  }
+}
+

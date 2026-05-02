@@ -32,7 +32,7 @@
 #define SPIFLASH_LOG(_address, _count)                                         \
   do {                                                                         \
     Serial.print(__FUNCTION__);                                                \
-    Serial.print(": adddress = ");                                             \
+    Serial.print(": address = ");                                              \
     Serial.print(_address, HEX);                                               \
     if (_count) {                                                              \
       Serial.print(" count = ");                                               \
@@ -90,28 +90,19 @@ bool Adafruit_SPIFlashBase::begin(SPIFlash_Device_t const *flash_devs,
 /// List of all possible flash devices used by Adafruit boards
 static const SPIFlash_Device_t possible_devices[] = {
     // Main devices used in current Adafruit products
-    GD25Q16C,
-    GD25Q32C,
-    GD25Q64C,
-    S25FL116K,
-    S25FL216K,
+    GD25Q16C, GD25Q32C, GD25Q64C, S25FL116K, S25FL216K,
 
     // Only a handful of production run
     W25Q16FW,
-    W25Q64JV_IQ,
+
+    // Flash breakout
+    W25Q16JV_IQ, W25Q32JV_IQ, W25Q64JV_IQ, W25Q128JV_SQ,
 
     // Fujitsu FRAM
-    MB85RS64V,
-    MB85RS1MT,
-    MB85RS2MTA,
-    MB85RS4MT,
+    MB85RS64V, MB85RS1MT, MB85RS2MTA, MB85RS4MT,
 
     // Other common flash devices
-    W25Q16JV_IQ,
-    W25Q32JV_IQ,
-    AT25SF041,
-    AT25DF081A,
-};
+    AT25SF041, AT25DF081A};
 
 /// Flash device list count
 enum {
@@ -131,16 +122,6 @@ static SPIFlash_Device_t const *findDevice(SPIFlash_Device_t const *device_list,
     }
   }
   return NULL;
-}
-
-void Adafruit_SPIFlashBase::write_status_register(uint8_t const status[2]) {
-  if (_flash_dev->write_status_register_split) {
-    _trans->writeCommand(SFLASH_CMD_WRITE_STATUS2, status + 1, 1);
-  } else if (_flash_dev->single_status_byte) {
-    _trans->writeCommand(SFLASH_CMD_WRITE_STATUS, status + 1, 1);
-  } else {
-    _trans->writeCommand(SFLASH_CMD_WRITE_STATUS, status, 2);
-  }
 }
 
 bool Adafruit_SPIFlashBase::begin(SPIFlash_Device_t const *flash_devs,
@@ -178,11 +159,9 @@ bool Adafruit_SPIFlashBase::begin(SPIFlash_Device_t const *flash_devs,
 
   if (_flash_dev == NULL) {
 #if SPIFLASH_DEBUG
-    if (Serial) {
-      Serial.print("Unknown flash device 0x");
-      Serial.println(
+    Serial.print("Unknown flash device 0x");
+    Serial.println(
         ((uint32_t)jedec_ids[0]) << 16 | jedec_ids[1] << 8 | jedec_ids[2], HEX);
-    }
 #endif
     return false;
   }
@@ -237,40 +216,19 @@ bool Adafruit_SPIFlashBase::begin(SPIFlash_Device_t const *flash_devs,
       writeEnable();
 
       uint8_t full_status[2] = {0x00, _flash_dev->quad_enable_bit_mask};
-      write_status_register(full_status);
+
+      if (_flash_dev->write_status_register_split) {
+        _trans->writeCommand(SFLASH_CMD_WRITE_STATUS2, full_status + 1, 1);
+      } else if (_flash_dev->single_status_byte) {
+        _trans->writeCommand(SFLASH_CMD_WRITE_STATUS, full_status + 1, 1);
+      } else {
+        _trans->writeCommand(SFLASH_CMD_WRITE_STATUS, full_status, 2);
+      }
     }
   } else {
-    /*
-     * Most of QSPI flash memory ICs have non-volatile QE bit in a status
-     * register. If it was set once - we need to apply a separate procedure to
-     * clear it off when the device is connected to a non-QSPI capable bus or it
-     * has _flash_dev->supports_qspi setting in 'false' state
-     */
-    // Disable Quad Mode if not available
-    if (!_trans->supportQuadMode() || !_flash_dev->supports_qspi) {
-      // Verify that QSPI mode is not enabled.
-      uint8_t status =
-          _flash_dev->single_status_byte ? readStatus() : readStatus2();
-
-      // Check the quad enable bit.
-      if ((status & _flash_dev->quad_enable_bit_mask) != 0) {
-        writeEnable();
-
-        uint8_t full_status[2] = {0x00, 0x00};
-        write_status_register(full_status);
-      }
-    }
-
     // Single mode, use fast read if supported
     if (_flash_dev->supports_fast_read) {
-      if (_trans->supportQuadMode() && !_flash_dev->supports_qspi) {
-        /* Re-init QSPI with READOC_FASTREAD and WRITEOC_PP */
-        _trans->end();
-        _trans->setReadCommand(SFLASH_CMD_FAST_READ);
-        _trans->begin();
-      } else {
-        _trans->setReadCommand(SFLASH_CMD_FAST_READ);
-      }
+      _trans->setReadCommand(SFLASH_CMD_FAST_READ);
     }
   }
 
@@ -305,17 +263,13 @@ bool Adafruit_SPIFlashBase::begin(SPIFlash_Device_t const *flash_devs,
 
 #endif // ARDUINO_ARCH_ESP32
 
-bool Adafruit_SPIFlashBase::end(void) {
-
+void Adafruit_SPIFlashBase::end(void) {
   if (_trans == NULL) {
-    return false;
+    return;
   }
 
   _trans->end();
-
   _flash_dev = NULL;
-
-  return true;
 }
 
 void Adafruit_SPIFlashBase::setIndicator(int pin, bool state_on) {
@@ -354,6 +308,14 @@ uint8_t Adafruit_SPIFlashBase::readStatus2(void) {
   return status;
 }
 
+bool Adafruit_SPIFlashBase::isReady(void) {
+  if (_flash_dev->is_fram) {
+    return true;
+  } else {
+    return (readStatus() & 0x03) == 0;
+  }
+}
+
 void Adafruit_SPIFlashBase::waitUntilReady(void) {
   // FRAM has no need to wait for either read or write operation
   if (_flash_dev->is_fram) {
@@ -372,6 +334,32 @@ bool Adafruit_SPIFlashBase::writeEnable(void) {
 
 bool Adafruit_SPIFlashBase::writeDisable(void) {
   return _trans->runCommand(SFLASH_CMD_WRITE_DISABLE);
+}
+
+bool Adafruit_SPIFlashBase::erasePage(uint32_t pageNumber) {
+  if (!_flash_dev) {
+    return false;
+  }
+
+  // skip erase for FRAM
+  if (_flash_dev->is_fram) {
+    return true;
+  }
+
+  _indicator_on();
+
+  // Before we erase the page we need to wait for any writes to finish
+  waitUntilReady();
+  writeEnable();
+
+  SPIFLASH_LOG(pageNumber * SFLASH_PAGE_SIZE, 0);
+
+  bool const ret = _trans->eraseCommand(SFLASH_CMD_ERASE_PAGE,
+                                        pageNumber * SFLASH_PAGE_SIZE);
+
+  _indicator_off();
+
+  return ret;
 }
 
 bool Adafruit_SPIFlashBase::eraseSector(uint32_t sectorNumber) {
@@ -401,8 +389,9 @@ bool Adafruit_SPIFlashBase::eraseSector(uint32_t sectorNumber) {
 }
 
 bool Adafruit_SPIFlashBase::eraseBlock(uint32_t blockNumber) {
-  if (!_flash_dev)
+  if (!_flash_dev) {
     return false;
+  }
 
   // skip erase for fram
   if (_flash_dev->is_fram) {
@@ -448,8 +437,9 @@ bool Adafruit_SPIFlashBase::eraseChip(void) {
 
 uint32_t Adafruit_SPIFlashBase::readBuffer(uint32_t address, uint8_t *buffer,
                                            uint32_t len) {
-  if (!_flash_dev)
+  if (!_flash_dev) {
     return 0;
+  }
 
   _indicator_on();
 
@@ -480,8 +470,9 @@ uint32_t Adafruit_SPIFlashBase::read32(uint32_t addr) {
 uint32_t Adafruit_SPIFlashBase::writeBuffer(uint32_t address,
                                             uint8_t const *buffer,
                                             uint32_t len) {
-  if (!_flash_dev)
+  if (!_flash_dev) {
     return 0;
+  }
 
   SPIFLASH_LOG(address, len);
 
@@ -508,8 +499,9 @@ uint32_t Adafruit_SPIFlashBase::writeBuffer(uint32_t address,
           SFLASH_PAGE_SIZE - (address & (SFLASH_PAGE_SIZE - 1));
       uint32_t const toWrite = min(remain, leftOnPage);
 
-      if (!_trans->writeMemory(address, buffer, toWrite))
+      if (!_trans->writeMemory(address, buffer, toWrite)) {
         break;
+      }
 
       remain -= toWrite;
       buffer += toWrite;

@@ -375,6 +375,8 @@ void GxEPD2_270_T91::_Update_Part()
   _waitWhileBusy("_Update_Part", partial_refresh_time);
 }
 
+// added by Linar (?) for each module - moved to GxEPD2_EPD.cpp
+/*
 bool GxEPD2_270_T91::probe()
 {
   if (_timeout_expired) {
@@ -383,3 +385,5 @@ bool GxEPD2_270_T91::probe()
     return true;
   }
 }
+*/
+

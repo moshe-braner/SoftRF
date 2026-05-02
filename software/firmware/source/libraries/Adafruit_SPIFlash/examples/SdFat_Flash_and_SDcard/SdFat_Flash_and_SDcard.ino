@@ -6,65 +6,49 @@
 // Flash and SD card (if present) and display information about the QSPI flash.
 //
 
-#include <SdFat.h>
+#include "SdFat_Adafruit_Fork.h"
+#include <SPI.h>
+
 #include <Adafruit_SPIFlash.h>
 
-#if defined(ARDUINO_ARCH_ESP32)
-  // ESP32 use same flash device that store code.
-  // Therefore there is no need to specify the SPI and SS
-  Adafruit_FlashTransport_ESP32 flashTransport;
-
-#else
-  // On-board external flash (QSPI or SPI) macros should already
-  // defined in your board variant if supported
-  // - EXTERNAL_FLASH_USE_QSPI
-  // - EXTERNAL_FLASH_USE_CS/EXTERNAL_FLASH_USE_SPI
-  #if defined(EXTERNAL_FLASH_USE_QSPI)
-    Adafruit_FlashTransport_QSPI flashTransport;
-
-  #elif defined(EXTERNAL_FLASH_USE_SPI)
-    Adafruit_FlashTransport_SPI flashTransport(EXTERNAL_FLASH_USE_CS, EXTERNAL_FLASH_USE_SPI);
-
-  #else
-    #error No QSPI/SPI flash are defined on your board variant.h !
-  #endif
-#endif
+// for flashTransport definition
+#include "flash_config.h"
 
 Adafruit_SPIFlash onboardFlash(&flashTransport);
 SdFat onboardSdCard;
 
 constexpr int getSDCardPin() noexcept {
 #ifdef SDCARD_SS_PIN
-	return SDCARD_SS_PIN;
+  return SDCARD_SS_PIN;
 #else
-	// modify to fit your needs
-	// by default, pin 4 is the SD_CS pin used by the Adafruit 1.8" TFT SD Shield
-	return 4; 
+  // modify to fit your needs
+  // by default, pin 4 is the SD_CS pin used by the Adafruit 1.8" TFT SD Shield
+  return 4;
 #endif
 }
 void setup() {
-	Serial.begin(9600);
-	while (!Serial) {
-		// wait for native usb
-		delay(100); 
-	}
-    Serial.print("Starting up onboard QSPI Flash...");
-    onboardFlash.begin();
-    Serial.println("Done");
-    Serial.println("Onboard Flash information");
-    Serial.print("JEDEC ID: 0x");
-    Serial.println(onboardFlash.getJEDECID(), HEX);
-    Serial.print("Flash size: ");
-    Serial.print(onboardFlash.size() / 1024);
-    Serial.println(" KB");
-    Serial.print("Starting up SD Card...");
-    if (!onboardSdCard.begin(getSDCardPin())) {
-        Serial.println("No card found (is one inserted?)");
-    } else {
-        Serial.println("Card found!");
-    }
+  Serial.begin(115200);
+  while (!Serial) {
+    // wait for native usb
+    delay(100);
+  }
+  Serial.print("Starting up onboard QSPI Flash...");
+  onboardFlash.begin();
+  Serial.println("Done");
+  Serial.println("Onboard Flash information");
+  Serial.print("JEDEC ID: 0x");
+  Serial.println(onboardFlash.getJEDECID(), HEX);
+  Serial.print("Flash size: ");
+  Serial.print(onboardFlash.size() / 1024);
+  Serial.println(" KB");
+  Serial.print("Starting up SD Card...");
+  if (!onboardSdCard.begin(getSDCardPin())) {
+    Serial.println("No card found (is one inserted?)");
+  } else {
+    Serial.println("Card found!");
+  }
 }
 
 void loop() {
-	// nothing to do
+  // nothing to do
 }

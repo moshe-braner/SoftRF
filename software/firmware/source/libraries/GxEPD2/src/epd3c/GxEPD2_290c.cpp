@@ -12,7 +12,7 @@
 
 #include "GxEPD2_290c.h"
 
-GxEPD2_290c::GxEPD2_290c(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
+GxEPD2_290c::GxEPD2_290c(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
   GxEPD2_EPD(cs, dc, rst, busy, LOW, 20000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate)
 {
 }
@@ -283,14 +283,18 @@ void GxEPD2_290c::refresh(bool partial_update_mode)
 
 void GxEPD2_290c::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
 {
-  x -= x % 8; // byte boundary
-  w -= x % 8; // byte boundary
+  // intersection with screen
+  int16_t w1 = x < 0 ? w + x : w; // reduce
+  int16_t h1 = y < 0 ? h + y : h; // reduce
   int16_t x1 = x < 0 ? 0 : x; // limit
   int16_t y1 = y < 0 ? 0 : y; // limit
-  int16_t w1 = x + w < int16_t(WIDTH) ? w : int16_t(WIDTH) - x; // limit
-  int16_t h1 = y + h < int16_t(HEIGHT) ? h : int16_t(HEIGHT) - y; // limit
-  w1 -= x1 - x;
-  h1 -= y1 - y;
+  w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
+  h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
+  if ((w1 <= 0) || (h1 <= 0)) return;
+  // make x1, w1 multiple of 8
+  w1 += x1 % 8;
+  if (w1 % 8 > 0) w1 += 8 - w1 % 8;
+  x1 -= x1 % 8;
   _Init_Part();
   if (usePartialUpdateWindow) _writeCommand(0x91); // partial in
   _setPartialRamArea(x1, y1, w1, h1);
@@ -344,9 +348,14 @@ void GxEPD2_290c::_PowerOn()
 
 void GxEPD2_290c::_PowerOff()
 {
-  _writeCommand(0x02); // power off
-  _waitWhileBusy("_PowerOff", power_off_time);
-  _power_is_on = false;
+  if (_power_is_on)
+  {
+    _writeCommand(0x50);
+    _writeData(0xf7); // border floating
+    _writeCommand(0x02); // power off
+    _waitWhileBusy("_PowerOff", power_off_time);
+    _power_is_on = false;
+  }
 }
 
 void GxEPD2_290c::_InitDisplay()
@@ -358,9 +367,10 @@ void GxEPD2_290c::_InitDisplay()
   _writeData (0x17);
   //_writeCommand(0x04);
   //_waitWhileBusy("_wakeUp Power On");
-  _writeCommand(0X00);
-  _writeData(0x8f);
-  _writeCommand(0X50);
+  _writeCommand(0x00);     //panel setting
+  _writeData(0x0f);    //LUT from OTP£¬128x296
+  _writeData(0x0d);     //VCOM to 0V fast
+  _writeCommand(0x50);
   _writeData(0x77);
   _writeCommand(0x61);
   _writeData (0x80);

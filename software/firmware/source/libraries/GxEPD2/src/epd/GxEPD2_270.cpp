@@ -20,7 +20,7 @@ GxEPD2_270::GxEPD2_270(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
 void GxEPD2_270::clearScreen(uint8_t value)
 {
   writeScreenBuffer(value);
-  refresh(true);
+  refresh(false);
   writeScreenBufferAgain(value);
 }
 
@@ -52,6 +52,11 @@ void GxEPD2_270::writeImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_
 }
 
 void GxEPD2_270::writeImageAgain(const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
+  _writeImage(0x14, bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_270::writeImageToPrevious(const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
   _writeImage(0x14, bitmap, x, y, w, h, invert, mirror_y, pgm);
 }
@@ -108,6 +113,12 @@ void GxEPD2_270::writeImagePart(const uint8_t bitmap[], int16_t x_part, int16_t 
 
 void GxEPD2_270::writeImagePartAgain(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
                                      int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
+{
+  _writeImagePart(0x14, bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
+}
+
+void GxEPD2_270::writeImagePartToPrevious(const uint8_t bitmap[], int16_t x_part, int16_t y_part, int16_t w_bitmap, int16_t h_bitmap,
+    int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
 {
   _writeImagePart(0x14, bitmap, x_part, y_part, w_bitmap, h_bitmap, x, y, w, h, invert, mirror_y, pgm);
 }
@@ -249,7 +260,7 @@ void GxEPD2_270::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
   int16_t y1 = y < 0 ? 0 : y; // limit
   w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
   h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
-  if ((w1 <= 0) || (h1 <= 0)) return;
+  if ((w1 <= 0) || (h1 <= 0)) return; 
   // make x1, w1 multiple of 8
   w1 += x1 % 8;
   if (w1 % 8 > 0) w1 += 8 - w1 % 8;
@@ -512,13 +523,4 @@ void GxEPD2_270::_Update_Part()
 {
   _writeCommand(0x12); //display refresh
   _waitWhileBusy("_Update_Part", partial_refresh_time);
-}
-
-bool GxEPD2_270::probe()
-{
-  if (_timeout_expired) {
-    return false;
-  } else {
-    return true;
-  }
 }

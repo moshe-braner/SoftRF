@@ -20,6 +20,7 @@ class GxEPD2_154c : public GxEPD2_EPD
   public:
     // attributes
     static const uint16_t WIDTH = 200;
+    static const uint16_t WIDTH_VISIBLE = WIDTH;
     static const uint16_t HEIGHT = 200;
     static const GxEPD2::Panel panel = GxEPD2::GDEW0154Z04;
     static const bool hasColor = true;
@@ -30,10 +31,10 @@ class GxEPD2_154c : public GxEPD2_EPD
     static const uint16_t full_refresh_time = 7500; // ms, e.g. 7135635us
     static const uint16_t partial_refresh_time = 7500; // ms, e.g. 7135635us
     // constructor
-    GxEPD2_154c(int8_t cs, int8_t dc, int8_t rst, int8_t busy);
+    GxEPD2_154c(int16_t cs, int16_t dc, int16_t rst, int16_t busy);
     // methods (virtual)
     void init(uint32_t serial_diag_bitrate = 0); // = 0 : disabled
-    void init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_rst_mode = false);
+    void init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration = 20, bool pulldown_rst_mode = false);
     //  Support for Bitmaps (Sprites) to Controller Buffer and to Screen
     void clearScreen(uint8_t value = 0xFF); // init controller memory and screen (default white)
     void clearScreen(uint8_t black_value, uint8_t color_value); // init controller memory and screen

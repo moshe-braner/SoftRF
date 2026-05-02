@@ -55,7 +55,7 @@
 #define MCSR_BASE_ADDR 0x0200
 #define LISAR (MCSR_BASE_ADDR + 0x0008)
 
-GxEPD2_it60::GxEPD2_it60(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
+GxEPD2_it60::GxEPD2_it60(int16_t cs, int16_t dc, int16_t rst, int16_t busy) :
   GxEPD2_EPD(cs, dc, rst, busy, LOW, 10000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate),
   _spi_settings(24000000, MSBFIRST, SPI_MODE0),
   _spi_settings_for_read(1000000, MSBFIRST, SPI_MODE0)
@@ -64,12 +64,12 @@ GxEPD2_it60::GxEPD2_it60(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
 
 void GxEPD2_it60::init(uint32_t serial_diag_bitrate)
 {
-  init(serial_diag_bitrate, true, false);
+  init(serial_diag_bitrate, true, 20, false);
 }
 
-void GxEPD2_it60::init(uint32_t serial_diag_bitrate, bool initial, bool pulldown_rst_mode)
+void GxEPD2_it60::init(uint32_t serial_diag_bitrate, bool initial, uint16_t reset_duration, bool pulldown_rst_mode)
 {
-  GxEPD2_EPD::init(serial_diag_bitrate, initial, pulldown_rst_mode);
+  GxEPD2_EPD::init(serial_diag_bitrate, initial, reset_duration, pulldown_rst_mode);
 
   // we need a long reset pulse
   if (_rst >= 0)
@@ -87,22 +87,23 @@ void GxEPD2_it60::init(uint32_t serial_diag_bitrate, bool initial, bool pulldown
   if (_diag_enabled)
   {
     //Show Device information of IT8951
-    printf("Panel(W,H) = (%d,%d)\r\n",
-           IT8951DevInfo.usPanelW, IT8951DevInfo.usPanelH );
-    printf("Image Buffer Address = %X\r\n",
-           IT8951DevInfo.usImgBufAddrL | (IT8951DevInfo.usImgBufAddrH << 16));
+    Serial.print("Panel(W,H) = ("); Serial.print(IT8951DevInfo.usPanelW); Serial.print(", "); Serial.print(IT8951DevInfo.usPanelH); Serial.println(")");
+    Serial.print("Image Buffer Address = 0x"); Serial.println(uint32_t(IT8951DevInfo.usImgBufAddrL) | (uint32_t(IT8951DevInfo.usImgBufAddrH) << 16), HEX);
     //Show Firmware and LUT Version
-    printf("FW Version = %s\r\n", (uint8_t*)IT8951DevInfo.usFWVersion);
-    printf("LUT Version = %s\r\n", (uint8_t*)IT8951DevInfo.usLUTVersion);
+    Serial.print("FW Version = "); Serial.println((char*)IT8951DevInfo.usFWVersion);
+    Serial.print("LUT Version = "); Serial.println((char*)IT8951DevInfo.usLUTVersion);
   }
   //Set to Enable I80 Packed mode
   _IT8951WriteReg(I80CPCR, 0x0001);
   if (VCOM != _IT8951GetVCOM())
   {
     _IT8951SetVCOM(VCOM);
-    printf("VCOM = -%.02fV\n", (float)_IT8951GetVCOM() / 1000);
+    if (_diag_enabled)
+    {
+      Serial.print("set VCOM = -"); Serial.println((float)_IT8951GetVCOM() / 1000);
+    }
   }
-  printf("VCOM = -%.02fV\n", (float)_IT8951GetVCOM() / 1000);
+  //Serial.print("set VCOM = -"); Serial.println((float)_IT8951GetVCOM() / 1000);
 }
 
 void GxEPD2_it60::clearScreen(uint8_t value)

@@ -28,6 +28,32 @@
 #include "nrfx_qspi.h"
 #include <Arduino.h>
 
+// default PIN_QSPI_SCK, CS, IO0, IO1, IO2, IO3 to -1 to build with non-qpsi
+// board
+#ifndef PIN_QSPI_SCK
+#define PIN_QSPI_SCK -1
+#endif
+
+#ifndef PIN_QSPI_CS
+#define PIN_QSPI_CS -1
+#endif
+
+#ifndef PIN_QSPI_IO0
+#define PIN_QSPI_IO0 -1
+#endif
+
+#ifndef PIN_QSPI_IO1
+#define PIN_QSPI_IO1 -1
+#endif
+
+#ifndef PIN_QSPI_IO2
+#define PIN_QSPI_IO2 -1
+#endif
+
+#ifndef PIN_QSPI_IO3
+#define PIN_QSPI_IO3 -1
+#endif
+
 Adafruit_FlashTransport_QSPI::Adafruit_FlashTransport_QSPI(void)
     : Adafruit_FlashTransport_QSPI(PIN_QSPI_SCK, PIN_QSPI_CS, PIN_QSPI_IO0,
                                    PIN_QSPI_IO1, PIN_QSPI_IO2, PIN_QSPI_IO3) {}
@@ -70,19 +96,11 @@ void Adafruit_FlashTransport_QSPI::begin(void) {
           },
       .irq_priority = 7};
 
-  if (_cmd_read != SFLASH_CMD_QUAD_READ) {
-    qspi_cfg.prot_if.readoc = NRF_QSPI_READOC_FASTREAD; // 0x0B read command
-    qspi_cfg.prot_if.writeoc = NRF_QSPI_WRITEOC_PP;     // 0x02 write command
-  }
-
   // No callback for blocking API
   nrfx_qspi_init(&qspi_cfg, NULL, NULL);
 }
 
-void Adafruit_FlashTransport_QSPI::end(void) {
-  nrfx_qspi_uninit();
-  _cmd_read = SFLASH_CMD_QUAD_READ;
-}
+void Adafruit_FlashTransport_QSPI::end(void) { nrfx_qspi_uninit(); }
 
 void Adafruit_FlashTransport_QSPI::setClockSpeed(uint32_t clock_hz,
                                                  uint32_t read_hz) {
@@ -99,8 +117,9 @@ void Adafruit_FlashTransport_QSPI::setClockSpeed(uint32_t clock_hz,
   // delay is set to one freq period
   uint8_t delay = 1;
 
-  if (clkdiv)
+  if (clkdiv) {
     delay = (1UL << (clkdiv - 1));
+  }
 
   NRF_QSPI->IFCONFIG1 &=
       ~(QSPI_IFCONFIG1_SCKFREQ_Msk | QSPI_IFCONFIG1_SCKDELAY_Msk);

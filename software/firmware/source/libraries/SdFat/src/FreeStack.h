@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2018 Bill Greiman
+ * Copyright (c) 2011-2025 Bill Greiman
  * This file is part of the SdFat library for SD memory cards.
  *
  * MIT License
@@ -22,40 +22,62 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef FreeStack_h
-#define FreeStack_h
+#pragma once
 /**
  * \file
  * \brief FreeStack() function.
  */
+#include <stdint.h>
 #if defined(__AVR__) || defined(DOXYGEN)
+#include <avr/io.h>
+/** Indicate FillStack() and UnusedStack() are available. */
+#define HAS_UNUSED_STACK 1
 /** boundary between stack and heap. */
-extern char *__brkval;
+extern char* __brkval;
 /** End of bss section.*/
 extern char __bss_end;
 /** Amount of free stack space.
  * \return The number of free bytes.
  */
-static int FreeStack() {
-  char* sp = reinterpret_cast<char*>(SP);
+inline int FreeStack() {
+  const char* sp = reinterpret_cast<char*>(SP);
   return __brkval ? sp - __brkval : sp - &__bss_end;
-//  char top;
-//  return __brkval ? &top - __brkval : &top - &__bss_end;
 }
-#elif defined(PLATFORM_ID)  // Particle board
-static int FreeStack() {
-  return System.freeMemory();
+#elif defined(__IMXRT1062__)
+#define HAS_UNUSED_STACK 1
+extern uint8_t _ebss;
+inline int FreeStack() {
+  register uint32_t sp asm("sp");
+  return reinterpret_cast<char*>(sp) - reinterpret_cast<char*>(&_ebss);
 }
 #elif defined(__arm__)
+#define HAS_UNUSED_STACK 1
 extern "C" char* sbrk(int incr);
-static int FreeStack() {
-  char top = 't';
-  return &top - reinterpret_cast<char*>(sbrk(0));
+inline int FreeStack() {
+  register uint32_t sp asm("sp");
+  return reinterpret_cast<char*>(sp) - reinterpret_cast<char*>(sbrk(0));
 }
-#else
+#else  // defined(__AVR__) || defined(DOXYGEN)
+#ifndef FREE_STACK_CPP
 #warning FreeStack is not defined for this system.
-static int FreeStack() {
-  return 0;
-}
-#endif
-#endif  // FreeStack_h
+#endif  // FREE_STACK_CPP
+inline int FreeStack() { return 0; }
+#endif  // defined(__AVR__) || defined(DOXYGEN)
+#if defined(HAS_UNUSED_STACK) || defined(DOXYGEN)
+/** Fill stack with 0x55 pattern */
+void FillStack();
+/**
+ * Determine the amount of unused stack.
+ *
+ * FillStack() must be called to fill the stack with a 0x55 pattern.
+ *
+ * UnusedStack() may fail if malloc() or new is use.
+ *
+ * \return number of bytes with 0x55 pattern.
+ */
+int UnusedStack();
+#else  // HAS_UNUSED_STACK
+#define HAS_UNUSED_STACK 0
+inline void FillStack() {}
+inline int UnusedStack() { return 0; }
+#endif  // defined(HAS_UNUSED_STACK)

@@ -21,38 +21,21 @@
 // - Open the serial monitor at 115200 baud.  You should see the
 //   example start to run and messages printed to the monitor.
 //   If you don't see anything close the serial monitor, press
-//   the board reset buttton, wait a few seconds, then open the
+//   the board reset button, wait a few seconds, then open the
 //   serial monitor again.
 #include <SPI.h>
-#include <SdFat.h>
+
+#include "SdFat_Adafruit_Fork.h"
+
 #include <Adafruit_SPIFlash.h>
 
-#if defined(ARDUINO_ARCH_ESP32)
-  // ESP32 use same flash device that store code.
-  // Therefore there is no need to specify the SPI and SS
-  Adafruit_FlashTransport_ESP32 flashTransport;
-
-#else
-  // On-board external flash (QSPI or SPI) macros should already
-  // defined in your board variant if supported
-  // - EXTERNAL_FLASH_USE_QSPI
-  // - EXTERNAL_FLASH_USE_CS/EXTERNAL_FLASH_USE_SPI
-  #if defined(EXTERNAL_FLASH_USE_QSPI)
-    Adafruit_FlashTransport_QSPI flashTransport;
-
-  #elif defined(EXTERNAL_FLASH_USE_SPI)
-    Adafruit_FlashTransport_SPI flashTransport(EXTERNAL_FLASH_USE_CS, EXTERNAL_FLASH_USE_SPI);
-
-  #else
-    #error No QSPI/SPI flash are defined on your board variant.h !
-  #endif
-#endif
+// for flashTransport definition
+#include "flash_config.h"
 
 Adafruit_SPIFlash flash(&flashTransport);
 
 // file system object from SdFat
-FatFileSystem fatfs;
-
+FatVolume fatfs;
 
 void setup() {
   // Initialize serial port and wait for it to open before continuing.
@@ -60,56 +43,58 @@ void setup() {
   while (!Serial) {
     delay(100);
   }
-  Serial.println("Adafruit M0 Express CircuitPython Flash Example");
+  Serial.println("Adafruit SPIFlash CircuitPython Example");
 
   // Initialize flash library and check its chip ID.
   if (!flash.begin()) {
     Serial.println("Error, failed to initialize flash chip!");
-    while(1);
+    while (1) {
+    }
   }
-  Serial.print("Flash chip JEDEC ID: 0x"); Serial.println(flash.getJEDECID(), HEX);
+  Serial.print("Flash chip JEDEC ID: 0x");
+  Serial.println(flash.getJEDECID(), HEX);
 
   // First call begin to mount the filesystem.  Check that it returns true
   // to make sure the filesystem was mounted.
   if (!fatfs.begin(&flash)) {
     Serial.println("Failed to mount filesystem!");
-    Serial.println("Was CircuitPython loaded on the board first to create the filesystem?");
-    while(1);
+    Serial.println("Was CircuitPython loaded on the board first to create the "
+                   "filesystem?");
+    while (1) {
+    }
   }
   Serial.println("Mounted filesystem!");
 
   // Check if a boot.py exists and print it out.
   if (fatfs.exists("boot.py")) {
-    File bootPy = fatfs.open("boot.py", FILE_READ);
+    File32 bootPy = fatfs.open("boot.py", FILE_READ);
     Serial.println("Printing boot.py...");
     while (bootPy.available()) {
       char c = bootPy.read();
       Serial.print(c);
     }
     Serial.println();
-  }
-  else {
+  } else {
     Serial.println("No boot.py found...");
   }
 
   // Check if a main.py exists and print it out:
-  if (fatfs.exists("main.py")) {
-    File mainPy = fatfs.open("main.py", FILE_READ);
-    Serial.println("Printing main.py...");
+  if (fatfs.exists("code.py")) {
+    File32 mainPy = fatfs.open("code.py", FILE_READ);
+    Serial.println("Printing code.py...");
     while (mainPy.available()) {
       char c = mainPy.read();
       Serial.print(c);
     }
     Serial.println();
-  }
-  else {
-    Serial.println("No main.py found...");
+  } else {
+    Serial.println("No code.py found...");
   }
 
   // Create or append to a data.txt file and add a new line
   // to the end of it.  CircuitPython code can later open and
   // see this file too!
-  File data = fatfs.open("data.txt", FILE_WRITE);
+  File32 data = fatfs.open("data.txt", FILE_WRITE);
   if (data) {
     // Write a new line to the file:
     data.println("Hello CircuitPython from Arduino!");
@@ -117,8 +102,7 @@ void setup() {
     // See the other fatfs examples like fatfs_full_usage and fatfs_datalogging
     // for more examples of interacting with files.
     Serial.println("Wrote a new line to the end of data.txt!");
-  }
-  else {
+  } else {
     Serial.println("Error, failed to open data file for writing!");
   }
 
