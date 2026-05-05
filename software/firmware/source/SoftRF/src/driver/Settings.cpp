@@ -1009,10 +1009,10 @@ void save_settings_to_EEPROM()
   if (use_eeprom)
       settings->mode |= SOFTRF_MODE_EEPROM;
   int size = 0;
-  for (int i=STG_MODE; i<STG_END; i++) {             // skip version
+  for (int i=STG_MODE; i<STG_END; i++) {       // skip version
      if (hidden_setting(i) && stgdesc[i].hidden != STG_SAVEHIDE)
          continue;
-     if (use_eeprom && stgdesc[i].hidden == HIDE_P)  // avoiding the file system
+     if (stgdesc[i].hidden == HIDE_P)          // no file system
          continue;
      if (format_setting(i, false, true, p, EEPROM_SIZE - size) == false)
          continue;
@@ -1146,7 +1146,7 @@ bool load_setting(const int idx, const char *q)
     if (t == STG_OBSOLETE)
         convert_obsolete(idx);
     if (idx == STG_MODE) {
-        use_eeprom = (settings->mode | SOFTRF_MODE_EEPROM);
+        use_eeprom = (settings->mode & SOFTRF_MODE_EEPROM);
         settings->mode &= 0x0F;
     }
     return true;
@@ -1286,6 +1286,7 @@ bool load_settings()
 {
 #if defined(FILESYS)
     if (use_eeprom) {
+        // not reachable
         Serial.println(F("File system assumed broken"));
     } else if (load_settings_from_file() == true) {
         return true;
