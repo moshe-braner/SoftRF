@@ -1,11 +1,6 @@
 # RadioLib ![Build Status](https://github.com/jgromes/RadioLib/workflows/CI/badge.svg) [![PlatformIO Registry](https://badges.registry.platformio.org/packages/jgromes/library/RadioLib.svg)](https://registry.platformio.org/libraries/jgromes/RadioLib) [![Component Registry](https://components.espressif.com/components/jgromes/radiolib/badge.svg)](https://components.espressif.com/components/jgromes/radiolib)
 
-
 ### _One radio library to rule them all!_
-
-## About this modified partial copy of RadioLib
-
-Only the basic code for interfacing with the radio modules is included here.  The examples, protocols, and firmware binaries are omitted.  This version created and maintained by Moshe Braner.  Some small modifications were made to fit the intended use within SoftRF.  Where changes were made, "MB:" appears in a comment.  The full original RadioLib is at [https://github.com/jgromes/RadioLib](https://github.com/jgromes/RadioLib).
 
 ## Universal wireless communication library for embedded devices
 

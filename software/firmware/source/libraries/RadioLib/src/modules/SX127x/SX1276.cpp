@@ -5,13 +5,9 @@ SX1276::SX1276(Module* mod) : SX1278(mod) {
 
 }
 
-// MB: added the "fast" param
-int16_t SX1276::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord,
-    int8_t power, uint16_t preambleLength, uint8_t gain, bool fast) {
+int16_t SX1276::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, uint8_t gain) {
   // execute common part
-  uint8_t versions[] = { RADIOLIB_SX1278_CHIP_VERSION, RADIOLIB_SX1278_CHIP_VERSION_ALT, RADIOLIB_SX1278_CHIP_VERSION_RFM9X };
-  if (fast)
-      versions[0] = 0;   // MB: this signals SX127x::begin() to skip probe
+  const uint8_t versions[] = { RADIOLIB_SX1278_CHIP_VERSION, RADIOLIB_SX1278_CHIP_VERSION_ALT, RADIOLIB_SX1278_CHIP_VERSION_RFM9X };
   int16_t state = SX127x::begin(versions, 3, syncWord, preambleLength);
   RADIOLIB_ASSERT(state);
 
@@ -41,13 +37,9 @@ int16_t SX1276::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t sync
   return(state);
 }
 
-// MB: added the "fast" param
-int16_t SX1276::beginFSK(float freq, float br, float freqDev, float rxBw,
-    int8_t power, uint16_t preambleLength, bool enableOOK, bool fast) {
+int16_t SX1276::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK) {
   // execute common part
-  uint8_t versions[] = { RADIOLIB_SX1278_CHIP_VERSION, RADIOLIB_SX1278_CHIP_VERSION_ALT, RADIOLIB_SX1278_CHIP_VERSION_RFM9X };
-  if (fast)
-      versions[0] = 0;   // MB: this signals SX127x::beginFSK() to skip probe
+  const uint8_t versions[] = { RADIOLIB_SX1278_CHIP_VERSION, RADIOLIB_SX1278_CHIP_VERSION_ALT, RADIOLIB_SX1278_CHIP_VERSION_RFM9X };
   int16_t state = SX127x::beginFSK(versions, 3, freqDev, rxBw, preambleLength, enableOOK);
   RADIOLIB_ASSERT(state);
 
@@ -77,14 +69,9 @@ int16_t SX1276::beginFSK(float freq, float br, float freqDev, float rxBw,
 }
 
 int16_t SX1276::setFrequency(float freq) {
-/*
   if(!(((freq >= 137.0f) && (freq <= 175.0f)) ||
        ((freq >= 410.0f) && (freq <= 525.0f)) ||
-       ((freq >= 862.0f) && (freq <= 1020.0f))))
- MB: changed the order: */
-  if(!(((freq >= 862.0f) && (freq <= 1020.0f)) ||
-       ((freq >= 410.0f) && (freq <= 525.0f)) ||
-       ((freq >= 137.0f) && (freq <= 175.0f)))) {
+       ((freq >= 862.0f) && (freq <= 1020.0f)))) {
     return(RADIOLIB_ERR_INVALID_FREQUENCY);
   }
 

@@ -255,11 +255,6 @@
   // Adafruit nRF52 boards
   #define RADIOLIB_PLATFORM                           "Adafruit nRF52"
 
-// MB: added ARDUINO_ARCH_NRF52 as is used elsewhere in SoftRF
-#elif defined(ARDUINO_ARCH_NRF52) && !defined(ARDUINO_ARDUINO_NANO33BLE)
-  // Adafruit nRF52 boards
-  #define RADIOLIB_PLATFORM                           "Adafruit nRF52"
-
 #elif defined(ARDUINO_ARC32_TOOLS)
   // Intel Curie
   #define RADIOLIB_PLATFORM                           "Intel Curie"

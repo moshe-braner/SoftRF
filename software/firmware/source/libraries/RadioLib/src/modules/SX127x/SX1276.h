@@ -38,12 +38,8 @@ class SX1276: public SX1278 {
       \param gain Gain of receiver LNA (low-noise amplifier). Can be set to any integer in range 1 to 6 where 1 is the highest gain.
       Set to 0 to enable automatic gain control (recommended).
       \returns \ref status_codes
-
-        MB: added param "fast", if true, skip the reset and probe part of begin()
     */
-    int16_t begin(float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7,
-        uint8_t syncWord = RADIOLIB_SX127X_SYNC_WORD, int8_t power = 10, uint16_t preambleLength = 8,
-        uint8_t gain = 0, bool fast = false);
+    int16_t begin(float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7, uint8_t syncWord = RADIOLIB_SX127X_SYNC_WORD, int8_t power = 10, uint16_t preambleLength = 8, uint8_t gain = 0) override;
 
     /*!
       \brief FSK modem initialization method. Must be called at least once from Arduino sketch to initialize the module.
@@ -56,11 +52,8 @@ class SX1276: public SX1278 {
       \param preambleLength Length of FSK preamble in bits.
       \param enableOOK Use OOK modulation instead of FSK.
       \returns \ref status_codes
-
-        MB: added param "fast", if true, skip the reset and probe part of begin()
     */
-    int16_t beginFSK(float freq = 434.0, float br = 4.8, float freqDev = 5.0, float rxBw = 125.0,
-        int8_t power = 10, uint16_t preambleLength = 16, bool enableOOK = false, bool fast = false);
+    int16_t beginFSK(float freq = 434.0, float br = 4.8, float freqDev = 5.0, float rxBw = 125.0, int8_t power = 10, uint16_t preambleLength = 16, bool enableOOK = false) override;
 
     // configuration methods
 
