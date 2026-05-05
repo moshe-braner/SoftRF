@@ -36,8 +36,12 @@ class LR1110: public LR11x0 {
       If you are seeing -706/-707 error codes, it likely means you are using non-0 value for module with XTAL.
       To use XTAL, either set this value to 0, or set LR11x0::XTAL to true.
       \returns \ref status_codes
+
+      // mb: added "fast" option to skip module setup
     */
-    int16_t begin(float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7, uint8_t syncWord = RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, int8_t power = 10, uint16_t preambleLength = 8, float tcxoVoltage = 1.6);
+    int16_t begin(float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7,
+                  uint8_t syncWord = RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, int8_t power = 10,
+                  uint16_t preambleLength = 8, float tcxoVoltage = 1.6, bool fast = false);
 
     /*!
       \brief Initialization method for FSK modem.
@@ -51,8 +55,10 @@ class LR1110: public LR11x0 {
       If you are seeing -706/-707 error codes, it likely means you are using non-0 value for module with XTAL.
       To use XTAL, either set this value to 0, or set LR11x0::XTAL to true.
       \returns \ref status_codes
-    */
-    int16_t beginGFSK(float freq = 434.0, float br = 4.8, float freqDev = 5.0, float rxBw = 156.2, int8_t power = 10, uint16_t preambleLength = 16, float tcxoVoltage = 1.6);
+
+      // mb: added "fast" option to skip module setup    */
+    int16_t beginGFSK(float freq = 434.0, float br = 4.8, float freqDev = 5.0, float rxBw = 156.2,
+               int8_t power = 10, uint16_t preambleLength = 16, float tcxoVoltage = 1.6, bool fast = false);
     
     /*!
       \brief Initialization method for LR-FHSS modem.

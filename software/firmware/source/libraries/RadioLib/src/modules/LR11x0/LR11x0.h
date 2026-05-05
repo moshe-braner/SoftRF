@@ -73,8 +73,10 @@ class LR11x0: public LRxxxx {
       \param tcxoVoltage TCXO reference voltage to be set.
       \param high defaults to false for Sub-GHz band, true for frequencies above 1GHz
       \returns \ref status_codes
+
+      // mb: added "fast" option
     */
-    int16_t begin(float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, uint16_t preambleLength, float tcxoVoltage, bool high = false);
+    int16_t begin(float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, uint16_t preambleLength, float tcxoVoltage, bool high = false, bool fast = false);
 
     /*!
       \brief Initialization method for FSK modem.
@@ -84,8 +86,10 @@ class LR11x0: public LRxxxx {
       \param preambleLength FSK preamble length in bits.
       \param tcxoVoltage TCXO reference voltage to be set.
       \returns \ref status_codes
+
+      // mb: added "fast" option
     */
-    int16_t beginGFSK(float br, float freqDev, float rxBw, uint16_t preambleLength, float tcxoVoltage);
+    int16_t beginGFSK(float br, float freqDev, float rxBw, uint16_t preambleLength, float tcxoVoltage, bool fast = false);
 
     /*!
       \brief Initialization method for LR-FHSS modem.
@@ -112,8 +116,10 @@ class LR11x0: public LRxxxx {
       \param len Number of bytes to send.
       \param addr Address to send the data to. Will only be added if address filtering was enabled.
       \returns \ref status_codes
+
+      MB: added option of pre-known air time
     */
-    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0) override;
+    int16_t transmit(const uint8_t* data, size_t len, uint8_t addr = 0, uint8_t airtime = 0);
 
     /*!
       \brief Blocking binary receive method.
@@ -123,8 +129,10 @@ class LR11x0: public LRxxxx {
       \param timeout Reception timeout in milliseconds. If set to 0,
       timeout period will be calculated automatically based on the radio configuration.
       \returns \ref status_codes
+
+      MB: added option of pre-known air time
     */
-    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0) override;
+    int16_t receive(uint8_t* data, size_t len, RadioLibTime_t timeout = 0, uint8_t airtime = 0);
 
     /*!
       \brief Starts direct mode transmission.
@@ -437,6 +445,9 @@ class LR11x0: public LRxxxx {
       \returns RSSI value in dBm.
     */
     float getRSSI(bool packet, bool skipReceive = false);
+
+    // mb: added non-FP version
+    int8_t getRSSIint(void);
 
     /*!
       \brief Gets SNR (Signal to Noise Ratio) of the last received packet. Only available for LoRa modem.
@@ -931,9 +942,9 @@ class LR11x0: public LRxxxx {
 #endif
     uint8_t wifiScanMode = 0;
     bool gnss = false;
-    int16_t modSetup(float tcxoVoltage, uint8_t modem);
+    int16_t modSetup(float tcxoVoltage, uint8_t modem, bool fast=false); // mb: added "fast"
     bool findChip(uint8_t ver);
-    int16_t config(uint8_t modem);
+    int16_t config(uint8_t modem, bool fast=false); // mb: added "fast"
     int16_t setPacketMode(uint8_t mode, uint8_t len);
     int16_t startCad(uint8_t symbolNum, uint8_t detPeak, uint8_t detMin, uint8_t exitMode, RadioLibTime_t timeout);
     int16_t setHeaderType(uint8_t hdrType, size_t len = 0xFF);

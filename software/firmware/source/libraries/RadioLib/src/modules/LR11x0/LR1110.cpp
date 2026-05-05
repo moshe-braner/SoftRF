@@ -7,9 +7,10 @@ LR1110::LR1110(Module* mod) : LR11x0(mod) {
   chipType = RADIOLIB_LR11X0_DEVICE_LR1110;
 }
 
-int16_t LR1110::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, float tcxoVoltage) {
+// mb: added "fast" option
+int16_t LR1110::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, float tcxoVoltage, bool fast) {
   // execute common part
-  int16_t state = LR11x0::begin(bw, sf, cr, syncWord, preambleLength, tcxoVoltage);
+  int16_t state = LR11x0::begin(bw, sf, cr, syncWord, preambleLength, tcxoVoltage, fast);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
@@ -20,9 +21,10 @@ int16_t LR1110::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t sync
   return(state);
 }
 
-int16_t LR1110::beginGFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, float tcxoVoltage) {
+// mb: added "fast" option
+int16_t LR1110::beginGFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, float tcxoVoltage, bool fast) {
   // execute common part
-  int16_t state = LR11x0::beginGFSK(br, freqDev, rxBw, preambleLength, tcxoVoltage);
+  int16_t state = LR11x0::beginGFSK(br, freqDev, rxBw, preambleLength, tcxoVoltage, fast);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
