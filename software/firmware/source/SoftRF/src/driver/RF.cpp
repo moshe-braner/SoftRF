@@ -596,7 +596,9 @@ Serial.println("FLR CRC wrong");
     }
     break;
   case RF_CHECKSUM_TYPE_CRC_MODES:    // includes ADSL packet in FLR_ADSL dual mode
-    if (ADSL_Packet::checkPI((uint8_t  *) RxBuffer, size)) {
+    //if (ADSL_Packet::checkPI((uint8_t  *) RxBuffer, size))
+    // use table-driven version instead:
+    if (check_adsl_crc((const uint8_t *)RxBuffer, (uint8_t) size)) {
       //success = false;
 Serial.println("ADS-L CRC wrong");
     } else {
@@ -684,6 +686,8 @@ static uint8_t transmit(uint8_t passed_size) {
     crc16 = update_crc_ccitt(crc16, 0x31);
     crc16 = update_crc_ccitt(crc16, 0xFA);
     crc16 = update_crc_ccitt(crc16, 0xB6);
+    if (crc16 == 0)  // failed to allocate lookup table
+        return 0;
     break;
   case RF_PROTOCOL_PAW:
     /* insert Net ID */

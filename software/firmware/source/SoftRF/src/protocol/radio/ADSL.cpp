@@ -217,7 +217,12 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
 
   pos.Encode(adsl_t);
   adsl_t.Scramble();
-  adsl_t.setCRC();
+  //adsl_t.setCRC();
+  // use table-driven version instead:
+  uint32_t crc = calc_adsl_crc((const uint8_t *)&adsl_t.Version, (uint8_t)ADSL_PAYLOAD_SIZE);
+  adsl_t.CRC24[0]=crc>>16;
+  adsl_t.CRC24[1]=crc>>8;
+  adsl_t.CRC24[2]=crc;
 
   memcpy((void *) pkt, &adsl_t.Version, adsl_t.Length);
 

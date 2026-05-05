@@ -25,6 +25,8 @@
     *                                                                   *
     *   Date        Version Comment                                     *
     *                                                                   *
+    *   2026-05-04 by Moshe Braner: added table-driven ADS-L CRC        *
+    *                                                                   *
     *   2008-04-20  1.16    Added CRC-CCITT routine for Kermit          *
     *                                                                   *
     *   2007-04-01  1.15    Added CRC16 calculation for Modbus          *
@@ -51,19 +53,18 @@
 
 #define CRC_VERSION     "1.16+"
 
-
-
 #define FALSE           0
 #define TRUE            1
 
+uint16_t  update_crc_16(     uint16_t crc, char c                 );
+uint32_t  update_crc_32(     uint32_t crc, char c                 );
+uint16_t  update_crc_ccitt(  uint16_t crc, char c                 );
+uint16_t  update_crc_dnp(    uint16_t crc, char c                 );
+uint16_t  update_crc_kermit( uint16_t crc, char c                 );
+uint16_t  update_crc_sick(   uint16_t crc, char c, char prev_byte );
+uint16_t  update_crc_gdl90(  uint16_t crc, char c                 );
 
+void      update_crc8( uint8_t *crc, uint8_t m );
 
-unsigned short          update_crc_16(     unsigned short crc, char c                 );
-unsigned long           update_crc_32(     unsigned long  crc, char c                 );
-unsigned short          update_crc_ccitt(  unsigned short crc, char c                 );
-unsigned short          update_crc_dnp(    unsigned short crc, char c                 );
-unsigned short          update_crc_kermit( unsigned short crc, char c                 );
-unsigned short          update_crc_sick(   unsigned short crc, char c, char prev_byte );
-unsigned short          update_crc_gdl90(  unsigned short crc, char c                 );
-
-void                    update_crc8(       unsigned char *crc, unsigned char m        );
+uint32_t  check_adsl_crc(const uint8_t *data, uint8_t size);
+uint32_t  calc_adsl_crc(const uint8_t *data, uint8_t size);

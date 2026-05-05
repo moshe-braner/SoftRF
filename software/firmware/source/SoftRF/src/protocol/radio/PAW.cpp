@@ -63,7 +63,9 @@ bool paw_decode(void *pkt, container_t *this_aircraft, ufo_t *fop)
 {
     // need to check the ADS-L CRC embedded in the PAW packet
     // - RF.cpp only checked the CRC8 external to the PAW payload
-    if (ADSL_Packet::checkPI((uint8_t  *) pkt, (uint8_t) P3I_PAYLOAD_SIZE)) {
+    //if (ADSL_Packet::checkPI((uint8_t  *) pkt, (uint8_t) P3I_PAYLOAD_SIZE))
+    // use table-driven version instead:
+    if (check_adsl_crc((const uint8_t *) pkt, (uint8_t) P3I_PAYLOAD_SIZE)) {
         Serial.println("PAW internal CRC24 wrong");
         return false;
     }

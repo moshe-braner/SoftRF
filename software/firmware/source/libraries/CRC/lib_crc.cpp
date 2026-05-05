@@ -41,7 +41,9 @@
     *                                                                   *
     *   Date        Version Comment                                     *
     *                                                                   *
-    *   2026-03-26          by Moshe Braner: malloc() the tables        *
+    *   2026-05-04 by Moshe Braner: added table-driven ADS-L CRC        *
+    *                                                                   *
+    *   2026-03-26 by Moshe Braner: malloc() the tables                 *
     *                                                                   *
     *   2008-04-20  1.16    Added CRC-CCITT calculation for Kermit      *
     *                                                                   *
@@ -100,23 +102,26 @@
     *                                                                   *
     \*******************************************************************/
 
-static unsigned short crc_tab16_init     = 0;
-static unsigned short crc_tab32_init     = 0;
-static unsigned short crc_tabccitt_init  = 0;
-static unsigned short crc_tabdnp_init    = 0;
-static unsigned short crc_tabkermit_init = 0;
+static uint8_t crc_tab16_init     = 0;
+static uint8_t crc_tab32_init     = 0;
+static uint8_t crc_tabccitt_init  = 0;
+static uint8_t crc_tabdnp_init    = 0;
+static uint8_t crc_tabkermit_init = 0;
+static uint8_t crc_tabadsl_init   = 0;
+
 
 #if !defined(__ASR6501__) && !defined(ARDUINO_ARCH_ASR650X)
 /*
-static unsigned short   crc_tab16[256];
-static unsigned long    crc_tab32[256];
-static unsigned short   crc_tabdnp[256];
-static unsigned short   crc_tabkermit[256];
+static uint16_t   crc_tab16[256];
+static uint32_t    crc_tab32[256];
+static uint16_t   crc_tabdnp[256];
+static uint16_t   crc_tabkermit[256];
 */
-static unsigned short *crc_tab16 = NULL;
-static unsigned long  *crc_tab32 = NULL;
-static unsigned short *crc_tabdnp = NULL;
-static unsigned short *crc_tabkermit = NULL;
+static uint16_t *crc_tab16 = NULL;
+static uint32_t  *crc_tab32 = NULL;
+static uint16_t *crc_tabdnp = NULL;
+static uint16_t *crc_tabkermit = NULL;
+static uint32_t  *crc_tabadsl = NULL;
 #endif
 
 #if !defined(ESP8266) && !defined(__ASR6501__) && \
@@ -124,9 +129,9 @@ static unsigned short *crc_tabkermit = NULL;
     !defined(ENERGIA_ARCH_CC13XX)  && !defined(ENERGIA_ARCH_CC13X2) && \
     !defined(ARDUINO_ARCH_STM32)   && !defined(ARDUINO_ARCH_AVR)    && \
     !defined(ARDUINO_ARCH_RENESAS) && !defined(ARDUINO_ARCH_SILABS)
-static unsigned short *crc_tabccitt;
+static uint16_t *crc_tabccitt;
 #else
-static const unsigned short crc_tabccitt[256] PROGMEM = {
+static const uint16_t crc_tabccitt[256] PROGMEM = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
     0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
     0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
@@ -165,9 +170,9 @@ static const unsigned short crc_tabccitt[256] PROGMEM = {
 
 // wrapper for malloc(), used for allocating space for the CRC tables
 
-unsigned short *CRC_short_malloc()
+uint16_t *CRC_short_malloc()
 {
-    unsigned short *p = (unsigned short *) malloc(256 * sizeof(short));
+    uint16_t *p = (uint16_t *) malloc(256 * sizeof(short));
 #if defined(ARDUINO)
     if (p == NULL)
         Serial.println("[lib_crc] failed to malloc table space");
@@ -175,9 +180,9 @@ unsigned short *CRC_short_malloc()
     return p;
 }
 
-unsigned long *CRC_long_malloc()
+uint32_t *CRC_long_malloc()
 {
-    unsigned long *p = (unsigned long *) malloc(256 * sizeof(long));
+    uint32_t *p = (uint32_t *) malloc(256 * sizeof(long));
 #if defined(ARDUINO)
     if (p == NULL)
         Serial.println("[lib_crc] failed to malloc table space");
@@ -199,12 +204,13 @@ static void             init_crc32_tab( void );
 static void             init_crcccitt_tab( void );
 static void             init_crcdnp_tab( void );
 static void             init_crckermit_tab( void );
+static void             init_adsl_tab( void );
 
 
 
     /*******************************************************************\
     *                                                                   *
-    *   unsigned short update_crc_ccitt( unsigned long crc, char c );   *
+    *   uint16_t update_crc_ccitt( uint32_t crc, char c );   *
     *                                                                   *
     *   The function update_crc_ccitt calculates  a  new  CRC-CCITT     *
     *   value  based  on the previous value of the CRC and the next     *
@@ -212,11 +218,11 @@ static void             init_crckermit_tab( void );
     *                                                                   *
     \*******************************************************************/
 
-unsigned short update_crc_ccitt( unsigned short crc, char c ) {
+uint16_t update_crc_ccitt( uint16_t crc, char c ) {
 
-    unsigned short tmp, short_c;
+    uint16_t tmp, short_c;
 
-    short_c  = 0x00ff & (unsigned short) c;
+    short_c  = 0x00ff & (uint16_t) c;
 
     if (crc_tabccitt_init == 0)
         init_crcccitt_tab();
@@ -230,7 +236,7 @@ unsigned short update_crc_ccitt( unsigned short crc, char c ) {
     crc = (crc << 8) ^ pgm_read_word(&crc_tabccitt[tmp]);
 #else
     if (crc_tabccitt_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
     crc = (crc << 8) ^ crc_tabccitt[tmp];
 #endif
 
@@ -242,8 +248,8 @@ unsigned short update_crc_ccitt( unsigned short crc, char c ) {
 
     /*******************************************************************\
     *                                                                   *
-    *   unsigned short update_crc_sick(                                 *
-    *             unsigned long crc, char c, char prev_byte );          *
+    *   uint16_t update_crc_sick(                                 *
+    *             uint32_t crc, char c, char prev_byte );          *
     *                                                                   *
     *   The function  update_crc_sick  calculates  a  new  CRC-SICK     *
     *   value  based  on the previous value of the CRC and the next     *
@@ -251,12 +257,12 @@ unsigned short update_crc_ccitt( unsigned short crc, char c ) {
     *                                                                   *
     \*******************************************************************/
 
-unsigned short update_crc_sick( unsigned short crc, char c, char prev_byte ) {
+uint16_t update_crc_sick( uint16_t crc, char c, char prev_byte ) {
 
-    unsigned short short_c, short_p;
+    uint16_t short_c, short_p;
 
-    short_c  =   0x00ff & (unsigned short) c;
-    short_p  = ( 0x00ff & (unsigned short) prev_byte ) << 8;
+    short_c  =   0x00ff & (uint16_t) c;
+    short_p  = ( 0x00ff & (uint16_t) prev_byte ) << 8;
 
     if ( crc & 0x8000 ) crc = ( crc << 1 ) ^ P_SICK;
     else                crc =   crc << 1;
@@ -272,7 +278,7 @@ unsigned short update_crc_sick( unsigned short crc, char c, char prev_byte ) {
 #if !defined(__ASR6501__) && !defined(ARDUINO_ARCH_ASR650X)
     /*******************************************************************\
     *                                                                   *
-    *   unsigned short update_crc_16( unsigned short crc, char c );     *
+    *   uint16_t update_crc_16( uint16_t crc, char c );     *
     *                                                                   *
     *   The function update_crc_16 calculates a  new  CRC-16  value     *
     *   based  on  the  previous value of the CRC and the next byte     *
@@ -280,17 +286,17 @@ unsigned short update_crc_sick( unsigned short crc, char c, char prev_byte ) {
     *                                                                   *
     \*******************************************************************/
 
-unsigned short update_crc_16( unsigned short crc, char c ) {
+uint16_t update_crc_16( uint16_t crc, char c ) {
 
-    unsigned short tmp, short_c;
+    uint16_t tmp, short_c;
 
     if (crc_tab16_init == 0)
         init_crc16_tab();
 
     if (crc_tab16_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
 
-    short_c = 0x00ff & (unsigned short) c;
+    short_c = 0x00ff & (uint16_t) c;
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tab16[ tmp & 0xff ];
 
@@ -302,7 +308,7 @@ unsigned short update_crc_16( unsigned short crc, char c ) {
 
     /*******************************************************************\
     *                                                                   *
-    *   unsigned short update_crc_kermit( unsigned short crc, char c ); *
+    *   uint16_t update_crc_kermit( uint16_t crc, char c ); *
     *                                                                   *
     *   The function update_crc_kermit calculates a  new  CRC value     *
     *   based  on  the  previous value of the CRC and the next byte     *
@@ -310,17 +316,17 @@ unsigned short update_crc_16( unsigned short crc, char c ) {
     *                                                                   *
     \*******************************************************************/
 
-unsigned short update_crc_kermit( unsigned short crc, char c ) {
+uint16_t update_crc_kermit( uint16_t crc, char c ) {
 
-    unsigned short tmp, short_c;
+    uint16_t tmp, short_c;
 
     if (crc_tabkermit_init == 0)
         init_crckermit_tab();
 
     if (crc_tabkermit_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
 
-    short_c = 0x00ff & (unsigned short) c;
+    short_c = 0x00ff & (uint16_t) c;
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tabkermit[ tmp & 0xff ];
 
@@ -332,7 +338,7 @@ unsigned short update_crc_kermit( unsigned short crc, char c ) {
 
     /*******************************************************************\
     *                                                                   *
-    *   unsigned short update_crc_dnp( unsigned short crc, char c );    *
+    *   uint16_t update_crc_dnp( uint16_t crc, char c );    *
     *                                                                   *
     *   The function update_crc_dnp calculates a new CRC-DNP  value     *
     *   based  on  the  previous value of the CRC and the next byte     *
@@ -340,17 +346,17 @@ unsigned short update_crc_kermit( unsigned short crc, char c ) {
     *                                                                   *
     \*******************************************************************/
 
-unsigned short update_crc_dnp( unsigned short crc, char c ) {
+uint16_t update_crc_dnp( uint16_t crc, char c ) {
 
-    unsigned short tmp, short_c;
+    uint16_t tmp, short_c;
 
     if (crc_tabdnp_init == 0)
         init_crcdnp_tab();
 
     if (crc_tabdnp_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
 
-    short_c = 0x00ff & (unsigned short) c;
+    short_c = 0x00ff & (uint16_t) c;
     tmp =  crc       ^ short_c;
     crc = (crc >> 8) ^ crc_tabdnp[ tmp & 0xff ];
 
@@ -362,7 +368,7 @@ unsigned short update_crc_dnp( unsigned short crc, char c ) {
 
     /*******************************************************************\
     *                                                                   *
-    *   unsigned long update_crc_32( unsigned long crc, char c );       *
+    *   uint32_t update_crc_32( uint32_t crc, char c );       *
     *                                                                   *
     *   The function update_crc_32 calculates a  new  CRC-32  value     *
     *   based  on  the  previous value of the CRC and the next byte     *
@@ -370,17 +376,17 @@ unsigned short update_crc_dnp( unsigned short crc, char c ) {
     *                                                                   *
     \*******************************************************************/
 
-unsigned long update_crc_32( unsigned long crc, char c ) {
+uint32_t update_crc_32( uint32_t crc, char c ) {
 
-    unsigned long tmp, long_c;
+    uint32_t tmp, long_c;
 
     if (crc_tab32_init == 0)
         init_crc32_tab();
 
     if (crc_tab32_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
 
-    long_c = 0x000000ffL & (unsigned long) c;
+    long_c = 0x000000ffL & (uint32_t) c;
     tmp = crc ^ long_c;
     crc = (crc >> 8) ^ crc_tab32[ tmp & 0xff ];
 
@@ -402,7 +408,7 @@ unsigned long update_crc_32( unsigned long crc, char c ) {
 static void init_crc16_tab( void ) {
 
     int i, j;
-    unsigned short crc, c;
+    uint16_t crc, c;
 
     crc_tab16 = CRC_short_malloc();
     if (crc_tab16 == NULL) {
@@ -413,7 +419,7 @@ static void init_crc16_tab( void ) {
     for (i=0; i<256; i++) {
 
         crc = 0;
-        c   = (unsigned short) i;
+        c   = (uint16_t) i;
 
         for (j=0; j<8; j++) {
 
@@ -424,6 +430,8 @@ static void init_crc16_tab( void ) {
         }
 
         crc_tab16[i] = crc;
+
+        yield();
     }
 
     crc_tab16_init = 1;
@@ -444,7 +452,7 @@ static void init_crc16_tab( void ) {
 static void init_crckermit_tab( void ) {
 
     int i, j;
-    unsigned short crc, c;
+    uint16_t crc, c;
 
     crc_tabkermit = CRC_short_malloc();
     if (crc_tabkermit == NULL) {
@@ -455,7 +463,7 @@ static void init_crckermit_tab( void ) {
     for (i=0; i<256; i++) {
 
         crc = 0;
-        c   = (unsigned short) i;
+        c   = (uint16_t) i;
 
         for (j=0; j<8; j++) {
 
@@ -466,6 +474,8 @@ static void init_crckermit_tab( void ) {
         }
 
         crc_tabkermit[i] = crc;
+
+        yield();
     }
 
     crc_tabkermit_init = 1;
@@ -486,7 +496,7 @@ static void init_crckermit_tab( void ) {
 static void init_crcdnp_tab( void ) {
 
     int i, j;
-    unsigned short crc, c;
+    uint16_t crc, c;
 
     crc_tabdnp = CRC_short_malloc();
     if (crc_tabdnp == NULL) {
@@ -497,7 +507,7 @@ static void init_crcdnp_tab( void ) {
     for (i=0; i<256; i++) {
 
         crc = 0;
-        c   = (unsigned short) i;
+        c   = (uint16_t) i;
 
         for (j=0; j<8; j++) {
 
@@ -508,6 +518,8 @@ static void init_crcdnp_tab( void ) {
         }
 
         crc_tabdnp[i] = crc;
+
+        yield();
     }
 
     crc_tabdnp_init = 1;
@@ -528,7 +540,7 @@ static void init_crcdnp_tab( void ) {
 static void init_crc32_tab( void ) {
 
     int i, j;
-    unsigned long crc;
+    uint32_t crc;
 
     crc_tab32 = CRC_long_malloc();
     if (crc_tab32 == NULL) {
@@ -538,7 +550,7 @@ static void init_crc32_tab( void ) {
 
     for (i=0; i<256; i++) {
 
-        crc = (unsigned long) i;
+        crc = (uint32_t) i;
 
         for (j=0; j<8; j++) {
 
@@ -547,6 +559,8 @@ static void init_crc32_tab( void ) {
         }
 
         crc_tab32[i] = crc;
+
+        yield();
     }
 
     crc_tab32_init = 1;
@@ -572,7 +586,7 @@ static void init_crcccitt_tab( void ) {
     !defined(ARDUINO_ARCH_STM32)   && !defined(ARDUINO_ARCH_AVR)    && \
     !defined(ARDUINO_ARCH_RENESAS) && !defined(ARDUINO_ARCH_SILABS)
     int i, j;
-    unsigned short crc, c;
+    uint16_t crc, c;
 
     crc_tabccitt = CRC_short_malloc();
     if (crc_tabccitt == NULL) {
@@ -583,7 +597,7 @@ static void init_crcccitt_tab( void ) {
     for (i=0; i<256; i++) {
 
         crc = 0;
-        c   = ((unsigned short) i) << 8;
+        c   = ((uint16_t) i) << 8;
 
         for (j=0; j<8; j++) {
 
@@ -594,6 +608,8 @@ static void init_crcccitt_tab( void ) {
         }
 
         crc_tabccitt[i] = crc;
+
+        yield();
     }
 #endif
 
@@ -601,14 +617,14 @@ static void init_crcccitt_tab( void ) {
 
 }  /* init_crcccitt_tab */
 
-unsigned short update_crc_gdl90( unsigned short crc, char c ) {
+uint16_t update_crc_gdl90( uint16_t crc, char c ) {
 
-    unsigned short tmp, short_c;
+    uint16_t tmp, short_c;
 
     if (crc_tabccitt_init == 0)
         init_crcccitt_tab();
 
-    short_c  = 0x00ff & (unsigned short) c;
+    short_c  = 0x00ff & (uint16_t) c;
     tmp = (crc >> 8) ;
 #if defined(ESP8266) || defined(__ASR6501__) || defined(ARDUINO_ARCH_ASR650X) || \
     defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
@@ -617,7 +633,7 @@ unsigned short update_crc_gdl90( unsigned short crc, char c ) {
     crc = pgm_read_word(&crc_tabccitt[tmp]) ^ (crc << 8) ^  short_c;
 #else
     if (crc_tabccitt_init == 2)  // init failed to malloc() the table
-        return crc;
+        return 0;
     crc = crc_tabccitt[tmp] ^ (crc << 8) ^  short_c;
 #endif
 
@@ -632,7 +648,7 @@ unsigned short update_crc_gdl90( unsigned short crc, char c ) {
   *   x^8 + x^2 + x + 1
   */
 
-static const unsigned char crc8_table[256]
+static const uint8_t crc8_table[256]
 #if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__) || \
     defined(ARDUINO_ARCH_ASR650X) || \
     defined(ENERGIA_ARCH_CC13XX)  || defined(ENERGIA_ARCH_CC13X2) || \
@@ -666,7 +682,7 @@ static const unsigned char crc8_table[256]
 };
 
 
-void update_crc8(unsigned char *crc, unsigned char m)
+void update_crc8(uint8_t *crc, uint8_t m)
      /*
       * For a byte array whose accumulated crc value is stored in *crc, computes
       * resultant crc obtained by appending m to the byte array
@@ -681,4 +697,124 @@ void update_crc8(unsigned char *crc, unsigned char m)
 #else
   *crc = crc8_table[(*crc) ^ m];
 #endif
+}
+
+
+// added by Moshe Braner: table-driven CRC for ADS-L
+
+// Pawel's code from OGN library adsl.h:
+
+// pass a single byte through the CRC polynomial
+static uint32_t adsl_PolyPass(uint32_t CRC, uint8_t Byte)
+{
+    const uint32_t Poly = 0xFFFA0480;
+    CRC |= Byte;
+    for(uint8_t Bit=0; Bit<8; Bit++)
+    { 
+        if(CRC & 0x80000000)
+            CRC ^= Poly;
+        CRC<<=1; 
+    }
+    return CRC;
+}
+
+// run over data bytes and the three CRC bytes
+static uint32_t adsl_check_slow(const uint8_t *Byte, uint8_t Bytes)
+{
+    uint32_t CRC = 0;
+    for(uint8_t Idx=0; Idx<Bytes; Idx++)
+    {
+      CRC = adsl_PolyPass(CRC, Byte[Idx]);
+    }
+    return CRC>>8;      // should be all zero for a correct packet
+}
+
+// calculate PI for the given packet data excluding the three CRC bytes
+static uint32_t adsl_calc_slow(const uint8_t *Byte, uint8_t Bytes)
+{
+    uint32_t CRC = 0;
+    for(uint8_t Idx=0; Idx<Bytes; Idx++)
+    {
+        CRC = adsl_PolyPass(CRC, Byte[Idx]);
+    }
+    CRC = adsl_PolyPass(CRC, 0);
+    CRC = adsl_PolyPass(CRC, 0);
+    CRC = adsl_PolyPass(CRC, 0);
+    return CRC>>8;
+}
+
+// initialize a lookup table for faster calculation later
+
+static void init_adsl_tab()
+{
+    crc_tabadsl = CRC_long_malloc();
+    if (crc_tabadsl == NULL) {
+        crc_tabadsl_init = 2;
+        return;
+    }
+
+    for (uint32_t i=0; i<256; i++) {
+        uint32_t CRC = (i << 24);
+#if 0
+        const uint32_t Poly = 0xFFFA0480;
+        for (uint8_t Bit=0; Bit<8; Bit++) {
+            if(CRC & 0x80000000)
+                CRC ^= Poly;
+            CRC <<= 1;
+        }
+#else
+        CRC = adsl_PolyPass(CRC, (uint8_t) 0);
+#endif
+        crc_tabadsl[i] = CRC;
+        yield();
+    }
+}
+
+uint32_t check_adsl_crc(const uint8_t *Byte, uint8_t Bytes)
+{
+    if (crc_tabadsl_init == 0)
+        init_adsl_tab();
+
+    if (crc_tabadsl_init == 2)                  // init failed to malloc() the table
+        return adsl_check_slow(Byte, Bytes);    // use the slow non-table method
+
+    uint32_t CRC = 0;
+    for(int Idx=0; Idx<Bytes; Idx++)
+    {
+        uint8_t topbyte = ((CRC >> 24) & 0xFF);
+        CRC |= Byte[Idx];
+        CRC <<= 8;
+        CRC ^= crc_tabadsl[topbyte];
+    }
+    return CRC>>8;      // should be all zero for a correct packet
+}
+
+uint32_t calc_adsl_crc(const uint8_t *Byte, uint8_t Bytes)
+{
+    if (crc_tabadsl_init == 0)
+        init_adsl_tab();
+
+    if (crc_tabadsl_init == 2)                  // init failed to malloc() the table
+        return adsl_calc_slow(Byte, Bytes);     // use the slow non-table method
+
+    uint32_t CRC = 0;
+    uint8_t topbyte;
+    for(int Idx=0; Idx<Bytes; Idx++)
+    {
+        topbyte = ((CRC >> 24) & 0xFF);
+        CRC |= Byte[Idx];
+        CRC <<= 8;
+        CRC ^= crc_tabadsl[topbyte];
+    }
+    // continue to update CRC for 3 more zero-bytes:
+    topbyte = ((CRC >> 24) & 0xFF);
+    CRC <<= 8;
+    CRC ^= crc_tabadsl[topbyte];
+    topbyte = ((CRC >> 24) & 0xFF);
+    CRC <<= 8;
+    CRC ^= crc_tabadsl[topbyte];
+    topbyte = ((CRC >> 24) & 0xFF);
+    CRC <<= 8;
+    CRC ^= crc_tabadsl[topbyte];
+    return CRC>>8;
 }
