@@ -71,6 +71,38 @@ const rf_proto_desc_t adsl_proto_desc = {
   .slot1           = {800, 1200}
 };
 
+/*
+const rf_proto_desc_t uplink_proto_desc = {
+  .name            = {'U','P','L','I','N','K', 0},
+  .type            = RF_PROTOCOL_ADSL,
+  .modulation_type = RF_MODULATION_TYPE_2FSK,
+  .preamble_type   = RF_PREAMBLE_TYPE_AA,
+  .preamble_size   = UPLINK_PREAMBLE_SIZE,
+  .syncword        = UPLINK_SYNCWORD,
+  .syncword_size   = UPLINK_SYNCWORD_SIZE,
+  .syncword_skip   = UPLINK_SYNCWORD_SKIP,
+  .net_id          = 0x0000,
+  .payload_type    = RF_PAYLOAD_DIRECT,
+  .payload_size    = ADSL_PAYLOAD_SIZE + ADSL_CRC_SIZE,
+  .payload_offset  = 0,
+  .crc_type        = ADSL_CRC_TYPE,
+  .crc_size        = 0,
+
+  .bitrate         = RF_BITRATE_200KBPS,
+  .deviation       = RF_FREQUENCY_DEVIATION_50KHZ,
+  .whitening       = RF_WHITENING_NONE,
+  .bandwidth       = RF_RX_BANDWIDTH_SS_250KHZ,
+
+  .air_time        = UPLINK_AIR_TIME,
+
+  .tm_type         = RF_TIMING_2SLOTS_PPS_SYNC,
+  .tx_interval_min = ADSL_TX_INTERVAL_MIN,
+  .tx_interval_max = ADSL_TX_INTERVAL_MAX,
+  .slot0           = {200, 450},
+  .slot1           = {0, 0}
+};
+*/
+
 GPS_Position pos;
 ADSL_Packet  adsl_r __attribute__((aligned(sizeof(uint32_t)))); /* Rx */
 ADSL_Packet  adsl_t __attribute__((aligned(sizeof(uint32_t)))); /* Tx */
@@ -99,12 +131,10 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
 
   adsl_r.Descramble();
 
-  if (adsl_r.Type != 0x02)   // not iConspicuity
-      return false;
-
-  fop->protocol  = RF_PROTOCOL_ADSL;
-
-  fop->addr      = adsl_r.getAddress();
+  fop->protocol = RF_PROTOCOL_ADSL;
+  fop->addr     = adsl_r.getAddress();
+  bool relayed  = adsl_r.getRelay();
+  bool traffic  = adsl_r.isPosition();
 
   if (fop->addr == settings->ignore_id)
       return false;                  /* ID told in settings to ignore */
@@ -115,10 +145,22 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
           // if "seeing itself" is via requested relay, show it
           // Serial.println("Received own ID - relayed as landed out");
       } else {
-          Serial.println("warning: received same ID as this aircraft");
+          if (traffic && (! relayed))
+              Serial.println("warning: received same ID as this aircraft");
           return false;
       }
   }
+
+  if (adsl_r.isTelemetry()) {
+      char callsign[16];
+      uint8_t len = adsl_r.getInfo(callsign, 5);
+      if (len > 0)
+          Traffic_Update_Callsign(fop->addr, callsign, (size_t) (len+1));
+      return false;   // telemetry/info packets are not position traffic
+  }
+
+  if (!traffic)
+      return false;
 
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
     container_t *cip = &Container[i];
@@ -158,7 +200,7 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
 
   fop->stealth   = 0;
   fop->no_track  = 0;
-  fop->relayed   = adsl_r.getRelay();
+  fop->relayed   = relayed;
 
   return true;
 }
@@ -197,7 +239,7 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
   } else {
       // if not airborne, transmit only once in 8 seconds
       if (ThisAircraft.airborne == 0 && ThisAircraft.timestamp < ThisAircraft.positiontime + 8 && (! test_mode)) {
-          RF_Transmit_Postpone();
+          RF_Transmit_Postpone(false);
           return 0;
       }
       ThisAircraft.positiontime = ThisAircraft.timestamp;
@@ -214,7 +256,7 @@ size_t adsl_encode(void *pkt, container_t *aircraft) {
       aircraft_type = AIRCRAFT_TYPE_STATIC;
       adsl_t.FlightState = 2;   // pretend to be airborne (with variable altitude)
   } else {
-      adsl_t.FlightState = (aircraft->airborne? 2 : 1);   // >>> adsl_t.Meta.FlightState ?
+      adsl_t.FlightState = (aircraft->airborne? 2 : 1);
   }
 
   adsl_t.setAcftTypeOGN((int16_t) aircraft_type);

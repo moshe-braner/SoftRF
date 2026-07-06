@@ -271,26 +271,6 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     fop->no_track = !(status & 0x01);
     if (settings->debug_flags & DEBUG_RELAY)  fop->no_track = 0;
 
-#if 0
-  } else if (pkt->type == 2) {  /* Name */
-
-    uint8_t *body = ((uint8_t *) fanet_pkt) + FANET_HEADER_SIZE;
-    if (RF_last_rx_len > FANET_HEADER_SIZE) {
-        size_t body_len = RF_last_rx_len - FANET_HEADER_SIZE;
-        if (body_len > CALLSIGN_LEN-1)
-            body_len = CALLSIGN_LEN-1;
-        for (i=0; i < MAX_TRACKING_OBJECTS; i++) {
-            if (Container[i].addr == addr) {
-                strncpy(Container[i].callsign, body, body_len);
-                Container[i].callsign[CALLSIGN_LEN-1] = '\0';
-                break;
-            }
-        }
-    }
-
-    return false;  /* name packet is not traffic */
-#endif
-
   } else if (pkt->type == 2 || pkt->type == 3 || pkt->type == 4) {  /* pilot name, or text message */
 
     uint8_t *raw = (uint8_t *) fanet_pkt;
@@ -306,7 +286,7 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
         }
     }
     if (cip == NULL)
-        return false;
+        return false;   // ignore text messages from non-tracked aircraft
 
     /* Calculate actual payload offset - skip extended header if present */
     //bool has_ext = raw[0] & 0x80;
@@ -326,7 +306,7 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     Serial.print("FANET message RX Type ");
     Serial.print(pkt->type);
     Serial.print(" from ");
-    Serial.print(fop->addr, HEX);
+    Serial.print(addr, HEX);
     Serial.print(" len=");
     Serial.print(payload_len);
     if (pkt->type == 3) {
@@ -358,27 +338,25 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     }
     NMEABuffer[len++] = '\n';
     NMEABuffer[len] = '\0';
+    // output how?
   }
 #endif
 
     // for callsign and for PFLAM limit text length
     if (payload_len > CALLSIGN_LEN-1)
         payload_len = CALLSIGN_LEN-1;
-    raw[payload_offset+payload_len] = '\0';
-
-    if (pkt->type == 2) {  /* Name */
-        if (has_ext)
-            return false;
-        strncpy((char *)cip->callsign, (char *)&raw[payload_offset], payload_len);
+    raw[payload_offset+payload_len] = '\0';  // OK since  MAX_PKT_SIZE > CALLSIGN_LEN
+    if (pkt->type == 2 && (! has_ext) && (cip->callsign[0]=='\0' || cip->callsign[CALLSIGN_LEN-1]=='?')) {
+        /* copy FANET name (plus nullchar) into callsign */
+        //strncpy((char *)cip->callsign, (char *)&raw[payload_offset], payload_len+1);
+        //cip->callsign[payload_len] = '\0';
+        strcpy((char *)cip->callsign, (char *)&raw[payload_offset]);
         cip->callsign[CALLSIGN_LEN-1] = '\0';
     }
-
-    //if (settings->nmea_t & NMEA_T_PFLAM || settings->nmea2_t & NMEA_T_PFLAM) {
-        uint8_t pflam_type = PFLAM_BCST;
-        if (pkt->type == 2)  pflam_type = PFLAM_PNAME;
-        else if (unicast)    pflam_type = PFLAM_UCST;
-        NMEA_PFLAM(pflam_type, cip, &raw[payload_offset]);
-    //}  // this check done in NMEA_PFLAM
+    uint8_t pflam_type = PFLAM_BCST;
+    if (pkt->type == 2)  pflam_type = PFLAM_PNAME;
+    else if (unicast)    pflam_type = PFLAM_UCST;
+    NMEA_PFLAM(pflam_type, cip, &raw[payload_offset]);
 
     return false;  /* packet is not a traffic position report */
 
@@ -391,6 +369,7 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
   return true;
 }
 
+/* ------------------------------------------------------------------------- */
 
 // Additional FANET transmission packet types
 // Code courtesy of Vlad Belayev

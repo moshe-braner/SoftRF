@@ -37,6 +37,13 @@
 #define ADSL_TX_INTERVAL_MIN 600 /* in ms */
 #define ADSL_TX_INTERVAL_MAX 1400
 
+// for HDR:
+#define UPLINK_SYNCWORD      {0x2D, 0xD4, 0x18}
+#define UPLINK_SYNCWORD_SIZE 3
+#define UPLINK_SYNCWORD_SKIP 0
+#define UPLINK_PREAMBLE_SIZE 16
+#define UPLINK_AIR_TIME      2 /* in ms */
+
 #include <ads-l.h>
 
 typedef struct {
@@ -46,6 +53,7 @@ typedef struct {
 } adsl_packet_t;
 
 extern const rf_proto_desc_t adsl_proto_desc;
+//extern const rf_proto_desc_t uplink_proto_desc;
 
 bool adsl_decode(void *, container_t *, ufo_t *);
 size_t adsl_encode(void *, container_t *);

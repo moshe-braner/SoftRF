@@ -161,12 +161,18 @@ bool paw_decode(void *pkt, container_t *this_aircraft, ufo_t *fop)
 size_t paw_encode(void *pkt, container_t *aircraft) {
 
   // if not airborne, transmit only once in 8 seconds
-  if (ThisAircraft.airborne == 0 && ThisAircraft.timestamp < ThisAircraft.positiontime + 8 && (! test_mode)) {
-      RF_Transmit_Postpone();
-      return 0;              // otherwise adsl_encode() will return 0
+  // - but ignore that if dual PAW+FANET mode, since FANET will grab the slot
+  static uint32_t paw_positiontime = 0;
+  if (ThisAircraft.airborne == 0 && ThisAircraft.timestamp < paw_positiontime + 8
+           && dual_protocol != RF_FANET_PAW && dual_protocol != RF_PAW_FANET && (! test_mode)) {
+      RF_Transmit_Postpone(true);
+      return 0;
   }
-
+  paw_positiontime = ThisAircraft.timestamp;
+  uint32_t adsl_positiontime = ThisAircraft.positiontime;
+  ThisAircraft.positiontime = 0;              // otherwise adsl_encode() will return 0
   size_t size = adsl_encode(pkt, aircraft);
+  ThisAircraft.positiontime = adsl_positiontime;
   if (size != ADSL_PAYLOAD_SIZE + ADSL_CRC_SIZE  // 24
    || size != P3I_PAYLOAD_SIZE) {                // 24
 Serial.print("paw_encode() error: adsl_encode() returned ");

@@ -24,6 +24,7 @@
 #include <TimeLib.h>
 
 #include "../../../SoftRF.h"
+#include "../../TrafficHelper.h"
 #include "../../driver/RF.h"
 #include "../../driver/GNSS.h"
 #include "../../driver/Settings.h"
@@ -129,6 +130,16 @@ bool ogntp_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
          return true;                  /* ID told in settings to ignore */
   if (fop->addr == ThisAircraft.addr)
          return true;                  /* same ID as this aircraft - ignore */
+
+  if (ogn_rx_pkt.Packet.Header.Other) {
+    if (ogn_rx_pkt.Packet.isInfo() && ogn_rx_pkt.Packet.goodInfoCheck()) {
+        char callsign[17];
+        uint8_t len = ogn_rx_pkt.Packet.getInfo(callsign, 5);
+        if (len > 0)
+            Traffic_Update_Callsign(fop->addr, callsign, (size_t) len);
+    }
+    return false;   // status/info packets are not position traffic
+  }
 
   fop->addr_type =
       (ogn_rx_pkt.Packet.Header.AddrType == ADDR_TYPE_ICAO ? ADDR_TYPE_ICAO : ADDR_TYPE_FLARM);
