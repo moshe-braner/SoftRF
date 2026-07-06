@@ -141,20 +141,20 @@ int16_t SX127x::beginFSK(const uint8_t* chipVersions, uint8_t numVersions, float
   state = SX127x::setFrequencyDeviation(freqDev);
   RADIOLIB_ASSERT(state);
 
+  // enable AFC (MB: actually disables AFC)
+  state = SX127x::setAFC(false);
+  // MB: enable AFC?
+  // state = SX127x::setAFC(true);
+  RADIOLIB_ASSERT(state);
+
+  // set AFC&AGC to trigger on RSSI (both in OOK and FSK)
+  state = SX127x::setAFCAGCTrigger(RADIOLIB_SX127X_RX_TRIGGER_RSSI_INTERRUPT);
+  // trigger on preamble instead?
+  //state = SX127x::setAFCAGCTrigger(RADIOLIB_SX127X_RX_TRIGGER_PREAMBLE_DETECT);
+  RADIOLIB_ASSERT(state);
+
   // set AFC bandwidth
   state = SX127x::setAFCBandwidth(rxBw);
-  RADIOLIB_ASSERT(state);
-
-  // set AFC&AGC trigger to RSSI (both in OOK and FSK)
-  //state = SX127x::setAFCAGCTrigger(RADIOLIB_SX127X_RX_TRIGGER_RSSI_INTERRUPT);
-  // MB: trigger on preamble instead
-  state = SX127x::setAFCAGCTrigger(RADIOLIB_SX127X_RX_TRIGGER_PREAMBLE_DETECT);
-  RADIOLIB_ASSERT(state);
-
-  // enable AFC (MB: actually disables AFC)
-  //state = SX127x::setAFC(false);
-  // MB: enable AFC
-  state = SX127x::setAFC(true);
   RADIOLIB_ASSERT(state);
 
   // set receiver bandwidth
