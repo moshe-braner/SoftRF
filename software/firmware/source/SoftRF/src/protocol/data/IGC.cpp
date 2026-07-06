@@ -869,6 +869,16 @@ bool writeIGCHeader()
     igc_file_append_const("HFALGALTGPS:ELL\r\n");     // but we output the ellipsoid altitude
     igc_file_append_const("HFDTM100GPSDATUM: WGS-1984\r\n");
     igc_file_append_const("I00\r\n");   // >>> may add FXA etc later
+
+    // report some key settings
+    snprintf(buf, sizeof(buf), "CONF PROT %d %d BAND %d TX %d ATYP %d",
+        settings->rf_protocol,
+        settings->altprotocol,
+        settings->band,
+        settings->txpower,
+        settings->acft_type);
+    FlightLogComment(buf, true);
+
     return true;  
 }
 
@@ -1210,7 +1220,7 @@ void FlightLogComment(const char *data, bool force)
     if (! FlightLogOpen)
         return;
     if (! force && compfileOpen)
-        return;            // no comments in compressed file
+        return;            // no comments in compressed file unless forced
     char buf[80];
     strcpy(buf, "LSRF");
     size_t len = strlen(data);
@@ -1234,7 +1244,7 @@ const char *FlightLogStatus()
 {
     bool logging = (settings->logflight != FLIGHT_LOG_NONE);
     static char buf[20];
-    snprintf(buf, 20, "Logged %d bytes", FlightLogPosition);
+    snprintf(buf, sizeof(buf), "Logged %d bytes", FlightLogPosition);
     if (PSRAMbuf) {
         if (FlightLogPosition)
             return buf;
