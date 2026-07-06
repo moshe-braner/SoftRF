@@ -151,6 +151,16 @@ class OGN_Packet           // Packet structure for the OGN tracker
      unsigned int Voltage   : 8; // [1/64V] VR          // supply voltager
    } Status;
 
+   union
+   {      uint8_t Byte[16];
+     struct
+     {    uint8_t Data[14];      // [16x7bit] packed string of 16-char: 7bit/char
+          uint8_t DataChars:  4; // [int] number of characters in the packed string
+          uint8_t ReportType: 4; // [1] Info packet
+          uint8_t Check;         // XOR check
+     } ;
+   } Info;
+
   } ;
 
    uint8_t  *Byte(void) const { return (uint8_t  *)&HeaderWord; } // packet as bytes
@@ -184,6 +194,50 @@ class OGN_Packet           // Packet structure for the OGN tracker
    { if(!Header.Other) { PrintPosition(); return; }
      if(Status.ReportType==0) { PrintDeviceStatus(); return; }
    }
+
+   bool isStatus(void) const { return Status.ReportType==0; }
+   bool isInfo  (void) const { return Status.ReportType==1; }
+
+   uint8_t getInfoChar(uint8_t Idx) const
+   { if(Idx>=16) return 0;
+     uint8_t BitIdx = Idx*7;
+             Idx = BitIdx>>3;
+     uint8_t Ofs = BitIdx&0x07;
+     if(Ofs==0) return Info.Data[Idx]&0x7F;
+     if(Ofs==1) return Info.Data[Idx]>>1;
+     uint8_t Len = 8-Ofs;
+     return (Info.Data[Idx]>>Ofs) | ((Info.Data[Idx+1]<<Len)&0x7F); }
+
+   uint8_t readInfo(char *Value, uint8_t &InfoType, uint8_t ValueIdx=0) const
+   { uint8_t Len=0;
+     uint8_t Chars = Info.DataChars;
+     char Char=0;
+     for( ; ; )
+     { if((ValueIdx+Len)>Chars) return 0;
+       Char = getInfoChar(ValueIdx+Len);
+       if(Char<0x20) break;
+       Value[Len++]=Char; }
+     Value[Len]=0;
+     InfoType=Char;
+     return Len+1; }
+
+   uint8_t InfoCheck(void) const
+   { uint8_t Check=0;
+     for(uint8_t Idx=0; Idx<15; Idx++)
+       Check ^= Info.Byte[Idx];
+     return Check; }
+
+   uint8_t goodInfoCheck(void) const { return Info.Check == InfoCheck(); }
+
+   uint8_t getInfo(char *Value, uint8_t Type=5) const
+   { uint8_t InfoType;
+     uint8_t Idx=0;
+     for( ; ; )
+     { uint8_t Chars = readInfo(Value, InfoType, Idx);
+       if(Chars==0) break;
+       if(InfoType==Type) return strlen(Value);
+       Idx+=Chars; }
+     return 0; }
 
    void PrintDeviceStatus(void) const
    { printf("%c:%06lX R%c%c %02ds:",
@@ -1715,4 +1769,3 @@ class GPS_Position
 } ;
 
 #endif // of __OGN_H__
-

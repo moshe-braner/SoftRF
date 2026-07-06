@@ -41,8 +41,12 @@ enum
 {
   RF_SINGLE_PROTOCOL,
   RF_FLR_ADSL,         // true dual-protocol reception
-  RF_FLR_FANET,        // time-slicing
-  RF_FLR_P3I           // time-slicing
+  RF_FLR_FANET,        // time-slots
+  RF_FLR_PAW,          // time-slots
+  RF_FANET_PAW,        // alternating seconds
+  RF_PAW_FANET,        // alternating seconds
+  RF_FANET_ADSB,       // alternating seconds
+  RF_PAW_ADSB,         // alternating seconds
 };
 
 enum
@@ -72,8 +76,9 @@ enum
 
 enum
 {
-	RF_BITRATE_100KBPS,
 	RF_BITRATE_38400,
+	RF_BITRATE_100KBPS,
+	RF_BITRATE_200KBPS,
 	RF_BITRATE_1042KBPS,
 	RF_BITRATE_2000KBPS
 };

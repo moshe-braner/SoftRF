@@ -9,11 +9,14 @@
 // Coordinate scales:
 // - uBlox GPS and FLARM:       LSB = 1e-7 deg
 // - OGN-Tracker:               LSB = 0.0001/60 deg
-// - FANET/ADS-L pseudo-cordic: LSB =
+// - FANET/ADS-L pseudo-cordic: LSB = 1/93206 deg for Lat or 1/46603 deg for Lon
 // - True cordic:               2^32 = 360 deg
 
 int32_t Coord_FNTtoOGN(int32_t Coord) { return ((int64_t)Coord*27000219 +(1<<28))>>29; }    // [FANET cordic] => [0.0001/60 deg]
 int32_t Coord_OGNtoFNT(int32_t Coord) { return ((int64_t)Coord*83399317 +(1<<21))>>22; }    // [0.0001/60 deg] => [FANET cordic]
+
+// int32_t Coord_FNTtoCRD(int32_t Coord) { return (Coord<<7) + ((Coord*68+0x8000)>>16) ; }     // [FANET cordic] => [32-bit cordic]
+int32_t Coord_FNTtoCRD(int32_t Coord) { return Coord + ((((Coord+64)>>7)*68+0x8000)>>16) ; }     // [FANET 32-bit cordic] => [32-bit cordic]
 
 int32_t Coord_FNTtoUBX(int32_t Coord) { return ((int64_t)Coord*900007296+(1<<29))>>30; }    // [FANET cordic ] => [1e-7 deg]
 int32_t Coord_UBXtoFNT(int32_t Coord) { return ((int64_t)Coord*5003959  +(1<<21))>>22; }    // [1e-7 deg]      => [FANET cordic]
@@ -26,14 +29,21 @@ int32_t Coord_CRDtoUBX(int32_t Coord) { return ((int64_t)Coord*78125+(1<<24))>>2
 
 // ==============================================================================================
 
-int32_t FeetToMeters(int32_t Altitude) { return (Altitude*2497+4096)>>13; } // [feet] => [m]  3 m error at 300'000 ft
-int32_t MetersToFeet(int32_t Altitude) { return (Altitude*6719+1024)>>11; } // [m] => [feet]  8 ft error at 100'000 m
+static int32_t DivRound(int32_t Value, int32_t Div)
+{ if(Value>=0) return (Value+(Div/2))/Div;
+  return -((-Value+(Div/2))/Div); }
+
+// Fast approximations, if exact conversion ever becomes too expensive:
+// int32_t FeetToMeters(int32_t Altitude) { return (Altitude*2497+4096)>>13; } // [feet] => [m]  3 m error at 300'000 ft
+// int32_t MetersToFeet(int32_t Altitude) { return (Altitude*6719+1024)>>11; } // [m] => [feet]  8 ft error at 100'000 m
+int32_t FeetToMeters(int32_t Altitude) { return DivRound(Altitude*381, 1250); } // [feet] => [m]
+int32_t MetersToFeet(int32_t Altitude) { return DivRound(Altitude*1250, 381); } // [m] => [feet]
 
 // ==============================================================================================
 
 uint8_t AcftType_OGNtoADSB(uint8_t AcftType)
-                         // no-inf0, glider, tow, heli, parachute, drop-plane, hang-glider, para-glider, powered, jet, UFO, balloon, Zeppelin, UAV, ground vehicle, fixed object
-{ const uint8_t AcftCat[16] = { 0x00, 0xB1, 0xA1, 0xA7, 0xB3,      0xA1,       0xB4,        0xB4,        0xA1,   0xA2, 0x00, 0xB2,    0xB2,    0xB6, 0xC3, 0xC4 };
+                         // no-inf0, glider, tow, heli, parachute, drop-plane, hang-glider, para-glider, powered, jet, gyro, balloon, Zeppelin, UAV, ground vehicle, fixed object
+{ const uint8_t AcftCat[16] = { 0x00, 0xB1, 0xA1, 0xA7, 0xB3,      0xA1,       0xB4,        0xB4,        0xA1,   0xA2, 0xA7, 0xB2,    0xB2,    0xB6, 0xC3, 0xC4 };
   return AcftCat[AcftType]; }
 
 uint8_t AcftType_FNTtoADSB(uint8_t AcftType)
@@ -45,12 +55,13 @@ uint8_t AcftType_ADSBtoOGN(uint8_t AcftCat)
 { // if(AcftCat&0x38) return 0;
   uint8_t Upp = AcftCat>>4;
   uint8_t Low = AcftCat&7;
+  if(Upp==0x0) return Low;
   if(Upp==0xA)
   { if(Low==1) return 8;
     if(Low==7) return 3;
     return 9; }
-  if(Upp==0xB)
-  { const uint8_t Map[8] = { 0, 0xB, 1, 4, 7, 0, 0xD, 0 };
+  if(Upp==0xB)          //      B1, B2,B3,B4,B5,  B6, B7
+  { const uint8_t Map[8] = { 0,  1,0xB, 4, 7, 0, 0xD, 0 };
     return Map[Low]; }
   if(Upp==0xC)
   { if(Low>=4) return 0xF;
@@ -59,14 +70,14 @@ uint8_t AcftType_ADSBtoOGN(uint8_t AcftCat)
   return 0; }
 
 uint8_t AcftType_OGNtoGDL(uint8_t AcftType)
-                         // no-info, glider, tow, heli, parachute, drop-plane, hang-glider, para-glider, powered, jet, UFO, balloon, Zeppelin, UAV, ground vehicle, static-object
-{ const uint8_t AcftCat[16] = { 0,      9,   1,    7,        11,          1,          12,          12,       1,   2,   0,      10,       10,   14,  18,     19 } ;
+                         // no-info, glider, tow, heli, parachute, drop-plane, hang-glider, para-glider, powered, jet, gyro, balloon, Zeppelin, UAV, ground vehicle, static-object
+{ const uint8_t AcftCat[16] = { 0,      9,   1,    7,        11,          1,          12,          12,       1,   2,   7,      10,       10,   14,  18,     19 } ;
   return AcftCat[AcftType]; }
 
 uint8_t AcftType_OGNtoADSL(uint8_t AcftType)                // OGN to ADS-L aircraft-type
 { const uint8_t Map[16] = { 0, 4, 1, 3,                     // unknown, glider, tow-plane, helicopter
                             8, 1, 7, 7,                     // sky-diver, drop plane, hang-glider, para-glider
-                            1, 2, 0, 5,                     // motor airplane, jet, UFO, balloon
+                            1, 2, 3, 5,                     // motor airplane, jet, gyrocopter, balloon
                             5,11, 0, 0 } ;                  // airship, UAV, ground vehicle, static object
   return Map[AcftType]; }
 
@@ -465,5 +476,13 @@ float BaroAlt(float P)                     // altitude [m] for given pressure [P
   { if(P>BaroRefTable[Idx+1].Pb) break; }
   BaroRef &Ref = BaroRefTable[Idx];
   return BaroAlt(P, Ref.hb, Ref.Pb, Ref.Tb, Ref.Lb /* , Ref.gb */ ); }
+
+float DewPoint(float T, float RH) // https://iridl.ldeo.columbia.edu/dochelp/QA/Basic/dewpoint.html
+{ const float T0 = 273.15f;                       // [K]
+  const float E0 = 0.611f;                        // [hPa]
+  const float LRv = 5423.0f;                      // [K]
+  float Es = E0*expf(LRv*(1.0f/T0-1.0f/(T+T0)));  // [hPa]
+  float E = 0.01f*RH*Es; if(E<=0) return 0;       // [hPa]
+  return 1.0f/(1.0f/T0-logf(E/E0)/LRv)-T0; }      // [degC]
 
 // ==============================================================================================

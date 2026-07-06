@@ -15,8 +15,8 @@ int32_t Coord_OGNtoCRD(int32_t Coord);
 int32_t Coord_UBXtoCRD(int32_t Coord);
 int32_t Coord_CRDtoUBX(int32_t Coord);
 
-int32_t FeetToMeters(int32_t Altitude);                               //
-int32_t MetersToFeet(int32_t Altitude);                               //
+int32_t FeetToMeters(int32_t Altitude);                               // [feet] => [m]
+int32_t MetersToFeet(int32_t Altitude);                               // [m] => [feet]
 
 uint8_t AcftType_OGNtoADSB(uint8_t AcftType);
 uint8_t AcftType_FNTtoADSB(uint8_t AcftType);
@@ -113,5 +113,6 @@ int APRS2IGC(char *Out, const char *Inp, int GeoidSepar);   // convert APRS mess
 float BaroTemp(float h);                    // temperature [K] at given altitude [m]
 float BaroPress(float h);                   // pressure [Pa] at given altitude [m]
 float BaroAlt(float P);                     // altitude [m] for given pressure [Pa]
+float DewPoint(float T, float RH);          // DewPoint [degC] from given temperature [degC] and relative humidity [%]
 
 #endif // __OGNCONV_H__

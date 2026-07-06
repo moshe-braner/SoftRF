@@ -2,6 +2,7 @@
 #define __NMEA_H__
 
 #include <stdint.h>
+#include <string.h>
 
 uint8_t NMEA_Check(uint8_t *NMEA, uint8_t Len);
 uint8_t NMEA_AppendCheck(uint8_t *NMEA, uint8_t Len);
@@ -9,9 +10,9 @@ inline uint8_t NMEA_AppendCheck(char *NMEA, uint8_t Len) { return NMEA_AppendChe
 uint8_t NMEA_AppendCheckCRNL(uint8_t *NMEA, uint8_t Len);
 inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_AppendCheckCRNL((uint8_t*)NMEA, Len); }
 
- class NMEA_RxMsg             // receiver for the NMEA sentences
+ class NMEA_RxMsg                    // receiver for the NMEA sentences
 { public:
-   static const uint8_t MaxLen=96;   // maximum length
+   static const uint8_t MaxLen=104;  // maximum length
    static const uint8_t MaxParms=24; // maximum number of parameters (commas)
    uint8_t Data[MaxLen];             // the message itself
    uint8_t Len;                      // number of bytes
@@ -29,6 +30,15 @@ inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_Appen
      { (*SendByte)(Data[Idx]); }
      (*SendByte)('\r'); (*SendByte)('\n'); }
 
+   int ProcessLine(const char *Line)
+   { Clear();
+     int Idx=0;
+     for( ; ; Idx++)
+     { uint8_t Byte=Line[Idx]; if(Byte==0) break;
+       ProcessByte(Byte);
+       if(Byte<=' ' || isComplete()) break; }
+     return Idx; }
+
    void ProcessByte(uint8_t Byte)            // pass all bytes through this call and it will build the frame
      {
        if(isComplete()) return;              // if already a complete frame, ignore extra bytes
@@ -43,7 +53,7 @@ inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_Appen
          else if(Byte<=' ')                  // other control bytes treat as errors
          { Clear(); return; }                // and drop the frame
          else if(Byte==',')                  // save comma positions to later get back to the fields
-         { if(Parms<MaxParms) Parm[Parms++]=Len+1; }
+         { if(Parms<MaxParms) Parm[Parms++]=Len+1; }       // save the position just after the comma
          if(Len<MaxLen) { Data[Len++]=Byte; Check^=Byte; } // store data but if too much then treat as an error
                    else Clear();             // if too long, then drop the frame completely
        }
@@ -95,19 +105,35 @@ inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_Appen
        return Parm[Field+1]-Parm[Field]-1; }
 */
 
-   uint8_t isGP(void) const                    // GPS sentence ?
-   //   { return isGP((const char *)Data); }
-   // uint8_t static isGP(const char *Data)
+   uint8_t isGP(void) const                     // GPS sentence ?
      { if(Data[1]!='G') return 0;
        return Data[2]=='P'; }
 
+   uint8_t isGL(void) const                     // GLONASS sentence ?
+     { if(Data[1]!='G') return 0;
+       return Data[2]=='L'; }
+
+   uint8_t isGA(void) const                     // GALILEO sentence ?
+     { if(Data[1]!='G') return 0;
+       return Data[2]=='A'; }
+
+   uint8_t isGQ(void) const                     // QZSS
+     { if(Data[1]!='G') return 0;
+       return Data[2]=='Q'; }
+
    uint8_t isGN(void) const
-   //  { return isGN((const char *)Data); }
-   // uint8_t static isGN(const char *Data)
      { if(Data[1]!='G') return 0;
        return Data[2]=='N'; }
 
-   uint8_t isGx(void) const                    // GPS or GLONASS sentence ?
+   uint8_t isBD(void) const                     // for Beidou GSA and GSV
+     { if(Data[1]!='B') return 0;
+       return Data[2]=='D'; }
+
+   uint8_t isGB(void) const                     // for Beidou GSA and GSV
+     { if(Data[1]!='G') return 0;
+       return Data[2]=='B'; }
+
+   uint8_t isGx(void) const                     // GPS or GLONASS sentence ?
      { return Data[1]=='G'; }
 
    uint8_t isGPRMC(void) const                  // GPS recomended minimum data
@@ -146,6 +172,18 @@ inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_Appen
        if(Data[4]!='G') return 0;
        return Data[5]=='A'; }
 
+   uint8_t isGxVTG(void) const                  // velocity relative to the ground
+     { if(!isGx()) return 0;
+       if(Data[3]!='V') return 0;
+       if(Data[4]!='T') return 0;
+       return Data[5]=='G'; }
+
+   uint8_t isGxZDA(void) const                  // UTC time+date, time zone
+     { if(!isGx()) return 0;
+       if(Data[3]!='Z') return 0;
+       if(Data[4]!='D') return 0;
+       return Data[5]=='A'; }
+
    uint8_t isGPGSA(void) const                   // GPS satellite data
      { if(!isGP()) return 0;
        if(Data[3]!='G') return 0;
@@ -158,38 +196,79 @@ inline uint8_t NMEA_AppendCheckCRNL(char *NMEA, uint8_t Len) { return NMEA_Appen
        if(Data[4]!='S') return 0;
        return Data[5]=='A'; }
 
-   uint8_t isGxGSA(void) const                   // 
+   uint8_t isGxGSA(void) const                   // GP=GPS, GA=Galileo, GL=Glonass, GB=BaiDou, GN=any of the systems combined
      { if(!isGx()) return 0;
        if(Data[3]!='G') return 0;
        if(Data[4]!='S') return 0;
        return Data[5]=='A'; }
 
-   uint8_t isGPTXT(void) const                   // GPS satellite data
+   uint8_t isGxGSV(void) const                   // Satellite data
+     { if(!isGx() && !isBD()) return 0;          // we include as well $BDGSV
+       if(Data[3]!='G') return 0;
+       if(Data[4]!='S') return 0;
+       return Data[5]=='V'; }
+
+   uint8_t isGPGSV(void) const                   // GPS satellite data
      { if(!isGP()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isGLGSV(void) const                   // GLONASS satellite data
+     { if(!isGL()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isGAGSV(void) const                   // GALILEO satellite data
+     { if(!isGA()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isGBGSV(void) const                   // BEIDOU satellite data
+     { if(!isGB()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isBDGSV(void) const                   // BEIDOU satellite data
+     { if(!isBD()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isGQGSV(void) const                   // QZSS satellite data
+     { if(!isGQ()) return 0;
+       return isGxGSV(); }
+
+   uint8_t isGxTXT(void) const                   // GPS test message
+     { if(!isGx()) return 0;
        if(Data[3]!='T') return 0;
        if(Data[4]!='X') return 0;
        return Data[5]=='T'; }
 
-   uint8_t isP(void) const
+   uint8_t isP(void) const                       // Private thus specific to the euqipment
    { return Data[1]=='P'; }
 
    uint8_t isPOGN(void) const                    // OGN dedicated NMEA sentence
-     { if(Data[1]!='P') return 0;
-       if(Data[2]!='O') return 0;
-       if(Data[3]!='G') return 0;
-       return Data[4]=='N'; }
+   { return memcmp(Data+1, "POGN", 4)==0; }
 
    uint8_t isPOGNB(void)                         // barometric report from the OGN tracker
-     { if(!isPOGN()) return 0;
+   { if(!isPOGN()) return 0;
        return Data[5]=='B'; }
 
    uint8_t isPOGNT(void)                         // other aircraft position (tracking) report from OGN trackers
-     { if(!isPOGN()) return 0;
-       return Data[5]=='T'; }
+   { if(!isPOGN()) return 0;
+     return Data[5]=='T'; }
 
    uint8_t isPOGNS(void)                         // tracker parameters setup
-     { if(!isPOGN()) return 0;
-       return Data[5]=='S'; }
+   { if(!isPOGN()) return 0;
+     return Data[5]=='S'; }
+
+   uint8_t isPGRMZ(void)                         // barometric pressure report
+   { return memcmp(Data+1, "PGRMZ", 5)==0; }
+
+   uint8_t isPOGNL(void)                         // log file list request
+   { if(!isPOGN()) return 0;
+     return Data[5]=='L'; }
+
+   uint8_t isPFLA(void) const                    // FLARM dedicated NMEA sentence
+   { return memcmp(Data+1, "PFLA", 4)==0; }
+
+   uint8_t isPFLAC(void)                         // configuration
+   { if(!isPFLA()) return 0;
+     return Data[5]=='C'; }
 
 } ;
 
