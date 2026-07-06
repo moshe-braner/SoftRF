@@ -613,6 +613,9 @@ void this_airborne(bool validfix)
       airborne_changed = true;
       Landed_time = 0;  // even if landed and took off again
       ground_status == GROUND_STATUS_AIRBORNE;
+      if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_PARAGLIDER
+      &&  (settings->alarm == TRAFFIC_ALARM_PG_HILL || settings->alarm == TRAFFIC_ALARM_PG_NONE))
+          no_pg_alarm = true;
 //#if defined(ESP32)
       startlogs();      // restart flight log (and alarm log) on takeoff
 //#endif
@@ -639,6 +642,16 @@ void this_airborne(bool validfix)
             toneAC(1900, 10, 50, 1);     // double-beep
         }
     //}
+
+    // determine "away from launch hill" for paragliders
+    if (no_pg_alarm && settings->alarm == TRAFFIC_ALARM_PG_HILL) {
+        float dlat = ThisAircraft.latitude  - initial_latitude;
+        float dlon = (ThisAircraft.longitude - initial_longitude) * CosLat();
+        float vdist = fabsf(ThisAircraft.altitude - initial_altitude);
+        float hdistsq = (dlat*dlat + dlon*dlon);
+        if (hdistsq > (2000.0f * 2000.0f / 111319.0f) || vdist > 1000.0f)
+            no_pg_alarm = false;
+    }
 
     ThisAircraft.airborne = (airborne > 0)? 1 : 0;
 
