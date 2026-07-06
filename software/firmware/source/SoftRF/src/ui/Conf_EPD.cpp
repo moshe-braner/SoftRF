@@ -95,7 +95,9 @@ NMEA2: USB LD
           protostr,
           (settings->alarm == TRAFFIC_ALARM_LATEST ? "LAT" :
           (settings->alarm == TRAFFIC_ALARM_VECTOR ? "VCT" :
-          (settings->alarm == TRAFFIC_ALARM_DISTANCE ? "DST" : "---"))));
+          (settings->alarm == TRAFFIC_ALARM_PG_HILL ? "PG+" :
+          (settings->alarm == TRAFFIC_ALARM_PG_NONE ? "PG-" :
+          (settings->alarm == TRAFFIC_ALARM_DISTANCE ? "DST" : "---"))))));
       display->getTextBounds(info_line, 0, 0, &tbx, &tby, &tbw, &tbh);
       y += tbh;
       display->setCursor(x, y);

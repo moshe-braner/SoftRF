@@ -126,18 +126,18 @@ unsigned long UpdateTrafficTimeMarker = 0;
 container_t Container[MAX_TRACKING_OBJECTS];    // more fields
 ufo_t fo;                                       // fewer fields
 
-void EmptyContainer(container_t *p) { memset(p, 0, sizeof(CONTAINER)); }
-void EmptyFO(ufo_t *p) { memset(p, 0, sizeof(UFO)); }
+void EmptyContainer(container_t *cip) { memset(cip, 0, sizeof(CONTAINER)); }
+void EmptyFO(ufo_t *fop) { memset(fop, 0, sizeof(UFO)); }
 
-uint8_t fo_raw[34] __attribute__((aligned(sizeof(uint32_t))));
+uint8_t fo_raw[MAX_PKT_SIZE] __attribute__((aligned(sizeof(uint32_t))));
 char fo_callsign[CALLSIGN_LEN];
 traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 int max_alarm_level = ALARM_LEVEL_NONE;
 int8_t maxrssi;
-uint8_t adsb_acfts;
+uint8_t adsb_acfts = 0;
+uint8_t fanet_acfts = 0;
 bool alarm_ahead = false;                    /* global, used for visual displays */
-bool relay_next = false;
-bool alt_relay_next = false;
+bool no_pg_alarm = false;
 static uint32_t towing = 0;
 static uint32_t tow_addr = 0;
 static bool tow_logged = false;
@@ -149,7 +149,6 @@ static int8_t (*Alarm_Level)(container_t *, container_t *);
 static uint32_t Alarm_timer = 0;
 
 container_t *relay_waiting = NULL;
-uint32_t priority_relay = 0;   // ID of landed-out or close ADS-B
 
 // this is used in NMEA.cpp and EPD.cpp:
 const char *Aircraft_Type[] = {
@@ -174,10 +173,10 @@ const char *Aircraft_Type[] = {
 
 // Compute registration-number from ICAO ID - USA and Canada only
 
-static void icao_canadian(container_t *fop)
+static void icao_canadian(container_t *cip)
 {
-    uint32_t icao = fop->addr;
-    char *buf = (char *) fop->callsign;
+    uint32_t icao = cip->addr;
+    char *buf = (char *) cip->callsign;
     buf[0] = 'C';
     buf[1] = '-';
     icao -= 0xC00001;
@@ -221,19 +220,19 @@ static void get_suffix(uint32_t offset, char *buf)
     return;
 }
 
-void icao_to_n(container_t *fop)
+void icao_to_n(container_t *cip)
 {
-    char *buf = (char *) fop->callsign;
+    char *buf = (char *) cip->callsign;
     if (buf[0] != '\0' && buf[0] != ' ')        // already have a callsign
         return;
     buf[CALLSIGN_LEN-1] = '?';           // marks as computed, not received
-    if (fop->addr_type != ADDR_TYPE_ICAO)
+    if (cip->addr_type != ADDR_TYPE_ICAO)
         return;
     if (settings->band != RF_BAND_US)   // this is only for USA & Canada aircraft
         return;
-    uint32_t icao = fop->addr;
+    uint32_t icao = cip->addr;
     if (icao > 0xC00000 && icao < 0xC0CDF9) {   // a valid Canadian ICAO ID
-        icao_canadian(fop);
+        icao_canadian(cip);
         return;
     }
     if (icao < 0xA00001 || icao > 0xADF7C7)     // not a valid US ICAO ID
@@ -317,6 +316,9 @@ float Adj_alt_diff(container_t *this_aircraft, container_t *fop)
 static int8_t Alarm_Distance(container_t *this_aircraft, container_t *fop)
 {
   int8_t rval = ALARM_LEVEL_NONE;
+
+  if (no_pg_alarm && fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
+      return ALARM_LEVEL_NONE;
 
   float distance = fop->distance;
   if (distance > ALARM_ZONE_CLOSE
@@ -527,6 +529,9 @@ static int8_t Alarm_Vector(container_t *this_aircraft, container_t *fop)
  */
 static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
 {
+  if (no_pg_alarm && fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
+      return ALARM_LEVEL_NONE;
+
   if (fop->distance > 2*ALARM_ZONE_CLOSE) {    // 3km
     return ALARM_LEVEL_NONE;
     /* save CPU cycles */
@@ -832,23 +837,30 @@ static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
   return rval;
 }
 
-void logOneTraffic(container_t *fop, const char *label, bool force)
+void logOneTraffic(container_t *fop, const char *label, bool detailed)
 {
 //#if defined(USE_SD_CARD)
     uint32_t addr = ((fop->no_track && fop->tx_type==TX_TYPE_FLARM)? 0xAAAAAA : fop->addr);
-    int alarm_level = fop->alarm_level - 1;
-    if (alarm_level < ALARM_LEVEL_NONE)
-        alarm_level = ALARM_LEVEL_NONE;
-    snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-      PSTR("%s,%d,%d,%d,%d,%06x,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n"),
-      label, alarm_level, fop->tx_type, fop->protocol, fop->aircraft_type, addr,
-      (int)fop->distance, (int)fop->bearing,
-      (int)fop->speed, (int)fop->course, (int)fop->turnrate,
-      (int)fop->RelativeHeading, (int)fop->alt_diff, (int)(fop->vs - ThisAircraft.vs),
-      (int)ThisAircraft.speed, (int)ThisAircraft.course, (int)ThisAircraft.turnrate,
-      (int)(wind_speed * (1.0 / _GPS_MPS_PER_KNOT)), (int)wind_direction);
+    int alarm_level = fop->alarm_level;
+    if (alarm_level > ALARM_LEVEL_NONE)  --alarm_level;
+    if (detailed) {    // used for logging alarms
+        snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+          PSTR("%s,%d,%d,%d,%06x,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n"),
+          label, alarm_level, fop->protocol, fop->aircraft_type, addr,
+          (int)fop->distance, (int)fop->bearing,
+          (int)fop->speed, (int)fop->course, (int)fop->turnrate,
+          (int)fop->RelativeHeading, (int)fop->alt_diff, (int)(fop->vs - ThisAircraft.vs),
+          (int)ThisAircraft.speed, (int)ThisAircraft.course, (int)ThisAircraft.turnrate,
+          (int)(wind_speed * (1.0 / _GPS_MPS_PER_KNOT)), (int)wind_direction);
+    } else {
+        snprintf_P(NMEABuffer, sizeof(NMEABuffer),
+          PSTR("%s,%d,%d,%d,%06x,%d,%d\r\n"),
+          label, alarm_level, fop->protocol, fop->aircraft_type, addr,
+          (int)fop->distance, (int)fop->bearing);
+    }
     //Serial.print(NMEABuffer);
     NMEAOutD();
+    bool force = (label[4] == 'A');          // log LSRFA even in compressed log files
     FlightLogComment(NMEABuffer+4, force);   // it will prepend the LSRF
 //#endif
 }
@@ -1072,10 +1084,10 @@ void Traffic_Update(container_t *fop)
       }
 
 //#if defined(USE_SD_CARD)
-// - allow logalarms even on FATFS
-      if (fop->alarm_level > old_alarm_level && FlightLogOpen) {
+      if (fop->alarm_level > old_alarm_level /* && FlightLogOpen */) {
+          // do not wait until logFlightPosition()
           if (settings->logalarms || settings->logflight == FLIGHT_LOG_TRAFFIC)
-            logOneTraffic(fop, "LSRFA", true);  // do not wait until logFlightPosition()
+              logOneTraffic(fop, "LSRFA", (settings->logflight == FLIGHT_LOG_TRAFFIC));
       }
 //#endif
   }
@@ -1252,153 +1264,53 @@ void save_range_stats()
     load_range_stats();            // in case of another flight
 }
 
-/* relay landed-out or ADS-B traffic if we are airborne */
+static uint32_t lastrelay = 0;
+
+// Relay landed-out or ADS-B traffic if we are airborne.
 void air_relay(container_t *cip)
 {
-    static uint32_t lastrelay = 0;
+    if (cip->addr == 0)   // expired
+        return;
 
-    bool was_next = (cip == relay_waiting);
-    if (was_next) {
-        relay_waiting = NULL;
-        if (cip->addr == 0)   // expired
+    if (current_TX_protocol != RF_PROTOCOL_LATEST
+    &&  current_TX_protocol != RF_PROTOCOL_LEGACY
+    &&  current_TX_protocol != RF_PROTOCOL_ADSL
+    &&  current_TX_protocol != RF_PROTOCOL_OGNTP)
+        return;
+
+    if (dual_protocol != RF_SINGLE_PROTOCOL && settings->relay < RELAY_ONLY) {
+        // in FLR_FANET only have Slot 0 for ownship+relay, so relay less often
+        if (dual_protocol != RF_FLR_ADSL && ((RF_time & 0x0F) != 0x0F))
             return;
-if ((settings->debug_flags & DEBUG_DEEPER2)
-&& (settings->nmea_d || settings->nmea2_d))
-Serial.println("...relay_waiting");
     }
 
-    bool relayed = false;
+    if (RF_Transmit_Happened())
+        return;
+
     bool landed_out = (cip->aircraft_type == AIRCRAFT_TYPE_UNKNOWN
                        && cip->airborne == 0 && cip->protocol == RF_PROTOCOL_LATEST);
     bool normal_protocol = (current_TX_protocol == settings->rf_protocol);
     bool adsb = (cip->tx_type >= TX_TYPE_TISB || cip->tx_type <= TX_TYPE_ADSB);
                 // - this may be GDL90 input from an attached device, possibly not truly ADS-B
-    bool adsl_relay = false;
-
-    if (landed_out) {
-        priority_relay = cip->addr;  // don't relay non-landed-out FLARM traffic
-    } else {
-        //if (settings->relay < RELAY_ALL)     // RELAY_LANDED - already checked
-        //    return;
-        if (cip->protocol == RF_PROTOCOL_LATEST) {
-            // && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl) - already checked
-            // relay FLARM traffic >10km away in ADSL protocol
-            //if (cip->distance < 10000 && (! test_mode))
-            //    return;
-            bool relay = test_mode;
-            if (cip->distance > 10000)
-                relay = true;
-            // also relay closer traffic if it is much lower
-            else if (cip->alt_diff < -1000.0f && cip->adj_distance > 15000)
-                relay = true;
-            if (! relay)
-                return;
-            if (RF_current_slot != 0)
-                return;
-            adsl_relay = true;
-        } else {
-            // only relay ADS-B
-            if (! adsb)
-                return;
-            if (! normal_protocol)  // do not relay ADS-B in altprotocol
-                return;
-            bool relay = true;
-            if (cip->aircraft_type == AIRCRAFT_TYPE_JET) {
-                if (cip->distance > 16000)
-                    relay = false;
-            } else if (cip->aircraft_type == AIRCRAFT_TYPE_HELICOPTER) {
-                if (cip->distance > 10000)
-                    relay = false;
-            } else {
-                if (cip->distance > 8000)  // only relay gliders and light planes if close
-                    relay = false;
-            }
-            //if (cip->aircraft_type != AIRCRAFT_TYPE_JET && cip->aircraft_type != AIRCRAFT_TYPE_HELICOPTER) {
-            //    if (cip->distance > 10000)  // only relay gliders and light planes if close
-            //        relay = false;
-                // - The idea is that if the aircraft is also sending FLARM signals, then if close
-                //     those signals will be received, and other protocols will be ignored.
-                //   Thus if close and another protocol, then no FLARM, and safe to relay,
-                //     meaning it won't make a FLARM "see itself" and go crazy.
-                // - no longer an issue if we relay in ADS-L protocol
-            //}
-            if (! relay) {
-                if (priority_relay == cip->addr)  // was closer earlier
-                    priority_relay = 0;
-                return;
-            }
-            priority_relay = cip->addr;  // don't relay non-landed-out FLARM traffic
-        }
-        if (dual_protocol != RF_SINGLE_PROTOCOL && settings->relay < RELAY_ONLY) {
-            // even for RF_FLR_FANET, not just for RF_FLR_ADSL
-            // but in FLR_FANET only have Slot 0 for ownship+relay, so relay less often
-            if (dual_protocol != RF_FLR_ADSL && ((RF_time & 0x0F) != 0x0F))
-                return;
-            // >>> maybe relay non-landed-out in ADS-L protocol
-            //     - but then OGN stations (they now receive ADS-L) will report it?
-            //          - unless they look at the "relayed" bit in the ADS-L packet
-            //     - OTOH relaying in ADS-L ensures won't cause a FLARM to see itself
-            // >>> but SoftRF with FLR_ADSL & flr_adsl only listen to ADS-L in slot 0
-            //if (RF_current_slot == 0)
-            //    adsl_relay = true;
-        }
-    }
-
-    if (settings->debug_flags & DEBUG_SIMULATE)
-        return;
+    bool adsl_relay = (cip->protocol == RF_PROTOCOL_LATEST && (! landed_out));
+    bool relayed = false;
 
     // if alternated to another protocol, relay in alt protocol,
     // but don't update timerelayed so will be relayed normally too
 
-    if (normal_protocol) {
-        if (settings->relay >= RELAY_ONLY) {
-            // in this mode, with no own-ship position reporting, there is
-            // no limit on total relaying (up to one-packet per time slot)
-            // but relay each target no more often than every 2 seconds
-            if (cip->timerelayed + RELAY_ONLY_TIME > cip->timestamp)
-                return;
-        } else {
-            // when relay is an addendum to the main task of self-reporting,
-            // only relay once in a while:
-            //   5 seconds for any, 7 or 15 for same aircraft
-            if (millis() < lastrelay + 1000*ANY_RELAY_TIME)
-                return;
-            int timelimit = (adsb? ANY_RELAY_TIME+2 : ENTRY_RELAY_TIME);
-            if (cip->timerelayed + timelimit > cip->timestamp)
-                return;
-            // In multi-channel regions, only try and relay landed-out during time slot 0,
-            // - to maximize chance that OGN stations (in North America) will receive it
-            // (they may also receive a relay via OGNTP in slot 1)
-            if (landed_out && RF_current_slot != 0) {
-                if (settings->band == RF_BAND_US || settings->band == RF_BAND_AU)
-                    return;
-            }
-        }
-    } else {      // alt protocol, happens every 8 seconds
-        if (settings->relay >= RELAY_ONLY)
-            return;
-    }
-
-    //if (settings->debug_flags)
-    //    Serial.println("Attempting to relay...");
-
-    if (RF_Transmit_Happened() == false         // no transmission yet in this time slot 
-            && (millis()+20 < TxEndMarker)) {   // enough time left in current time slot
-        delay(10);  // give receivers in other aircraft time to process the original packet
-        // re-encode packets for relaying (might be in LEGACY, LATEST, ADS-L or OGNTP protocol)
-        uint8_t cur_proto = current_TX_protocol;
-        if (adsl_relay)
-            current_TX_protocol = RF_PROTOCOL_ADSL;   // override normal protocol
-        size_t s = RF_Encode(cip, false);       // no wait (but must be within time slot)
-        if (s != 0)
-            relayed = RF_Transmit(s, false);    // no wait (but must be within time slot)
-        // note: ADS-B packets arriving between 200 & 400 ms after PPS will not be relayed
-        current_TX_protocol = cur_proto;
-    }
+    // re-encode packets for relaying (might be in LEGACY, LATEST, ADS-L or OGNTP protocol)
+    uint8_t cur_proto = current_TX_protocol;
+    if (adsl_relay)
+        current_TX_protocol = RF_PROTOCOL_ADSL;   // override normal protocol
+    uint8_t relay_proto = current_TX_protocol;
+    size_t s = RF_Encode(cip, false);       // no wait (already checked RF_Transmit_Ready())
+    if (s != 0)
+        relayed = RF_Transmit(s, false);    // no wait (but must be within time slot)
+    current_TX_protocol = cur_proto;
 
     if (cip->timerelayed == 0) {           // first relay (since new or expired)
         cip->timerelayed = 1;              // may be overwritten below with real timestamp
-        if (relayed && ! landed_out && settings->logflight == FLIGHT_LOG_TRAFFIC) {
+        if (relayed /* && ! landed_out */ && settings->logflight == FLIGHT_LOG_TRAFFIC) {
             snprintf_P(NMEABuffer, sizeof(NMEABuffer),
               PSTR("$PSRLY,%02d:%02d,%06x,%s\r\n"),
               gnss.time.hour(), gnss.time.minute(), cip->addr, cip->callsign);
@@ -1408,10 +1320,12 @@ Serial.println("...relay_waiting");
     }
 
     if (relayed) {
-        if (normal_protocol) {
+        if (normal_protocol || adsl_relay) {
+            relay_waiting = NULL;
             cip->timerelayed = cip->timestamp;
             lastrelay = millis();
         }
+        // else, if relayed in alt protocol, leave marked for relay in main protocol
         if (landed_out) {
             Serial.print("Relayed packet from landed-out aircraft ");
             Serial.print(cip->addr, HEX);
@@ -1431,53 +1345,104 @@ Serial.println("...relay_waiting");
                 Serial.println(cip->addr, HEX);
             }
         }
-        if ((settings->nmea_d || settings->nmea2_d) && (settings->debug_flags)) {
+        if ((settings->nmea_d || settings->nmea2_d) && (settings->debug_flags & DEBUG_RELAY)) {
             snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-              PSTR("$PSARL,1,%06X,%ld\r\n"),
-              cip->addr, cip->timerelayed);
+              PSTR("$PSARL,%06X,%d,%ld\r\n"),
+              cip->addr, relay_proto, cip->timerelayed);
             NMEAOutD();
         }
-    } else if (landed_out) /* && not relayed */ {
-        // reserve a future time slot for relay message
-        relay_next = true;
-        // - prevent transmission of this aircraft's position during next Slot 0
-        // - the hope is that another packet will then arrive from the landed_out aircraft
-        //if (settings->debug_flags)
-        //    Serial.println("try relay landed-out aircraft next slot 0");
-        /* if (settings->altprotocol != RF_PROTOCOL_NONE && settings->altprotocol != RF_PROTOCOL_ADSL) */
-        if (settings->altprotocol == RF_PROTOCOL_OGNTP) {
-            alt_relay_next = true;
-            // - prevent transmission of this aircraft's position during next altprotocol slot
-            //if (settings->debug_flags)
-            //    Serial.println("try relay landed-out aircraft next altprotocol slot");
-        }
-    } else if (settings->relay < RELAY_ONLY) { /* && not relayed && not landed_out */
-        // If could not relay at this moment although relay is due,
-        // then mark to be relayed as soon as slot 1 starts.
-        // This differs from the relay_next mechanism, in that this will transmit the
-        // already-received data later, at the moment within Slot 1 when own-ship
-        // would have been transmitted, while relay_next will transmit new data but
-        // only if it arrives within the next Slot 0, at the moment it arrives.  Both
-        // prevent own-ship transmission in the designated time slot.
-        if (! was_next && dual_protocol <= RF_FLR_ADSL) {
-            if (relay_waiting) {
-                if (cip->timerelayed <= relay_waiting->timerelayed)
-                    relay_waiting = cip;    // overwrite existing relay_waiting
+    }
+}
+
+// Set up to do the actual relay instead of the next transmission of ownship position
+void stage_air_relay(container_t *cip)
+{
+    if (settings->debug_flags & DEBUG_SIMULATE)
+        return;
+
+    if (cip == relay_waiting)   // already set up
+        return;
+
+    bool landed_out = (cip->aircraft_type == AIRCRAFT_TYPE_UNKNOWN
+                       && cip->airborne == 0 && cip->protocol == RF_PROTOCOL_LATEST);
+    //bool normal_protocol = (current_TX_protocol == settings->rf_protocol);
+    bool adsb = (cip->tx_type >= TX_TYPE_TISB || cip->tx_type <= TX_TYPE_ADSB);
+                // - this may be GDL90 input from an attached device, possibly not truly ADS-B
+    bool relay = (landed_out || test_mode);
+
+    if (! landed_out) {
+        //if (settings->relay < RELAY_ALL)     // RELAY_LANDED - already checked
+        //    return;
+        if (cip->protocol == RF_PROTOCOL_LATEST) {
+            // && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl) - already checked
+            // relay FLARM traffic >10km away in ADSL protocol
+            if (cip->distance > 10000)
+                relay = true;
+            // also relay closer traffic if it is much lower
+            else if (cip->alt_diff < -1000.0f && cip->adj_distance > 15000)
+                relay = true;
+        } else {
+            // only relay ADS-B
+            if (! adsb)
+                return;
+            //if (! normal_protocol)  // do not relay ADS-B in altprotocol
+            //    return;
+            bool relay = true;
+            if (cip->aircraft_type == AIRCRAFT_TYPE_JET) {
+                if (cip->distance > 16000)
+                    relay = false;
+            } else if (cip->aircraft_type == AIRCRAFT_TYPE_HELICOPTER) {
+                if (cip->distance > 10000)
+                    relay = false;
             } else {
-                relay_waiting = cip;
+                if (cip->distance > 8000)  // only relay gliders and light planes if close
+                    relay = false;
             }
+            // - The idea is that if the aircraft is also sending FLARM signals, then if close
+            //     those signals will be received, and other protocols will be ignored.
+            //   If close and another protocol, then assume no FLARM, and safe to relay,
+            //     meaning it won't make a FLARM "see itself" and go crazy.
+            // - Not an issue if we relay in ADS-L protocol
+        }
+    }
+
+    if (! relay)
+        return;
+
+    if (settings->relay >= RELAY_ONLY) {
+        // in this mode, with no own-ship position reporting, there is
+        // no limit on total relaying (up to one-packet per time slot)
+        // but relay each target no more often than every 2 seconds
+        if (cip->timerelayed + RELAY_ONLY_TIME > cip->timestamp)
+            return;
+        if (settings->txpower == RF_TX_POWER_LOW) {
+            air_relay(cip);      // relay without delay
+            return;
+        }                        // else postpone
+    } else {
+        // when relay is an addendum to the main task of self-reporting,
+        // only relay once in a while:
+        //   5 seconds for any, 7 or 15 for same aircraft
+        if (millis() < lastrelay + 1000*ANY_RELAY_TIME)
+            return;
+        int timelimit = (adsb? ANY_RELAY_TIME+2 : ENTRY_RELAY_TIME);
+        if (cip->timerelayed + timelimit > cip->timestamp)
+            return;
+    }
+
+    // Mark to be relayed at the moment when own-ship position would have been transmitted
+    // This may be in the current time slot or a later one
+    if (landed_out || relay_waiting==NULL || cip->timerelayed <= relay_waiting->timerelayed) {
+        relay_waiting = cip;    // overwrite existing relay_waiting
 if (relay_waiting
-&& (settings->debug_flags & DEBUG_DEEPER2)
+&& (settings->debug_flags & DEBUG_RELAY)
 && (settings->nmea_d || settings->nmea2_d))
 Serial.println("relay_waiting...");
-        }
-        // but if this was the attempt at a delayed relay, don't try again
     }
-    // ADS-B packets arrive at random times, don't try and reserve a time slot
 }
 
 // update fields from a received packet into Container[]
-void CopyTraffic(container_t *cip, ufo_t *fop, const char *callsign)
+void CopyTraffic(container_t *cip, ufo_t *fop, const char *callsign, size_t cs_len)
 {
     cip->addr = fop->addr;
     cip->latitude = fop->latitude;
@@ -1509,13 +1474,40 @@ void CopyTraffic(container_t *cip, ufo_t *fop, const char *callsign)
     // if callsign was passed, copy it into Container[]
     bool callsign_passed = (callsign && callsign[0] != '\0' && callsign[0] != ' ');
     bool no_cip_callsign = (cip->callsign[0] == '\0' || cip->callsign[0] == ' ');
-    bool has_n_number = (cip->callsign[CALLSIGN_LEN-1] == '?');
-    if (callsign_passed && (no_cip_callsign || has_n_number)) {
-        strncpy((char *) cip->callsign, callsign, CALLSIGN_LEN-1);
+    bool computed_n_number = (cip->callsign[CALLSIGN_LEN-1] == '?');
+    if (callsign_passed && (no_cip_callsign || computed_n_number)) {
+        if (cs_len > CALLSIGN_LEN-1)  cs_len = CALLSIGN_LEN-1;
+        strncpy((char *) cip->callsign, callsign, cs_len);
+        cip->callsign[cs_len] = '\0';
         cip->callsign[CALLSIGN_LEN-1] = '\0';
-    } else if (no_cip_callsign && (!has_n_number)) {
+    } else if (no_cip_callsign && (! computed_n_number)) {
         // if callsign was not received, compute USA N-number from ICAO ID (if in range)
         icao_to_n(cip);
+    }
+}
+
+void Traffic_Update_Callsign(uint32_t addr, const char *callsign, size_t cs_len)
+{
+    if (callsign == NULL || callsign[0] == '\0' || callsign[0] == ' ')
+        return;
+    for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+        container_t *cip = &Container[i];
+        if (cip->addr == addr) {
+            bool no_cip_callsign = (cip->callsign[0] == '\0' || cip->callsign[0] == ' ');
+            bool computed_n_number = (cip->callsign[CALLSIGN_LEN-1] == '?');
+            if (no_cip_callsign || computed_n_number) {
+                if (cs_len > CALLSIGN_LEN-1)  cs_len = CALLSIGN_LEN-1;
+                strncpy((char *)cip->callsign, callsign, cs_len);
+                cip->callsign[cs_len] = '\0';
+                cip->callsign[CALLSIGN_LEN - 1] = '\0';
+                size_t len = strlen((char *)cip->callsign);
+                while (len > 0 && cip->callsign[len - 1] == ' ')
+                    cip->callsign[--len] = '\0';
+                if (len != 0)
+                    NMEA_PFLAM(PFLAM_ACALL, cip, cip->callsign);
+            }
+        }
+        return;
     }
 }
 
@@ -1531,7 +1523,7 @@ void report_landed_out(ufo_t *fop)
         AlarmLog.print((const char *) NMEABuffer);
 }
 
-void AddTraffic(ufo_t *fop, const char *callsign)
+void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
 {
     container_t *cip;
 
@@ -1539,11 +1531,12 @@ void AddTraffic(ufo_t *fop, const char *callsign)
 
     bool landed_out = (fop->aircraft_type == AIRCRAFT_TYPE_UNKNOWN && fop->airborne == 0);
 
-    if ((settings->rf_protocol == RF_PROTOCOL_LATEST || dual_protocol == RF_FLR_ADSL)
+    if ((settings->rf_protocol == RF_PROTOCOL_LATEST
+              || settings->rf_protocol == RF_PROTOCOL_ADSL
+              || dual_protocol == RF_FLR_ADSL)
           && (ThisAircraft.airborne || settings->relay > RELAY_ONLY || test_mode)
           && fop->relayed == false) {           // not a packet already relayed one hop
       // relay some traffic - only if we are airborne (even in "relay only" mode)
-      // - do not relay if ownship main protocol is ADS-L or OGNTP for now
       // - do not relay ADS-L and OGNTP traffic for now
       // - use relay,4 for testing "relay only" mode on the ground
       if (landed_out && settings->relay != RELAY_OFF) {
@@ -1552,14 +1545,12 @@ void AddTraffic(ufo_t *fop, const char *callsign)
                  && (dual_protocol == RF_FLR_ADSL || settings->flr_adsl)
                  && fop->protocol == RF_PROTOCOL_LATEST
                  && fop->stealth  == false
-                 && fop->no_track == false
-                 // && settings->rx1090 == 0 && settings->gdl90_in == DEST_NONE)))
-                 && priority_relay == 0) {
+                 && fop->no_track == false) {
           do_relay = true;
       } else if (settings->relay >= RELAY_ALL && fop->protocol == RF_PROTOCOL_GDL90) {
           do_relay = true;
       }
-      // for ADS-B traffic air_relay() is called directly from GNS5892.cpp
+      // for ADS-B traffic stage_air_relay() is called directly from ES1090.cpp
     }
 
     /* first check whether we are already tracking this object */
@@ -1609,7 +1600,7 @@ void AddTraffic(ufo_t *fop, const char *callsign)
             fop->longitude == cip->longitude) {
                 cip->last_crc  = fop->last_crc;      // so 2nd time slot packet will be ignored
                 cip->timestamp = fop->timestamp;     // so it won't expire
-                if (do_relay)  air_relay(cip);
+                if (do_relay)  stage_air_relay(cip);
                 return;
         }
 
@@ -1634,11 +1625,11 @@ void AddTraffic(ufo_t *fop, const char *callsign)
             report_landed_out(fop);
         }
 
-        CopyTraffic(cip, fop, callsign);
+        CopyTraffic(cip, fop, callsign, cs_len);
         Calc_Traffic_Distances(cip);
         // Now can update alarm_level
         Traffic_Update(cip);
-        if (do_relay)  air_relay(cip);
+        if (do_relay)  stage_air_relay(cip);
         return;
       }
     }
@@ -1654,11 +1645,11 @@ void AddTraffic(ufo_t *fop, const char *callsign)
         cip = &Container[i];
         //*cip = EmptyContainer;
         EmptyContainer(cip);
-        CopyTraffic(cip, fop, callsign);
+        CopyTraffic(cip, fop, callsign, cs_len);
         Calc_Traffic_Distances(cip);
         Traffic_Update(cip);
         sample_range(cip);
-        if (do_relay)  air_relay(cip);
+        if (do_relay)  stage_air_relay(cip);
         return;
       }
     }
@@ -1666,15 +1657,15 @@ void AddTraffic(ufo_t *fop, const char *callsign)
     for (i=0; i < MAX_TRACKING_OBJECTS; i++) {
       if (OurTime > Container[i].timestamp + ENTRY_EXPIRATION_TIME) {
         cip = &Container[i];
-        if (cip->addr == priority_relay)
-            priority_relay = 0;
+        //if (cip->addr == priority_relay)
+        //    priority_relay = 0;
         //*cip = EmptyContainer;
         EmptyContainer(cip);
-        CopyTraffic(cip, fop, callsign);
+        CopyTraffic(cip, fop, callsign, cs_len);
         Calc_Traffic_Distances(cip);
         Traffic_Update(cip);
         //sample_range(cip);
-        if (do_relay)  air_relay(cip);
+        if (do_relay)  stage_air_relay(cip);
         return;
       }
     }
@@ -1712,15 +1703,15 @@ void AddTraffic(ufo_t *fop, const char *callsign)
     if (max_dist_ndx < MAX_TRACKING_OBJECTS
         && (adj_distance < max_dist || fop->addr == follow_id || fop->relayed)) {
       cip = &Container[max_dist_ndx];
-      if (cip->addr == priority_relay)
-          priority_relay = 0;
+      //if (cip->addr == priority_relay)
+      //    priority_relay = 0;
       //*cip = EmptyContainer;
       EmptyContainer(cip);
-      CopyTraffic(cip, fop, callsign);
+      CopyTraffic(cip, fop, callsign, cs_len);
       Copy_Traffic_Distances(cip);     // computed above by Stash_Traffic_Distances(fop)
       Traffic_Update(cip);
       //sample_range(cip);   - do not sample, aircraft may be closer than max range
-      if (do_relay)  air_relay(cip);
+      if (do_relay)  stage_air_relay(cip);
       return;
     }
 
@@ -1767,9 +1758,9 @@ Serial.println("RF loopback is detected");     // seen on the sx1262?
 
     if (fo.protocol == RF_PROTOCOL_ADSB_UAT)
 //  ||  fo.protocol == RF_PROTOCOL_ADSB_1090)
-        AddTraffic(&fo, fo_callsign);
+        AddTraffic(&fo, fo_callsign, (size_t) (CALLSIGN_LEN-1));
     else
-        AddTraffic(&fo, (char *) NULL);
+        AddTraffic(&fo, (char *) NULL, (size_t) 0);
 }
 
 void Traffic_setup()
@@ -1783,9 +1774,11 @@ void Traffic_setup()
     Alarm_Level = &Alarm_Vector;
     break;
   case TRAFFIC_ALARM_LATEST:
+  case TRAFFIC_ALARM_PG_NONE:
     Alarm_Level = &Alarm_Latest;
     break;
   case TRAFFIC_ALARM_DISTANCE:
+  case TRAFFIC_ALARM_PG_HILL:
   default:
     Alarm_Level = &Alarm_Distance;
     break;
@@ -1803,10 +1796,7 @@ void Traffic_setup()
 
 void Traffic_loop()
 {
-    // if could not relay ADS-B when it was received, because
-    // was between slot 1 & slot 0, or transmission already happened,
-    // then it was marked for relay at next slot 1
-    if (relay_waiting != NULL && RF_current_slot == 1 && RF_Transmit_Ready(true))
+    if (relay_waiting != NULL && RF_Transmit_Ready(true))
         air_relay(relay_waiting);
 
     if (! isTimeToUpdateTraffic())
@@ -1887,8 +1877,8 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
 }
           sample_range(fop);
 
-          if (fop->addr == priority_relay)
-              priority_relay = 0;
+          //if (fop->addr == priority_relay)
+          //    priority_relay = 0;
 
           // EmptyContainer(fop);
           fop->addr = 0;
@@ -1985,25 +1975,32 @@ void ClearExpired()
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
     if (Container[i].addr &&
          (OurTime > Container[i].timestamp + ENTRY_EXPIRATION_TIME)) {
-      if (Container[i].addr == priority_relay)
-          priority_relay = 0;
+      //if (Container[i].addr == priority_relay)
+      //    priority_relay = 0;
       //EmptyContainer(&Container[i]);
       Container[i].addr = 0;
     }
   }
 }
 
+// Returns a count of tracked aircraft,
+// also puts counts of special aircraft in adsb_acfts and fanet_acfts,
+// and also computes maxrssi.
+// Called from NMEA_export() every second, and from some other places.
 int Traffic_Count()
 {
   int count = 0;
   adsb_acfts = 0;
+  fanet_acfts = 0;
   int rssimax = -126;
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
     if (Container[i].addr) {
       count++;
-      if (Container[i].protocol == RF_PROTOCOL_ADSB_1090
-      ||  Container[i].protocol == RF_PROTOCOL_GDL90) {
+      uint8_t protocol = Container[i].protocol;
+      if (protocol == RF_PROTOCOL_ADSB_1090 || protocol == RF_PROTOCOL_GDL90) {
           ++adsb_acfts;
+      } else if (protocol == RF_PROTOCOL_FANET) {
+          ++fanet_acfts;
       } else {
           int rssi = Container[i].rssi;
           if (rssi < 0) {
@@ -2034,16 +2031,16 @@ int traffic_cmp_by_distance(const void *a, const void *b)
   return  0;
 }
 
-/* called (as needed) from softRF.ino normal(), or from ParseData() above, */
-/*   or every few minutes from Estimate_Wind() if ADDR_TYPE_RANDOM         */
+// called (as needed) from softRF.ino normal(),
+//   or every few minutes from Estimate_Wind() if ADDR_TYPE_RANDOM
 void generate_random_id()
 {
     uint32_t id = millis();
-    id = (id ^ (id<<5) ^ (id>>5)) & 0x000FFFFF;
+    id = (id ^ (id<<5) ^ (id>>5)) & 0x0000FFFF;
     if (settings->id_method == ADDR_TYPE_RANDOM)
-      id |= 0x000E0000;
+      id |= 0x008E0000;
     else
-      id |= 0x000F0000;
-    id |= 0x00400000;
+      id |= 0x008F0000;
+    //id |= 0x00800000;
     ThisAircraft.addr = id;
 }

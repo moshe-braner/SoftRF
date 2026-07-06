@@ -20,6 +20,7 @@
 #define TRAFFICHELPER_H
 
 #include "system/SoC.h"
+#include "driver/RF.h"
 
 /* for DISTANCE method: traffic beyond ALARM_ZONE_NONE is invisible */
 #define ALARM_ZONE_NONE       15000 /* zone range is 1500m <-> 15000m */
@@ -62,7 +63,9 @@ enum
 	TRAFFIC_ALARM_NONE,
 	TRAFFIC_ALARM_DISTANCE,
 	TRAFFIC_ALARM_VECTOR,
-	TRAFFIC_ALARM_LATEST
+	TRAFFIC_ALARM_LATEST,
+	TRAFFIC_ALARM_PG_HILL,
+	TRAFFIC_ALARM_PG_NONE
 };
 
 enum
@@ -79,23 +82,24 @@ enum
 
 #define TRAFFIC_ALERT_SOUND   1
 
-void air_relay(container_t *fop);
-void AddTraffic(ufo_t *fop, const char *callsign);
+void stage_air_relay(container_t *cip);
+void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len);
 void ParseData(void);
 void Traffic_setup(void);
 void Traffic_loop(void);
 void ClearExpired(void);
 void Traffic_Update(container_t *fop);
+void Traffic_Update_Callsign(uint32_t addr, const char *callsign, size_t cs_len);
 int  Traffic_Count(void);
 void logCloseTraffic(void);
-void icao_to_n(container_t *fop);
+void icao_to_n(container_t *cip);
 int  traffic_cmp_by_distance(const void *, const void *);
 float Adj_alt_diff(container_t *, container_t *);
 void generate_random_id(void);
 void save_range_stats(void);
 
-void EmptyContainer(container_t *p);
-void EmptyFO(ufo_t *p);
+void EmptyContainer(container_t *cip);
+void EmptyFO(ufo_t *fop);
 
 #define D2R (3.141593f/180.0f)
 #define R2D (180.0f/3.141593f)
@@ -105,16 +109,18 @@ float InvCosLat(void);
 
 extern container_t Container[MAX_TRACKING_OBJECTS];  // EmptyContainer;
 extern ufo_t fo;  // EmptyFO;
-extern uint8_t fo_raw[34];
+extern uint8_t fo_raw[MAX_PKT_SIZE];
 extern char fo_callsign[33];
 extern traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 extern int max_alarm_level;
 extern bool alarm_ahead;
+extern bool no_pg_alarm;
 extern bool relay_next;
 extern bool alt_relay_next;
 extern container_t *relay_waiting;
 extern float average_baro_alt_diff;
 extern uint8_t adsb_acfts;
+extern uint8_t fanet_acfts;
 extern int8_t maxrssi;
 
 extern const char *Aircraft_Type[];

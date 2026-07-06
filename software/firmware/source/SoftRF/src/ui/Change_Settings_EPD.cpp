@@ -92,6 +92,8 @@ set_entry alarms[] = {
   {TRAFFIC_ALARM_LATEST,   "Latest"},
   {TRAFFIC_ALARM_VECTOR,   "Vector"},
   {TRAFFIC_ALARM_DISTANCE, "Distance"},
+  {TRAFFIC_ALARM_PG_HILL,  "PG Hill"},
+  {TRAFFIC_ALARM_PG_NONE,  "No PG"},
   {TRAFFIC_ALARM_NONE,     "None"},
   {-1, NULL}
 };

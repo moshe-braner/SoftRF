@@ -769,10 +769,12 @@ void handleSettings() {
 <th align=left>Alarm trigger</th>\
 <td align=right>\
 <select name='alarm'>\
-<option %s value='%d'>None</option>\
-<option %s value='%d'>Distance</option>\
-<option %s value='%d'>Vector</option>\
 <option %s value='%d'>Latest</option>\
+<option %s value='%d'>Vector</option>\
+<option %s value='%d'>Distance</option>\
+<option %s value='%d'>PG Hill</option>\
+<option %s value='%d'>No PG</option>\
+<option %s value='%d'>None</option>\
 </select>\
 </td>\
 </tr>\
@@ -808,10 +810,12 @@ void handleSettings() {
   (settings->acft_type == AIRCRAFT_TYPE_BALLOON ? "selected" : ""),  AIRCRAFT_TYPE_BALLOON,
   (settings->acft_type == AIRCRAFT_TYPE_STATIC ? "selected" : ""),  AIRCRAFT_TYPE_STATIC,
   (settings->acft_type == AIRCRAFT_TYPE_WINCH ? "selected" : ""),  AIRCRAFT_TYPE_WINCH,
-  (settings->alarm == TRAFFIC_ALARM_NONE ? "selected" : ""),  TRAFFIC_ALARM_NONE,
-  (settings->alarm == TRAFFIC_ALARM_DISTANCE ? "selected" : ""),  TRAFFIC_ALARM_DISTANCE,
-  (settings->alarm == TRAFFIC_ALARM_VECTOR ? "selected" : ""),  TRAFFIC_ALARM_VECTOR,
   (settings->alarm == TRAFFIC_ALARM_LATEST ? "selected" : ""),  TRAFFIC_ALARM_LATEST,
+  (settings->alarm == TRAFFIC_ALARM_VECTOR ? "selected" : ""),  TRAFFIC_ALARM_VECTOR,
+  (settings->alarm == TRAFFIC_ALARM_DISTANCE ? "selected" : ""),  TRAFFIC_ALARM_DISTANCE,
+  (settings->alarm == TRAFFIC_ALARM_PG_HILL ? "selected" : ""),  TRAFFIC_ALARM_PG_HILL,
+  (settings->alarm == TRAFFIC_ALARM_PG_NONE ? "selected" : ""),  TRAFFIC_ALARM_PG_NONE,
+  (settings->alarm == TRAFFIC_ALARM_NONE ? "selected" : ""),  TRAFFIC_ALARM_NONE,
   (settings->volume == BUZZER_OFF ? "selected" : ""), BUZZER_OFF,
   (settings->volume == BUZZER_VOLUME_LOW ? "selected" : ""), BUZZER_VOLUME_LOW,
   (settings->volume == BUZZER_VOLUME_FULL ? "selected" : ""), BUZZER_VOLUME_FULL,
@@ -835,12 +839,14 @@ void handleSettings() {
 <option %s value='%d'>Off</option>\
 <option %s value='%d'>SPP</option>\
 <option %s value='%d'>LE</option>\
+<option %s value='%d'>skip SensBox</option>\
 </select>\
 </td>\
 </tr>"),
     (settings->bluetooth == BLUETOOTH_OFF ? "selected" : ""), BLUETOOTH_OFF,
     (settings->bluetooth == BLUETOOTH_SPP ? "selected" : ""), BLUETOOTH_SPP,
-    (settings->bluetooth == BLUETOOTH_LE_HM10_SERIAL ? "selected" : ""), BLUETOOTH_LE_HM10_SERIAL
+    (settings->bluetooth == BLUETOOTH_LE_HM10_SERIAL ? "selected" : ""), BLUETOOTH_LE_HM10_SERIAL,
+    (settings->bluetooth == BLUETOOTH_LE_NO_SENSBOX ? "selected" : ""), BLUETOOTH_LE_NO_SENSBOX
     );
 
     len = strlen(offset);
