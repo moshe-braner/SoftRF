@@ -18,7 +18,7 @@
 
 bool BTactive = false;
 
-// XCsoar is confused by BLE "sensor" devices, so try and skip them
+// XCsoar and/or SeeYou Navigator are confused by BLE "sensor" devices, so try and skip them
 // - uncomment this line to restore them:
 #define BLE_SENSORS
 
@@ -137,6 +137,7 @@ static void ESP32_Bluetooth_setup()
     break;
 #endif /* CONFIG_IDF_TARGET_ESP32S3 */
   case BLUETOOTH_LE_HM10_SERIAL:
+  case BLUETOOTH_LE_NO_SENSBOX:
     {
       BLE_FIFO_RX = new cbuf(BLE_FIFO_RX_SIZE);
       BLE_FIFO_TX = new cbuf(BLE_FIFO_TX_SIZE);
@@ -179,6 +180,8 @@ static void ESP32_Bluetooth_setup()
       pService->start();
 
 #if defined(BLE_SENSORS)
+
+      if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX) {
 
       // Create the BLE Service
       pService = pServer->createService(BLEUUID(UUID16_SVC_BATTERY));
@@ -249,6 +252,9 @@ static void ESP32_Bluetooth_setup()
 
       // Start the service
       pService->start();
+
+      }   // end of if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX)
+
 #endif  // BLE_SENSORS
 
 #if defined(USE_BLE_MIDI)
@@ -275,7 +281,8 @@ static void ESP32_Bluetooth_setup()
       BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
       pAdvertising->addServiceUUID(BLEUUID(UART_SERVICE_UUID));
 #if defined(BLE_SENSORS)
-      pAdvertising->addServiceUUID(BLEUUID(UUID16_SVC_BATTERY));
+      if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX)
+        pAdvertising->addServiceUUID(BLEUUID(UUID16_SVC_BATTERY));
       // >>> why doesn't UUID16_SVC_DEVICE_INFORMATION get advertised?
 #endif
 #if defined(USE_BLE_MIDI)
@@ -313,6 +320,7 @@ static void ESP32_Bluetooth_loop()
   switch(settings->bluetooth)
   {
   case BLUETOOTH_LE_HM10_SERIAL:
+  case BLUETOOTH_LE_NO_SENSBOX:
     {
       // notify changed value
       // bluetooth stack will go into congestion, if too many packets are sent
@@ -346,10 +354,12 @@ static void ESP32_Bluetooth_loop()
           //Serial.println("BLE reconnected");
       }
 #if defined(BLE_SENSORS)
-      if (deviceConnected && isTimeToBattery()) {
-        uint8_t battery_level = Battery_charge();
-        pBATCharacteristic->setValue(&battery_level, 1);
-        pBATCharacteristic->notify();
+      if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX) {
+        if (deviceConnected && isTimeToBattery()) {
+          uint8_t battery_level = Battery_charge();
+          pBATCharacteristic->setValue(&battery_level, 1);
+          pBATCharacteristic->notify();
+        }
       }
 #endif
     }
@@ -368,7 +378,8 @@ static void ESP32_Bluetooth_fini()
       return;   // only do this once per boot
   BTactive = false;   // until next reboot
   delay(200);         // let data bridging flush out
-  if (settings->bluetooth == BLUETOOTH_LE_HM10_SERIAL) {
+  if (settings->bluetooth == BLUETOOTH_LE_HM10_SERIAL
+  ||  settings->bluetooth == BLUETOOTH_LE_NO_SENSBOX) {
       BLEDevice::deinit();
   } else if (settings->bluetooth == BLUETOOTH_SPP) {
       esp_bluedroid_disable();
@@ -391,6 +402,7 @@ static int ESP32_Bluetooth_available()
     break;
 #endif /* CONFIG_IDF_TARGET_ESP32S3 */
   case BLUETOOTH_LE_HM10_SERIAL:
+  case BLUETOOTH_LE_NO_SENSBOX:
     rval = BLE_FIFO_RX->available();
     break;
   case BLUETOOTH_OFF:
@@ -415,6 +427,7 @@ static int ESP32_Bluetooth_read()
     break;
 #endif /* CONFIG_IDF_TARGET_ESP32S3 */
   case BLUETOOTH_LE_HM10_SERIAL:
+  case BLUETOOTH_LE_NO_SENSBOX:
     rval = BLE_FIFO_RX->read();
     break;
   case BLUETOOTH_OFF:
@@ -438,6 +451,7 @@ static size_t ESP32_Bluetooth_write(const uint8_t *buffer, size_t size)
     break;
 #endif /* CONFIG_IDF_TARGET_ESP32S3 */
   case BLUETOOTH_LE_HM10_SERIAL:
+  case BLUETOOTH_LE_NO_SENSBOX:
     rval = BLE_FIFO_TX->write((char *) buffer,
                         (BLE_FIFO_TX->room() > size ? size : BLE_FIFO_TX->room()));
     break;
@@ -1458,8 +1472,10 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 
 void nRF52_Bluetooth_setup()
 {
-  if (settings->bluetooth != BLUETOOTH_LE_HM10_SERIAL)
+  if (settings->bluetooth != BLUETOOTH_LE_HM10_SERIAL
+  &&  settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX)
       return;
+
   if (settings->nmea_out != DEST_BLUETOOTH && settings->nmea_out2 != DEST_BLUETOOTH)
       return;
 
@@ -1522,7 +1538,8 @@ void nRF52_Bluetooth_setup()
 
 #if defined(BLE_SENSORS)
   // Start SensBox Service
-  blesens.begin();
+  if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX)
+    blesens.begin();
 #endif
 
 #if defined(USE_BLE_MIDI)
@@ -1646,14 +1663,16 @@ static void nRF52_Bluetooth_loop()
   }
 
 #if defined(BLE_SENSORS)
-  if (Bluefruit.connected() && isTimeToSensBox()) {
-    uint8_t sens_status = isValidFix() ? GNSS_STATUS_3D_MOVING : GNSS_STATUS_NONE;
-    blesens.notify_nav (sens_status);
-    blesens.notify_move(sens_status);
-    blesens.notify_gps2(sens_status);
-    blesens.notify_sys (sens_status);
-    BLE_SensBox_TimeMarker = millis();
-    yield();
+  if (settings->bluetooth != BLUETOOTH_LE_NO_SENSBOX) {
+    if (Bluefruit.connected() && isTimeToSensBox()) {
+      uint8_t sens_status = isValidFix() ? GNSS_STATUS_3D_MOVING : GNSS_STATUS_NONE;
+      blesens.notify_nav (sens_status);
+      blesens.notify_move(sens_status);
+      blesens.notify_gps2(sens_status);
+      blesens.notify_sys (sens_status);
+      BLE_SensBox_TimeMarker = millis();
+      yield();
+    }
   }
 #endif
 }
