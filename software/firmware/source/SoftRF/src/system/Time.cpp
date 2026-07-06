@@ -368,6 +368,20 @@ void Time_loop()
         OurTime += 1;
     /* updated ref_time_ms is the other side effect */
 
+#if 0
+    // correct the GPS Epoch if necessary
+    // (this only fixes the UTC second, IGC file will still show wrong date)
+    // (would be far better to patch the RMC sentences)
+    if (yr < 55) {
+        static bool shown = false;
+        if ((! shown) && GNSSTimeMarker) {
+            Serial.println("Subtracting 1024 weeks for GPS epoch");
+            shown = true;
+        }
+        OurTime += (1024 * 7 * 24 * 3600);
+    }
+#endif
+
     // apply a correction to leap seconds if available
     // (set up in GNSS_loop based on Ublox leap-seconds and settings->leapsecs)
     if (leap_seconds_correction > 0)

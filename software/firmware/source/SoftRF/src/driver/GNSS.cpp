@@ -2115,7 +2115,7 @@ void add_pfsim_traffic()
     fo.airborne = 1;
     fo.circling = (fo.turnrate < 10.0) ? -1 : ((fo.turnrate > 10.0) ? 1 : 0);
     fo.tx_type = TX_TYPE_FLARM;
-    AddTraffic(&fo, "SIM");
+    AddTraffic(&fo, "SIM", (size_t) 4);
     pfsim.waiting = false;
 }
 

@@ -9,14 +9,13 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### Latest major additions:
 
-* vMB203: now supports messaging (PFLAM)
+* vMB204: allows FANET+PAW+FLR+ADSL multiprotocol mode, revised relaying again
+* vMB203: supports FLARM and FANET messaging (PFLAM)
 * vMB202: using RadioLib, now supports the Sensecap T1000-E and Thinknode M3 (& M1)
 * vMB179: added FANET id_method, auto-region by default, buzz at first GNSS fix
-* vMB174: dual-protocol FANET (or P3I) plus FLARM (or ADS-L) modes
+* vMB174: dual-protocol FANET (or PAW) plus FLARM (or ADS-L) modes
 * vMB172: dual-protocol FLARM/ADS-L reception, some relaying in ADS-L protocol
 * vMB171: revised relaying of ADS-B traffic, including "relay only" mode 
-* vMB166: added the ADS-L protocol
-* vMB160: setting to control the time traffic not-heard-from is reported
 * vMB159: capability to periodically transmit in an alternate protocol
 * vMB155: collect statistics on reception range by relative direction 
 * vMB153: record compressed flight logs in flash memory (T-Beam & T-Echo)
@@ -29,6 +28,7 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 ### Beyond Lyusupov's version:
 
 * Collision prediction for circling aircraft
+* Optional multi-protocol operation
 * Can set aircraft ID for self, ID to ignore, and ID to follow
 * Support 3-level collision alarms via buzzer
 * Can configure two simultaneous NMEA output destinations

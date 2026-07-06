@@ -561,10 +561,10 @@ Serial.println("Tentative GNSS fix");
         GNSSTimeMarker = millis();
         float lat = gnss.location.lat();
         float lon = gnss.location.lng();
-        Serial.printf("Stable GNSS fix:\r\n\
-            lat/lon: %.5f %.5f\r\n\
-            date: %d %d %d\r\n\
-            time: %d %d %d\r\n",
+        Serial.printf("Stable GNSS fix:\r\n"
+            "    lat/lon: %.5f %.5f\r\n"
+            "    date: %d %d %d\r\n"
+            "    time: %d %d %d\r\n",
             lat, lon,
             gnss.date.year(), gnss.date.month(), gnss.date.day(),
             gnss.time.hour(), gnss.time.minute(), gnss.time.second());
@@ -684,10 +684,11 @@ Serial.println("Tentative GNSS fix");
 
       // if received a packet, postpone transmission until next time around the loop().
 
-      if (!rx_success && RF_Transmit_Ready(true)
-          && (relay_waiting == NULL || RF_current_slot == 0)
-          && settings->relay < RELAY_ONLY) {
-          // Don't bother with the encode() if can't transmit right now
+      if (!rx_success
+              && relay_waiting == NULL
+              && settings->relay < RELAY_ONLY
+              && RF_Transmit_Ready(true)) {
+              // Don't bother with the encode() if can't transmit right now
           size_t s = RF_Encode(&ThisAircraft, true);  // returns 0 if implausible data
           if (s != 0) {
               RF_Transmit(s, true);
@@ -763,8 +764,14 @@ if (rx_success) which_rx_try = 2;
     if (msnow > IGCTimeMarker && ms_since_pps > 270
             && ms_since_pps < ((settings->debug_flags & DEBUG_SIMULATE)? 800 : 370)) {
       logFlightPosition();
-      if (settings->logflight == FLIGHT_LOG_TRAFFIC)
-          logCloseTraffic();
+      if (settings->logflight == FLIGHT_LOG_TRAFFIC) {
+          // don't report quite as often as the logging interval
+          static uint32_t trafficlog_time = 0;
+          if (msnow > trafficlog_time + 7100) {
+              logCloseTraffic();
+              trafficlog_time = msnow;
+          }
+      }
       IGCTimeMarker = ref_time_ms + (1000 * (uint32_t) settings->loginterval) + 320;
     }
 #else

@@ -309,7 +309,7 @@ static void *msgType10and20(container_t *aircraft)
     str.toUpperCase();
     memcpy(aircraft->callsign + strlen(GDL90_CallSign_Prefix[aircraft->protocol]),
             str.c_str(), str.length());
-    /* this callsign stays with aircraft until it expires */
+    /* callsign stays with aircraft until it expires */
     NMEA_PFLAM(PFLAM_ACALL, aircraft, aircraft->callsign);
   }
 
@@ -623,7 +623,7 @@ Serial.printf("GDL90>%x %s, %f, %f, %.0f\r\n",
   ++adsb_packets_counter;    // in GNS5892
 #endif
   RF_last_rssi = 0;
-  AddTraffic(&fo, (char *) tp->callsign);
+  AddTraffic(&fo, (char *) tp->callsign, (size_t) sizeof(tp->callsign));
 }
 
 // Accummulate bytes in traffic data message - ignore all others

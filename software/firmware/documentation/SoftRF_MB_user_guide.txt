@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated June 14, 2026 to fit software version MB203
+This version last updated July 6, 2026 to fit software version MB204
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -38,7 +38,7 @@ The more advanced PowerFLARM units can listen to FLARM signals via two antennas 
 
 What can my version of SoftRF do that the mainline version cannot?
 
-My version can receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP, ADS-L, FANET or PilotAware) once every few seconds, and can receive 2 or even 3 protocols at once.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
+My version can receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP, ADS-L, FANET or PilotAware) once every few seconds, and can receive up to 4 protocols at once.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
 
 And recent version of my SoftRF can also be configured to:
 * Relay selected other FLARM traffic, for increased range
@@ -115,7 +115,7 @@ Another alternative to the built-in GNSS module is to add an external one.  See 
 
 The T-Echo (or Thinknode M1) offers a 1.5-inch e-paper display, which makes the device more self-contained.  But adjusting the settings on the T-Echo is more difficult than on the T-Beam, because the T-Echo does not have WiFi connectivity.  It also transmits at lower power, and the stock antenna is nice-looking but has low performance.  And it is more difficult to attach other devices to it.
 
-The Thinknode M3 offers the ability to run SoftRF in a very compact self-contained unit. The Sensecap T1000-E is similar and also has extra flash memory which allows it to record flight logs, as can the T-Beam and T-Echo and M1 but not the M3.  If you choose the T1000-E, be sure to read the instructions on how to do the necessary downgrade of the bootloader.
+The Thinknode M3 offers the ability to run SoftRF in a very compact self-contained unit. The Sensecap T1000-E is similarly compact, and also has extra flash memory which allows it to record flight logs, as can the T-Beam and T-Echo and M1 but not the M3.  If you choose the T1000-E, be sure to read the instructions on how to do the necessary downgrade of the bootloader.
 
 See also Jim Hogue's detailed document:
 https://github.com/moshe-braner/SoftRF/blob/master/documents/Guide_to_Building_SoftRF_and_SkyView-Jim_Hogue.pdf
@@ -245,17 +245,17 @@ Aircraft ID: 6 hex digits.  If your aircraft is registered, you can enter its IC
 
 ID type to use: You can choose ICAO (the ID entered above), or Device (the fixed device ID).  (Additional ID types are available, see the "under the hood" document.)  Keep in mind that the transmitted ID depends on TWO settings.  E.g., if you enter the ICAO ID into the ID field but leave the ID Type as "device" then it will still transmit the device ID.  Whether you choose ICAO ID, or device ID, you can register your chosen ID on http://ddb.glidernet.org/ as your aircraft.  Then OGN viewers such as https://glidertracker.org/ will display your registration or contest ID.   If you don't register it then only the cryptic (6 hex digits) transmitted ID will be shown in those viewers.
 
-Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  Choose "Legacy" for the older FLARM radio protocol.  "Legacy" is visible to SoftRF devices and to OGN stations, but not to FLARMs.  (FLARMs are visible to SoftRF devices set to either "Latest" or "Legacy" setting.)  OGNTP is visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped gliders, choose "Latest".  For towplanes: If the device is setting off collision alerts in gliders on tow (although that should not happen often), it can be configured to OGNTP (or Legacy), so that it does not alert FLARMs, but is still visible to OGN receivers on the ground for logging purposes.  But it is best to have the tow plane transmit in a protocol that makes it visible to the other gliders.  The FANET and PilotAware protocols are also available choices, commonly used by paragliders, and by light planes in the UK, respectively.  Can also choose the ADS-L protocol.  Note that you can also choose to operate in two protocols at once, see the "under the hood" document.
+Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  OGNTP and ADS-L are visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped aircraft, choose "Latest".  The FANET and PilotAware protocols are also available choices, commonly used by paragliders, and by light planes in the UK, respectively.  Can also choose the ADS-L protocol.  Note that you can also choose to operate in two or more protocols at once, see the "under the hood" document.
 
 Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.  On devices other than the T-Beam the default region is "automatic", will be set upon first GNSS fix, but only saved for the future if the settings are saved manually.
 
 Aircraft type: E.g., glider, powered plane, etc.  This is important for collision avoidance and situational awareness, and also for OGN tracking.  This version of SoftRF added the aircraft type "winch", see the relevant section below.
 
-Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.
+Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.  Select "PG Hill" to avoid alarms until leaving vicinity of PG launch hill, distance-based alarms later.  Select "No PG" to avoid all alarms about paragliders, but use Latest algorithm to warn about other aircraft types.
 
 Volume: if a piezo buzzer is attached to the board for audible collision warnings, choose "Loud" here.  (It is not quite loud enough.)  If you get audible warnings via a connected device, e.g., XCsoar, then you can set the buzzer Volume to Low or Off.
 
-Built-in Bluetooth: On the T-Beam, leave Off, unless you want to connect to an external device (e.g., XCsoar) via Bluetooth, then choose SPP ("classic" BT) or LE ("low energy").  On the other devices, only BLE is available, and is turned on by default.
+Built-in Bluetooth: On the T-Beam, leave Off, unless you want to connect to an external device (e.g., XCsoar, Navigator, Oudie N) via Bluetooth, then choose SPP ("classic" BT) or LE ("low energy").  On the other devices (T-Echo, T1000E...), only BLE is available, and is turned on by default.
 
 NMEA output: this selects the port through which the data is sent out: Off (no data sent out), Serial (via the on-board serial interface, which also appears on the USB port), the auxiliary serial interface (T-Beam only), UDP (WiFi), TCP (another WiFi method), or Bluetooth.
 
@@ -271,7 +271,7 @@ Stealth: if set to "On", your aircraft will not be shown on other aircraft' disp
 
 No track: this is similar to Stealth, but for the purpose of telling ground (OGN) stations to not report your position.
 
-Flight logging: Flight logging is possible on devices with a file system formatted in the SPI flash.  This excludes the Thinknode M3.  You may need to format the "drive" on a PC after connecting with a USB cable.  This setting selects whether to write data to a flight log.  "Airborne" means logging will automatically start on takeoff and stop after landing.  "Traffic" also outputs data about nearby aircraft as comments in the flight log file.  The interval, in seconds, between recorded fixes is settable, default is 4 seconds.  See the "Flight Logging" section for more details.
+Flight logging: Flight logging is possible on devices with a file system formatted in the SPI flash.  This excludes the Thinknode M3.  You may need to format the "drive" on a PC after connecting with a USB cable.  This setting selects whether to write data to a flight log.  "Airborne" means logging will automatically start on takeoff and stop after landing.  "Traffic" also outputs data about nearby aircraft as LSRFT comments in the flight log file.  The interval, in seconds, between recorded fixes is settable, default is 4 seconds.  The interval between close-traffic reports is 8 seconds.  See the "Flight Logging" section for more details.
 
 IGC encryption key:  This is only shown if SoftRF is set to use the OGNTP protocol. The key is divided into 4 sections, each is 8 hexadecimal digits.  For each section separately, if it's zero, it is shown as "00000000", otherwise as "88888888", masking the true key.  If left as "88888888" then the current key is left intact.  Overwrite with something else to change it.  If set to all zeros then no encryption is done.
 
@@ -325,9 +325,9 @@ This fork of SoftRF stores the settings in a text file within the flash memory o
 
 You can restore the settings file (or an edited version of it) by clicking "upload".  The file must be named "settings.txt" for upload.  Uploading does not change the settings currently in effect, until SoftRF is rebooted.  So, for example, in the web interface you can click "backup" (which copies settings.txt into settingb.txt), then upload an alternative settings.txt file, then click "swap".  It will reboot with the same settings as before - but another "swap" will reboot with the alternative settings.
 
-The settings file is plain text, label,value pairs, one per line.  The labels must be exactly as generated by the software - capitalization matters.  Anything after a space (except for text fields such as pilot name) is a comment - some are added automatically, and can add some manually, e.g., "band,2  # US/CA".  A "SoftRF,1" line must be included, but otherwise settings can be skipped in the file - any not mentioned in the file are set to their default values.
+The settings file is plain text, label,value pairs, one per line.  The labels must be exactly as generated by the software - capitalization matters.  Many of the lines in the settings file have comments added at the end of the line (following "#"), which explain the coding.  That is handy when you are editing the file and want to know what code to enter after the comma.  One can add comments manually, e.g., "band,2  # US/CA".  A "SoftRF,1" line must be included, but otherwise settings can be skipped in the file - any not mentioned in the file are set to their default values.
 
-Many of the lines in the settings file have comments added at the end of the line (following "#"), which explain the coding.  That is handy when you are editing the file and want to know what code to enter after the comma.  Here are the codes used for a few important settings:
+Here are the codes used for a few important settings:
 
 protocol (and altprotocol)
 0	none     /* for altprotocol */
@@ -346,7 +346,7 @@ band
 4	NZ     /* 869.20 MHz band */
 5	RU     /* 868.8 MHz band */
 6	CN     /* 470 MHz band */
-7	UK     /* treated as EU, unless P3I */
+7	UK     /* treated as EU */
 8	IN     /* 866.0 MHz band */
 9	IL     /* 916.2 MHz band */
 10	KR     /* 920.9 MHz band */
@@ -369,6 +369,8 @@ alarm
 1	distance
 2	vector
 3	latest
+4	PG Hill
+5	No PG
 
 volume (buzzer)
 0	off
@@ -398,6 +400,7 @@ bluetooth
 0	off
 1	classic (SPP)   // (T-Beam only)
 2	BLE             // (T-Echo, M1, M3, T1000-E can only use BLE)
+3	BLE without "SensBox" - try this if BLE does not work with your device
 
 logflight
 0	none
@@ -484,7 +487,7 @@ Flight logging on the T-Beam can be done into the volatile RAM memory space (PSR
 
 The logging destination, SD vs. RAM (+ optionally flash), on a T-Beam is determined automatically, by whether an SD file system is "mounted".  The status web page will show a message as appropriate.  If logging is to RAM and/or flash then buttons will appear saying "download current", "List Archived" and "Clear Archive", and if a log is in progress, "Download Current" and "Clear Current".  With an SD card there will be buttons for "Download Latest", "List Files" and "Clear Files".
 
-Flight logging is possible on the nRF52840 devices within the nonvolatile flash memory of the device.  This excludes the Thinknode M3 which does not have SPI flash.  You may need to format the "drive" on a PC after connecting with a USB cable.  The flight log files are, by default, not compressed.  The space for flight logs on the T-Echo is limited to about 2 megabytes - which is enough for about 12 hours of flight recording at one fix every second.  If there is not enough free space for 3 hours of logging (at the chosen logging interval), a log will not be started.  So it is best to select "airborne" logging and a less-frequent logging interval, and to download the flight logs and clear that space periodically between flights.  Also, you have to choose whether to use the space mostly for flight logging, or mostly for the optional aircraft database, as explained here:
+Flight logging is possible on the nRF52840 devices that have flash memory outside of the nRF52840 itself.  This includes the T-Echo and the T1000-E, but excludes the Thinknode M3 which does not have SPI flash.  You may need to format the "drive" on a PC after connecting with a USB cable.  The flight log files are, by default, not compressed.  The space for flight logs on the T-Echo is limited to about 2 megabytes - which is enough for about 12 hours of flight recording at one fix every second.  If there is not enough free space for 3 hours of logging (at the chosen logging interval), a log will not be started.  So it is best to select "airborne" logging and a less-frequent logging interval, and to download the flight logs and clear that space periodically between flights.  Also, you have to choose whether to use the space mostly for flight logging, or mostly for the optional aircraft database, as explained here:
     https://github.com/lyusupov/SoftRF/wiki/Badge-Edition.-Aircrafts-database
 Another option in this version of SoftRF is to optionally write the flight logs in a compressed format.  This needs to be enabled by changing the "compflash" setting to "1".  See below on how to de-compress the files.
 
@@ -526,6 +529,8 @@ When logging to an SD card or to flash memory, if the T-Beam is shut down via a 
 If the T-Echo is shut down via a long press of the Mode button, the flight log (if still active) will be finalized and remain in the flash memory.  While connected to a computer via USB, additional flight logging may be blocked.  To ensure the flight log is complete (as of that moment), click the Mode button before connecting to a computer.  SoftRF will switch to another display page as normal, but also will silently finalize the flight log.
 
 The flight log files are "secured" (have G-records appended), and will be accepted as valid on Weglide and OLC.  But they are not IGC-certified, so cannot be used for badges and records.
+
+Traffic report lines (LSRFT) include the following fields: alarm level (0-3), protocol (coding as in the setting), aircraft type (ditto), aircraft ID, distance (meters), bearing (degrees).
 
 
 Data Bridging

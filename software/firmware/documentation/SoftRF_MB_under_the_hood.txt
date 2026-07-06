@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated June 14, 2026 to fit software version MB203
+This version last updated July 3, 2026 to fit software version MB204
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -43,9 +43,9 @@ pflaa_cs - 1 (default) to include "callsign" after hex ID in PFLAA sentences, 0 
 expire - number of seconds to keep reporting traffic not heard from - 1-30, default=5
     (note: the display device may keep reporting for longer, e.g., XCsoar for 5 more seconds)
 
-altprotocol - default=0, meaning none.  Set to 1 (OGNTP), 6 (Legacy), 7 (Latest) or 8 (ADS-L) to transmit in an alternative protocol once every 4 seconds.  This is if the main protocol is also 1, 6, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is also relayed in the OGNTP protocol, taking priority over self-reporting, once per 16 seconds.  New in version mb174: Can mix Latest (or ADS-L) and either FANET or PAW, then time-slicing will be used to transmit and receive in both protocols.  Note that the same ID will be transmitted in all protocols used, including FANET (ignoring the convention for FANET to use a "vendor ID for the first 2 hex digits").  If you have registered a FANET ID, and you don't want to change it, then use the "override" id_method setting to force that ID - but that ID will then be sent in the other protocols too.
+altprotocol - default=0, meaning none.  Set to 1 (OGNTP), 6 (Legacy), 7 (Latest) or 8 (ADS-L MDR) to transmit in an alternative protocol once every 4 seconds.  This is if the main protocol is also 1, 6, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is also relayed in the OGNTP protocol, taking priority over self-reporting, once per 16 seconds.  New version mb204: Can mix Latest (or ADS-L) and either FANET or PAW, or even FANET & PAW, and time-slicing will be used to transmit and receive in both protocols.  Note that the same ID will be transmitted in all protocols used, including FANET (ignoring the convention for FANET to use a "vendor ID for the first 2 hex digits").  If you have registered a FANET ID, and you don't want to change it, then use the "override" id_method setting to force that ID - but that ID will then be sent in the other protocols too.
 
-flr_adsl - default=0.  If set to 1, reception will be in simultaneous Latest+ADS-L mode (in time slot 0).  And in  dual-protocol modes Latest+FANET, Latest+PAW and Latest+OGNTP will also transmit in ADS-L occasionally.
+flr_adsl - default=1.  If set to 1, some reception will be in simultaneous Latest+ADS-L mode, and also some transmission will happen in those protocols.  In dual-protocol modes Latest+FANET, Latest+PAW and Latest+OGNTP, will also transmit in ADS-L occasionally.  In dual-protocol modes PAW+FANET and FANET+PAW, enabling flr_adsl means SoftRF will transmit and receive in *four* protocols at once.
 
 nmea_out and nmea_out2 - NMEA output destination codes are: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=Bluetooth 6=secondary serial.  Some destinations are not available on some devices, e.g., the T-Echo, M1, M3 and T1000-E have BT (BLE) but not UDP nor TCP nor secondary serial.
 
@@ -56,6 +56,12 @@ nmea_t & nmea2_t - 1 for PFLAU+PFLAA, 2 for PFLAJ, 4 for PFLAM, 8 for FNNGB
 nmea_e & nmea2_e - 1 for "tunnel" from connected devices, 2 for generated (strobe, alarm)
 
 debug_flags - now a 32-bit bitfield, see DEBUG_* values in Settings.h
+    01	WIND	Wind calculation serial output
+    02	PROJECTION	Wind projection / track extrapolation output
+    04	ALARM	Alarm calculation detail (requires nmea_d=1)
+    08	LEGACY	Raw FLARM/Latest packet hex dump on RX & TX
+    10	DEEPER	RF slot timing, RX/TX sizes, LR1110 packet detail
+    20	DEEPER2	Traffic helper internals, GNS5892 ADS-B detail
 nmea_d & nmea2_d - enable debug output from my version of SoftRF
 nmea_p & nmea2_p - debug output from original SoftRF
 
@@ -72,7 +78,7 @@ loginterval - interval (seconds) between flight log position records, 1 to 155
 
 compflash - On a T-Beam with an SD card this setting is ignored.  On a T-Beam without SD card: 0=log to RAM only, 1=also compress to IGZ file in flash.  On a T-Echo, M1 or T1000-E: 0=record uncompressed IGC files, 1=record compressed IGZ files.  See the "Flight logging" section in the user guide for decompressing instructions.
 
-alarmlog - Alarms Log: If enabled (1), every time a traffic alarm is issued (whether audible or not), a line of text is written into the alarmlog.txt file (in flash). (If flight logging, similar data is also inserted as an LSRF comment.)  This line includes the date, time, lat/lon, alarm level (1-3), aircraft ID, relative heading, and horizontal and vertical separation (in meters).  On the T-Beam, if you want to download this data, use the web interface and click the "Alarm Log: [Download]" button at the bottom of the status page.  The existing file is normally appended to.  If space in the flash file system is low, the alarm log file is erased and a new one created.  You can also do that manually by clicking the "Alarm Log: [Clear]" button on the status page.
+alarmlog - Alarms Log: If enabled (1), every time a traffic alarm is issued (whether audible or not), a line of text is written into the alarmlog.txt file (in flash).  This line includes the date, time, lat/lon, alarm level (1-3), count of alarming traffic, aircraft ID, relative heading, and horizontal and vertical separation (in meters).  On the T-Beam, if you want to download the alarm log, use the web interface and click the "Alarm Log: [Download]" button at the bottom of the status page.  The existing file is normally appended to.  If space in the flash file system is low, the alarm log file is erased and a new one created.  You can also do that manually by clicking the "Alarm Log: [Clear]" button on the status page.  If flight logging, and either alarmlog is enabled or logging includes "traffic", similar data is also inserted into the flight log as an LSRFA comment every time the alarm level of an aircraft increases.  These comment lines include the following fields: alarm level (0-3), protocol (coding as in the setting), aircraft type (ditto), aircraft ID, distance (meters), bearing (degrees), speed (knots), course, turnrate, relative heading,  relative altitude, relative vertical speed, this aircraft's speed course and turnrate, and estimated wind speed and direction.  (Fewer fields if the log is compressed.)
 
 log_nmea - option to log all NMEA output to an attached SD card (T-Beam only).  Logging starts only when a GNSS fix is attained, using the date to name the file, similar to the IGC flight log file naming.  E.g., 52B1NMEA.txt.
 
@@ -215,7 +221,7 @@ Protocol choices
 
 The following protocol choices are available:
 Single protocols:
-* ADS-L
+* ADS-L (MDR, on same frequencies as FLARM)
     - if flr_adsl=1 receive in flr_adsl dual mode in time slot 0
 * Legacy - compatible with the old (pre-2024) FLARM protocol, not recommended
 * Latest - compatible with the new (post-2024) FLARM protocol, recommended
@@ -223,7 +229,9 @@ Single protocols:
 * OGNTP
     - if flr_adsl=1 receive in flr_adsl dual mode in time slot 0 every 4 seconds
 * FANET
+    - if flr_adsl=1 in time slot 0 rx in flr_adsl dual mode & tx in Latest (ADS-L every 4 sec)
 * PAW (Pilot Aware, P3I)
+    - if flr_adsl=1 in time slot 0 rx in flr_adsl dual mode & tx in Latest (ADS-L every 4 sec)
 Mixed protocols:
 * Latest + ADS-L
     - tx & rx in Latest, except every 4 seconds in slot 0 tx in ADSL - note no ADSL rx
@@ -238,51 +246,62 @@ Mixed protocols:
 Time-slicing dual protocol modes:
 * Latest + FANET
         in slot 0: tx & rx in Latest
-        in slot 1: tx & rx in FANET
+        in slot 1: tx & rx in FANET (rx in Latest every 4 sec)
     - if flr_adsl=1:
         in slot 0 rx in flr_adsl simultaneous dual mode
-            and every 8 seconds tx in ADSL
+            and every 4 seconds tx in ADSL instead of Latest
+        in slot 1: tx & rx in FANET (rx in  flr_adsl dual mode every 4 sec)
 * FANET + Latest - same as Latest + FANET above
 * Latest + PAW
         in slot 0: tx & rx in Latest
         in slot 1: tx & rx in PAW
     - if flr_adsl=1:
         in slot 0 rx in flr_adsl simultaneous dual mode
-            and every 8 seconds tx in ADSL
+            and every 4 seconds tx in ADSL instead of Latest
 * PAW + Latest - same as Latest + PAW above
 * FANET + OGNTP
         in slot 0: tx and rx in OGNTP
         in slot 1: tx & rx in FANET
     - if flr_adsl=1:
          in slot 0 rx in flr_adsl simultaneous dual mode every 4 seconds
-            and every 8 seconds tx in ADSL - note no tx in Latest
+            and every 4 seconds tx in ADSL - note no tx in Latest
 * FANET + ADS-L
          in slot 0 tx & rx in ADSL
          in slot 1 tx & rx in FANET
     - if flr_adsl=1:
          in slot 0 rx in flr_adsl dual mode, tx in ADSL
-            and every 8 seconds tx in Latest
+            and every 4 seconds tx in Latest
 * PAW + ADS-L
          in slot 0 tx & rx in ADSL
          in slot 1 tx & rx in PAW
     - if flr_adsl=1:
          in slot 0 rx in flr_adsl dual mode, tx in ADSL
-            and every 8 seconds tx in Latest
+            and every 4 seconds tx in Latest
 * PAW + OGNTP
             slot 0: tx and rx in OGNTP
             slot 1: tx & rx in PAW
     - if flr_adsl=1:
          in slot 0 rx in flr_adsl simultaneous dual mode every 4 seconds
-            and every 8 seconds tx in ADSL - note no tx in Latest
-
+            and every 4 seconds tx in ADSL - note no tx in Latest
+Alternating-seconds modes:
+* FANET + PAW
+         rx in PAW (in 25% of the seconds) or FANET (75%)
+         tx in slot 1, every 2 sec on average, PAW 3 times more often than FANET
+    - if flr_adsl=1:
+         in slot 0 rx in in flr_adsl simultaneous dual mode
+         in slot 0 tx in Latest, but every 4 sec in ADS-L
+          - this last mode offers 2-way communications in 4 protocols at once!
+          - but it will receive each FANET & PAW traffic only every 10 seconds or so
+            - setting 'expire' to 10+ seconds is recommended
+* PAW + FANET - same as FANET + PAW, but listens to PAW for 3 out of every 8 seconds (rather than 2).
 
 Air Relay
 
-Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B, if an ADS-B receiver module is installed.  Or, if no ADS-B module is installed, FLARM traffic relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or the flr_adsl setting is enabled), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away (or closer if lower) is relayed.  Conversely, only ADS-B traffic that is less than 8km away is relayed (10km for helicopters and 16km for jets).
+Optional relaying by airborne aircraft of radio packets from other aircraft.  Relayed packets are not relayed a second time.  The relay setting "1" ("Landed") means gliders that "landed out" (if they activated "landed out mode" via the web interface on a T-Beam - or changed the aircraft type to zero in the settings file) - they will be "seen" from farther away (and perhaps by an OGN ground station) if airborne traffic with SoftRF is in the area and will relay the data.  The relay setting "2" ("all") also relays aircraft that were received via ADS-B, if an ADS-B receiver module is installed.  Or, if no ADS-B module is installed, FLARM traffic relayed in ADS-L protocol (if main protocol is Latest and altprotocol is ADS-L or the flr_adsl setting is enabled), in addition to landed-out gliders.  This relaying happens no more than once every 5 seconds in total, and once every 7 or more seconds for any given aircraft.  Only FLARM traffic that is over 10km away (or closer if lower in altitude) is relayed.  Conversely, only ADS-B traffic that is less than 8km away is relayed (10km for helicopters and 16km for jets).
 
 In "3" ("relay only") mode, SoftRF (only if it is airborne) relays ADS-B traffic, more often, at lower power (8 mW if set to "full power), but does not transmit its own position - use this mode to spread the benefit of ADS-B reception in SoftRF to Classic FLARMs in the same or nearby aircraft.
 
-Relayed packets from "landed-out" aircraft (meaning SoftRF that is manually switched into this mode, marked by the aircraft type being zero) are visible to FLARMs.  If SoftRF is in dual-protocol mode and in relay-all mode, it relays ADS-B and FLARM traffic in the ADS-L protocol, to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  If not in dual-protocol mode, FLARM traffic is not relayed, and ADS-B traffic is relayed in the "Legacy" protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
+Relayed packets from "landed-out" aircraft (meaning SoftRF that is manually switched into this mode, marked by the aircraft type being zero) are visible to FLARMs.  If SoftRF is in flr_adsl dual-protocol mode and in relay-all mode, it relays ADS-B and FLARM traffic in the ADS-L protocol, to make it invisible to FLARMs but visible to SoftRF in dual-protocol reception mode.  If not in dual-protocol mode, FLARM traffic is not relayed, and ADS-B traffic is relayed in the "Legacy" protocol.  ADS-B traffic relayed by SoftRF in relay-only mode can be received by FLARMs as well as other SoftRF devices, since they are relayed in the "Latest" new protocol.  Relayed packets are marked as such, by setting the third bit in the "address type" field in the Latest or Legacy protocol, which seems to be ignored by OGN ground stations, or by setting the "relayed" bit in the ADS-L protocol.  To test the relaying on the ground (while not airborne) can enter "test mode".
 
 Test Mode
 

@@ -229,37 +229,40 @@ static void init_stgdesc()
   }
 
   const char *yesno = "1=yes 0=no";
-  const char *destinations = "0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT ...";
-  //const char *bauds = "0=default(38) 2=9600 3=19200 4=38400 ...";
+  const char *destinations = "0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT..";
+  const char *nmea_g_types = "0=off 1=basic 3=GSA ...";
+  const char *nmea_t_types = "0=off 1=PFLAU+PFLAA 4=PFLAM 8=FNNGB";
+  const char *nmea_s_types = "0=off 1=basic 3=LK8EX1";
+  const char *nmea_e_types = "0=off 1=tunnel 2=output 3=both";
 
   stgcomment[STG_MODE]       = "0=Normal ...";
-  stgcomment[STG_PROTOCOL]   = "7=Latest 1=OGNTP 2=PAW 5=FANET";
-  stgcomment[STG_ALTPROTOCOL]= "0=none 1=OGNTP 5=FANET 8=ADSL";
+  stgcomment[STG_PROTOCOL]   = "7=Latest 8=ADSL 2=PAW 5=FANET";
+  stgcomment[STG_ALTPROTOCOL]= "0=none 1=OGNTP ...";
   stgcomment[STG_FLR_ADSL]   = "1=FLR+ADSL rx (& some tx)";
   stgcomment[STG_BAND]       = "1=EU 2=US ...";
   stgcomment[STG_ACFT_TYPE]  = "1=GL 2=TOWPL 6=HG 7=PG 0=landed out";
   stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device 5=FANET";
-  stgcomment[STG_ALARM]      = "3=Latest 2=Vector 1=Dist";
+  stgcomment[STG_ALARM]      = "3=Latest 2=Vect 1=Dist 0=None 4=PG";
   stgcomment[STG_HRANGE]     = "km";
   stgcomment[STG_VRANGE]     = "x100m";
   stgcomment[STG_TXPOWER]    = "0=off 1=low 2=full";
   stgcomment[STG_VOLUME]     = "0=off 1=low 2=full 3=ext";
   stgcomment[STG_TCPMODE]    = "0=server 1=client";
   stgcomment[STG_TCPPORT]    = "if client, 0=2000 1=8880";
-  stgcomment[STG_BLUETOOTH]  = "0=off 1=classic 2=BLE";
-  stgcomment[STG_BAUD_RATE]  = "0=default(38) 2=9600 3=19200 4=38400 ...";
+  stgcomment[STG_BLUETOOTH]  = "0=off 1=classic 2=BLE 3=skip SensBox";
+  stgcomment[STG_BAUD_RATE]  = "0=dflt(38K) 2=9600 3=19K 4=38K 5=57K..";
   stgcomment[STG_NMEA_OUT]   = destinations;
-  stgcomment[STG_NMEA_G]     = "0=off 1=basic 3=GSA ...";
-  stgcomment[STG_NMEA_T]     = "0=off 1=PFLAU+PFLAA 4=PFLAM 8=FNNGB";
-  stgcomment[STG_NMEA_S]     = "0=off 1=basic 3=LK8EX1";
+  stgcomment[STG_NMEA_G]     = nmea_g_types;
+  stgcomment[STG_NMEA_T]     = nmea_t_types;
+  stgcomment[STG_NMEA_S]     = nmea_s_types;
   stgcomment[STG_NMEA_D]     = yesno;
-  stgcomment[STG_NMEA_E]     = "0=off 1=tunnel 2=output 3=both";
+  stgcomment[STG_NMEA_E]     = nmea_e_types;
   stgcomment[STG_NMEA_OUT2]  = destinations;
-  stgcomment[STG_NMEA2_G]    = "0=off 1=basic 3=GSA ...";
-  stgcomment[STG_NMEA2_T]    = "0=off 1=PFLAU+PFLAA 4=PFLAM 8=FNNGB";
-  stgcomment[STG_NMEA2_S]    = "0=off 1=basic 3=LK8EX1";
+  stgcomment[STG_NMEA2_G]    = nmea_g_types;
+  stgcomment[STG_NMEA2_T]    = nmea_t_types;
+  stgcomment[STG_NMEA2_S]    = nmea_s_types;
   stgcomment[STG_NMEA2_D]    = yesno;
-  stgcomment[STG_NMEA2_E]    = "0=off 1=tunnel 2=output 3=both";
+  stgcomment[STG_NMEA2_E]    = nmea_e_types;
   stgcomment[STG_BAUDRATE2]  = "0=off 2=9600 3=19200 4=38400 ...";
   stgcomment[STG_ALT_UDP]    = "0=10110 1=10111";
   stgcomment[STG_RX1090]     = "0=none 1=GNS5892";
@@ -280,15 +283,15 @@ static void init_stgdesc()
 #else
   stgcomment[STG_POWER_SAVE] = "1=turn off wifi after 10min";
 #endif
-  stgcomment[STG_POWER_EXT]  = "1=allow dual-power boot, shutdown long after USB off";
+  stgcomment[STG_POWER_EXT]  = "1=dual-power boot, shutdown after USB off";
   stgcomment[STG_RFC]        = "freq correction +-30";
   stgcomment[STG_LEAPSECS]   = "leap seconds - automatic";
   stgcomment[STG_ALARMLOG]   = yesno;
-  stgcomment[STG_LOG_NMEA]   = "1 = log all NMEA output to SD card";
+  stgcomment[STG_LOG_NMEA]   = "1=log NMEA output to SD card";
   stgcomment[STG_LOGFLIGHT]  = "0=off 1=always 2=airborne 3=traffic";
   stgcomment[STG_LOGINTERVAL]= "seconds, 1-255";
 #if defined(ESP32)
-  stgcomment[STG_COMPFLASH]  = "0=log to RAM only, 1=also compress to flash";
+  stgcomment[STG_COMPFLASH]  = "0=log to RAM, 1=also compress to flash";
 #else
   stgcomment[STG_COMPFLASH]  = "0=log uncompressed, 1=compress";
 #endif
@@ -361,6 +364,8 @@ void Adjust_Settings()
     if (settings->rf_protocol == RF_PROTOCOL_LEGACY && settings->altprotocol != RF_PROTOCOL_LATEST)
         settings->altprotocol = RF_PROTOCOL_NONE; 
     if (settings->altprotocol == RF_PROTOCOL_LEGACY && settings->rf_protocol != RF_PROTOCOL_LATEST)
+        settings->altprotocol = RF_PROTOCOL_NONE;
+    if (settings->altprotocol == settings->rf_protocol)
         settings->altprotocol = RF_PROTOCOL_NONE;
     /*
      * Enforce legacy protocol setting for SX1276
@@ -611,21 +616,9 @@ void Adjust_Settings()
 
 #endif /* ESP32 */
 
-  if (settings->rf_protocol == RF_PROTOCOL_ADSB_1090) {
-      if (settings->altprotocol == RF_PROTOCOL_ADSB_1090
-      ||  settings->altprotocol == RF_PROTOCOL_P3I
-      ||  settings->altprotocol == RF_PROTOCOL_FANET) {
-          settings->altprotocol = RF_PROTOCOL_NONE;
-      } else {
-          settings->rf_protocol = settings->altprotocol;
-          settings->altprotocol = RF_PROTOCOL_ADSB_1090;
-      }
-  }
-  if (settings->altprotocol == RF_PROTOCOL_ADSB_1090) {
-      if (settings->rf_protocol == RF_PROTOCOL_P3I
-      ||  settings->rf_protocol == RF_PROTOCOL_FANET) {
-          settings->altprotocol = RF_PROTOCOL_NONE;
-      }
+  if (settings->rf_protocol == RF_PROTOCOL_ADSB_1090 && settings->altprotocol != RF_PROTOCOL_NONE) {
+      settings->rf_protocol = settings->altprotocol;
+      settings->altprotocol = RF_PROTOCOL_ADSB_1090;
   }
 
   if (settings->loginterval == 0)
@@ -887,7 +880,7 @@ void Settings_defaults()
 
     settings->version = 0;        // SOFTRF_SETTINGS_VERSION will come from file
     settings->altprotocol = RF_PROTOCOL_NONE;
-    settings->flr_adsl    = 0;
+    settings->flr_adsl    = 1;    // nudge towards cross-systems inter-operability
     settings->rx1090x     = 100;
     settings->hrange      = 27;   // km
     settings->vrange      = 20;   // 2000m

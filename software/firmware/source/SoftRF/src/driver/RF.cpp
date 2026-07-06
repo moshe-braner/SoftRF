@@ -78,6 +78,7 @@ uint8_t current_RX_protocol;
 uint8_t current_TX_protocol;
 uint8_t dual_protocol = RF_SINGLE_PROTOCOL;
 bool rx_flr_adsl = false;
+//uint8_t next_tx_protocol = 0;
 
 FreqPlan RF_FreqPlan;
 static bool RF_ready = false;
@@ -88,7 +89,7 @@ bool RF_SX12XX_RST_is_connected = true;
 const char *Protocol_ID[] = {
   [RF_PROTOCOL_NONE]      = "---",  // 0
   [RF_PROTOCOL_OGNTP]     = "OGN",
-  [RF_PROTOCOL_P3I]       = "PAW",
+  [RF_PROTOCOL_PAW]       = "PAW",
   [RF_PROTOCOL_ADSB_1090] = "ADS",
   [RF_PROTOCOL_ADSB_UAT]  = "UAT",
   [RF_PROTOCOL_FANET]     = "FAN",
@@ -113,7 +114,7 @@ protocol_duo protocol_duos[] = {
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_OGNTP,  "T+O"},
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_ADSL,   "T+A"},
   {RF_PROTOCOL_LATEST, RF_PROTOCOL_FANET,  "T+F"},
-  {RF_PROTOCOL_LATEST, RF_PROTOCOL_P3I,    "T+P"},
+  {RF_PROTOCOL_LATEST, RF_PROTOCOL_PAW,    "T+P"},
   {RF_PROTOCOL_OGNTP,  RF_PROTOCOL_LEGACY, "O+L"},
   {RF_PROTOCOL_OGNTP,  RF_PROTOCOL_LATEST, "O+T"},
   {RF_PROTOCOL_OGNTP,  RF_PROTOCOL_ADSL,   "O+A"},
@@ -122,10 +123,14 @@ protocol_duo protocol_duos[] = {
   {RF_PROTOCOL_ADSL,   RF_PROTOCOL_LATEST, "A+T"},
   {RF_PROTOCOL_FANET,  RF_PROTOCOL_LATEST, "F+T"},
   {RF_PROTOCOL_FANET,  RF_PROTOCOL_OGNTP,  "F+O"},
+  {RF_PROTOCOL_FANET,  RF_PROTOCOL_PAW,    "F+P"},
   {RF_PROTOCOL_FANET,  RF_PROTOCOL_ADSL,   "F+A"},
-  {RF_PROTOCOL_P3I,    RF_PROTOCOL_LATEST, "P+T"},
-  {RF_PROTOCOL_P3I,    RF_PROTOCOL_OGNTP,  "P+O"},
-  {RF_PROTOCOL_P3I,    RF_PROTOCOL_ADSL,   "P+A"},
+  {RF_PROTOCOL_FANET,RF_PROTOCOL_ADSB_1090,"F+B"},
+  {RF_PROTOCOL_PAW,    RF_PROTOCOL_LATEST, "P+T"},
+  {RF_PROTOCOL_PAW,    RF_PROTOCOL_OGNTP,  "P+O"},
+  {RF_PROTOCOL_PAW,    RF_PROTOCOL_FANET,  "P+F"},
+  {RF_PROTOCOL_PAW,    RF_PROTOCOL_ADSL,   "P+A"},
+  {RF_PROTOCOL_PAW, RF_PROTOCOL_ADSB_1090, "P+B"},
   {RF_PROTOCOL_NONE, RF_PROTOCOL_NONE, NULL}
 };
 
@@ -144,8 +149,12 @@ const char *protocol_lbl(uint8_t main, uint8_t alt)
 const char *dual_protocol_lbl[] = {
   [RF_SINGLE_PROTOCOL] = "PROTOCOL",
   [RF_FLR_ADSL]        = "FLR_ADSL",
-  [RF_FLR_FANET]       = "FLR_FANET",
-  [RF_FLR_P3I]         = "FLR_P3I"
+  [RF_FLR_FANET]       = "FLR_FANT",
+  [RF_FLR_PAW]         = "FLR_PAW",
+  [RF_FANET_PAW]       = "FANT_PAW",
+  [RF_PAW_FANET]       = "PAW_FANT",
+  [RF_FANET_ADSB]      = "FANT_ADS",
+  [RF_PAW_ADSB]        = "PAW_ADSB"
 };
 
 size_t (*protocol_encode)(void *, container_t *);
@@ -198,7 +207,7 @@ uint8_t parity(uint32_t x) {
     return (parity & 0x01);
 }
 
-uint8_t tx_power = 0;
+int8_t tx_power = 0;
 
 static void calc_txpower()
 {
@@ -207,7 +216,7 @@ static void calc_txpower()
   if (RF_FreqPlan.Plan == RF_BAND_AUTO)
       return;
 
-  if (RF_FreqPlan.Protocol == RF_PROTOCOL_P3I
+  if (RF_FreqPlan.Protocol == RF_PROTOCOL_PAW
     && RF_FreqPlan.Plan != RF_BAND_EU
     && RF_FreqPlan.Plan != RF_BAND_UK
     && RF_FreqPlan.Plan != RF_BAND_RU) {
@@ -285,7 +294,7 @@ static void set_initial_protocol(uint8_t protocol)   // only used during RF_setu
     protocol_encode = &ogntp_encode;
     protocol_decode = &ogntp_decode;
     break;
-  case RF_PROTOCOL_P3I:
+  case RF_PROTOCOL_PAW:
     mainprotocol_ptr = &paw_proto_desc;
     protocol_encode = &paw_encode;
     protocol_decode = &paw_decode;
@@ -313,6 +322,23 @@ static void set_initial_protocol(uint8_t protocol)   // only used during RF_setu
     break;
   }
 }
+
+/*
+// ADS-L HDR protocol for the 200-450 time slot:
+static void set_protocol_for_uplink()
+{
+  curr_rx_protocol_ptr = &uplink_proto_desc;
+  curr_tx_protocol_ptr = &uplink_proto_desc;
+  protocol_decode = &adsl_decode;
+  protocol_encode = &adsl_encode;
+  current_RX_protocol = RF_PROTOCOL_ADSL;
+  current_TX_protocol = RF_PROTOCOL_ADSL;
+  rx_flr_adsl = false;
+  RF_FreqPlan.setPlan((uint8_t) settings->band, (uint8_t) RF_PROTOCOL_PAW);
+  calc_txpower();
+  set_channel(0);
+}
+*/
 
 uint16_t manchester_decoded(uint8_t *buf)
 {
@@ -347,7 +373,7 @@ static bool receive()
 
   //receive_active = false;
 
-#if 1
+#if 0
 if (settings->debug_flags & DEBUG_DEEPER2) {
 if (! receive_active)   // polling said a packet was received
 {
@@ -372,7 +398,7 @@ Serial.println(bytes2Hex((byte *)RL_rxPacket, size));
 #endif
 
   unsigned crc_type = curr_rx_protocol_ptr->crc_type;
-//  if (curr_rx_protocol_ptr == &flr_adsl_proto_desc)
+
   if (rx_flr_adsl) {
     if (sw_manchester) {
       // examine 2 later bytes in the sync word to identify the protocol
@@ -642,7 +668,7 @@ Serial.println("PAW external CRC8 wrong");
   }
 
 #if 1
-if (success && settings->debug_flags) {
+if (success && (settings->debug_flags  & DEBUG_DEEPER)) {
 uint8_t protocol = curr_rx_protocol_ptr->type;
 if (rx_flr_adsl)  protocol = RF_last_protocol;
 Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms, RSSI %d\r\n",
@@ -856,6 +882,7 @@ Serial.println(bytes2Hex((byte *) RL_txPacket, length));
 
 // The wrapper code common to all the RF chips:
 
+#if 0
 // these protocols share the frequency plan and time slots
 bool in_family(uint8_t protocol)
 {
@@ -869,6 +896,7 @@ bool in_family(uint8_t protocol)
         return true;
     return false;
 }
+#endif
 
 /*
 uint8_t useOGNfreq(uint8_t protocol)
@@ -890,16 +918,21 @@ static void set_channel(uint8_t channel)
   if (! RF_ready)
       return;          // leave prev == NONE
 
-  if (channel != prev_channel || RF_FreqPlan.Protocol != prev_protocol) {
+  uint8_t protocol = RF_FreqPlan.Protocol;
+
+  // if continuous reception on one channel, make sure the radio is refreshed
+  bool refresh = true;
+  if (RF_FreqPlan.Channels > 1)   // frequency hopping
+      refresh = false;
+  else if (dual_protocol == RF_FLR_PAW || dual_protocol == RF_FLR_FANET)  // protocol hopping
+      refresh = false;
+  else if (settings->txpower != RF_TX_POWER_OFF
+           && protocol != RF_PROTOCOL_FANET && protocol != RF_PROTOCOL_PAW)  // frequent tx
+      refresh = false;
+
+  if (refresh || channel != prev_channel || protocol != prev_protocol) {
 
     uint32_t frequency = RF_FreqPlan.getChanFrequency(channel);
-
-    //Serial.print("frequency: "); Serial.println(frequency);
-
-    //if (receive_active) {     // done within rf_chip->setfreq()
-      //os_radio(RADIO_RST);
-      //receive_active = false;
-    //}
 
     /* correction of not more than 30 kHz is allowed */
     int8_t fc = settings->freq_corr;
@@ -915,6 +948,11 @@ static void set_channel(uint8_t channel)
       frequency = frequency + (fc * 1000);
     }
 
+    //if (receive_active) {     // done within rf_chip->setfreq()
+      //finishReceive();
+      //receive_active = false;
+    //}
+
     if (rf_chip)
       rf_chip->setfreq(frequency);
 
@@ -924,7 +962,7 @@ RF_FreqPlan.Plan, RF_FreqPlan.Protocol, prev_protocol, channel, frequency);
 }
 
     prev_channel  = channel;
-    prev_protocol = RF_FreqPlan.Protocol;
+    prev_protocol = protocol;
   }
 }
 
@@ -969,75 +1007,96 @@ byte RF_setup(void)
   Serial.printf(" Alt RF protocol: %d\r\n", (settings->altprotocol==RF_PROTOCOL_NONE? 0 : altprotocol_ptr->type));
 
   if (settings->rf_protocol==RF_PROTOCOL_LATEST && settings->altprotocol==RF_PROTOCOL_ADSL) {
-       if (settings->flr_adsl) {     // use dual-protocol reception trick
-           dual_protocol = RF_FLR_ADSL;
-           Serial.println("set up FLR_ADSL rx, FLR tx + some ADSL tx");
-       } else {
-           Serial.println("set up FLR rx & tx + some ADSL tx");
-       }
+      if (settings->flr_adsl) {     // use dual-protocol reception trick
+          dual_protocol = RF_FLR_ADSL;
+          Serial.println("set up FLR_ADSL rx, FLR tx + some ADSL tx");
+      } else {
+          Serial.println("set up FLR rx & tx + some ADSL tx");
+      }
   }
   if (settings->rf_protocol==RF_PROTOCOL_ADSL && settings->altprotocol==RF_PROTOCOL_LATEST) {
-       if (settings->flr_adsl) {     // use dual-protocol reception trick
-           dual_protocol = RF_FLR_ADSL;
-           Serial.println("set up FLR_ADSL rx, ADSL tx + some FLR tx");
-       } else {
-           Serial.println("set up ADSL rx & tx + some FLR tx");
-       }
+      if (settings->flr_adsl) {     // use dual-protocol reception trick
+          dual_protocol = RF_FLR_ADSL;
+          Serial.println("set up FLR_ADSL rx, ADSL tx + some FLR tx");
+      } else {
+          Serial.println("set up ADSL rx & tx + some FLR tx");
+      }
   }
   if (settings->rf_protocol==RF_PROTOCOL_LATEST && settings->altprotocol==RF_PROTOCOL_OGNTP) {
-       if (settings->flr_adsl) {
-           dual_protocol = RF_FLR_ADSL;
-           Serial.println("set up FLR_ADSL rx + some OGNTP tx");
-       } else {
-           Serial.println("set up FLR rx & tx + some OGNTP tx");
-       }
+      if (settings->flr_adsl) {
+          dual_protocol = RF_FLR_ADSL;
+          Serial.println("set up FLR_ADSL rx + some OGNTP tx");
+      } else {
+          Serial.println("set up FLR rx & tx + some OGNTP tx");
+      }
   }
   if ((settings->rf_protocol==RF_PROTOCOL_LATEST && settings->altprotocol==RF_PROTOCOL_FANET)
   ||  (settings->rf_protocol==RF_PROTOCOL_FANET  && settings->altprotocol==RF_PROTOCOL_LATEST)) {
-       dual_protocol = RF_FLR_FANET;
-       if (settings->flr_adsl)
-           Serial.println("set up FLR_FANET time slicing, FLR_ADSL rx + some ADSL tx");
-       else
-           Serial.println("set up FLR_FANET time slicing");
+      dual_protocol = RF_FLR_FANET;
+      if (settings->flr_adsl)
+          Serial.println("set up FLR_FANET time slicing, FLR_ADSL rx + some ADSL tx");
+      else
+          Serial.println("set up FLR_FANET time slicing");
   }
   if (settings->rf_protocol==RF_PROTOCOL_FANET && settings->altprotocol==RF_PROTOCOL_ADSL) {
-       dual_protocol = RF_FLR_FANET;
-       if (settings->flr_adsl)
-           Serial.println("set up FANET+ADSL time slicing, FLR_ADSL rx + ADSL tx");
-       else
-           Serial.println("set up FANET+ADSL time slicing");
+      dual_protocol = RF_FLR_FANET;
+      if (settings->flr_adsl)
+          Serial.println("set up FANET+ADSL time slicing, FLR_ADSL rx + ADSL tx");
+      else
+          Serial.println("set up FANET+ADSL time slicing");
   }
   if (settings->rf_protocol==RF_PROTOCOL_FANET && settings->altprotocol==RF_PROTOCOL_OGNTP) {
-       dual_protocol = RF_FLR_FANET;
-       Serial.println("set up FANET_OGNTP time slicing");
-       if (settings->flr_adsl)
-           Serial.println("set up FANET+OGNTP time slicing, FLR_ADSL rx, some ADSL tx");
-       else
-           Serial.println("set up FANET+OGNTP time slicing");
+      dual_protocol = RF_FLR_FANET;
+      Serial.println("set up FANET_OGNTP time slicing");
+      if (settings->flr_adsl)
+          Serial.println("set up FANET+OGNTP time slicing, FLR_ADSL rx, some ADSL tx");
+      else
+          Serial.println("set up FANET+OGNTP time slicing");
   }
-  if ((settings->rf_protocol==RF_PROTOCOL_LATEST && settings->altprotocol==RF_PROTOCOL_P3I)
-  ||  (settings->rf_protocol==RF_PROTOCOL_P3I    && settings->altprotocol==RF_PROTOCOL_LATEST)) {
-       dual_protocol = RF_FLR_P3I;
-       if (settings->flr_adsl)
-           Serial.println("set up FLR_FP3I time slicing, FLR_ADSL rx + some ADSL tx");
-       else
-           Serial.println("set up FLR_P3I time slicing");
-
+  if ((settings->rf_protocol==RF_PROTOCOL_LATEST && settings->altprotocol==RF_PROTOCOL_PAW)
+  ||  (settings->rf_protocol==RF_PROTOCOL_PAW    && settings->altprotocol==RF_PROTOCOL_LATEST)) {
+      dual_protocol = RF_FLR_PAW;
+      if (settings->flr_adsl)
+          Serial.println("set up FLR_PAW time slicing, FLR_ADSL rx + some ADSL tx");
+      else
+          Serial.println("set up FLR_PAW time slicing");
   }
-  if (settings->rf_protocol==RF_PROTOCOL_P3I && settings->altprotocol==RF_PROTOCOL_ADSL) {
-       dual_protocol = RF_FLR_P3I;
-       if (settings->flr_adsl)
-           Serial.println("set up P3I+ADSL time slicing, FLR_ADSL rx + ADSL tx");
-       else
-           Serial.println("set up P3I+ADSL time slicing");
+  if (settings->rf_protocol==RF_PROTOCOL_PAW && settings->altprotocol==RF_PROTOCOL_ADSL) {
+      dual_protocol = RF_FLR_PAW;
+      if (settings->flr_adsl)
+          Serial.println("set up PAW+ADSL time slicing, FLR_ADSL rx + ADSL tx");
+      else
+          Serial.println("set up PAW+ADSL time slicing");
   }
-  if (settings->rf_protocol==RF_PROTOCOL_P3I && settings->altprotocol==RF_PROTOCOL_OGNTP) {
-       dual_protocol = RF_FLR_P3I;
-       Serial.println("set up P3I_OGNTP time slicing");
-       if (settings->flr_adsl)
-           Serial.println("set up P3I+OGNTP time slicing, FLR_ADSL rx, some ADSL tx");
-       else
-           Serial.println("set up P3I+OGNTP time slicing");
+  if (settings->rf_protocol==RF_PROTOCOL_PAW && settings->altprotocol==RF_PROTOCOL_OGNTP) {
+      dual_protocol = RF_FLR_PAW;
+      Serial.println("set up PAW_OGNTP time slicing");
+      if (settings->flr_adsl)
+          Serial.println("set up PAW+OGNTP time slicing, FLR_ADSL rx, some ADSL tx");
+      else
+          Serial.println("set up PAW+OGNTP time slicing");
+  }
+  if (settings->rf_protocol==RF_PROTOCOL_FANET && settings->altprotocol==RF_PROTOCOL_NONE) {
+      if (settings->flr_adsl)
+          Serial.println("set up FANET protocol, plus some FLR & ADSL tx");
+  }
+  if (settings->rf_protocol==RF_PROTOCOL_PAW && settings->altprotocol==RF_PROTOCOL_NONE) {
+      if (settings->flr_adsl)
+          Serial.println("set up PAW protocol, plus some FLR & ADSL tx");
+  }
+  if (settings->rf_protocol==RF_PROTOCOL_FANET && settings->altprotocol==RF_PROTOCOL_PAW) {
+      dual_protocol = RF_FANET_PAW;
+      if (settings->flr_adsl)
+          Serial.println("set up FANET+PAW time slicing, some FLR & ADSL rx & tx");
+      else
+          Serial.println("set up FANET+PAW time slicing");
+  }
+  if (settings->rf_protocol==RF_PROTOCOL_PAW && settings->altprotocol==RF_PROTOCOL_FANET) {
+      dual_protocol = RF_PAW_FANET;
+      if (settings->flr_adsl)
+          Serial.println("set up PAW+FANET time slicing, some FLR & ADSL rx & tx");
+      else
+          Serial.println("set up PAW+FANET time slicing");
   }
 
   SoC->SPI_begin();
@@ -1052,116 +1111,13 @@ byte RF_setup(void)
   return rf_chip->type;
 }
 
-void RF_chip_channel(uint8_t protocol)
+void RF_chip_channel()
 {
     //uint8_t OGN = useOGNfreq(protocol);
-    uint8_t OGN = (protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
+    uint8_t OGN = (RF_FreqPlan.Protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
     RF_current_chan = RF_FreqPlan.getChannel((time_t)RF_time, RF_current_slot, OGN);
     set_channel(RF_current_chan);
 }
-
-#if 0
-/* original code, no longer used */
-/* time is handled in Time_loop(), and time slots in RF_loop() */
-void RF_SetChannel(void)
-{
-  tmElements_t  tm;
-  time_t        Time;
-  uint8_t       Slot;
-  uint32_t now_ms, pps_btime_ms, time_corr_neg;
-
-  switch (settings->mode)
-  {
-  case SOFTRF_MODE_TXRX_TEST:
-    Time = OurTime;
-    RF_timing = RF_timing == RF_TIMING_2SLOTS_PPS_SYNC ?
-                RF_TIMING_INTERVAL : RF_timing;
-    break;
-#if !defined(EXCLUDE_MAVLINK)
-  case SOFTRF_MODE_UAV:
-    Time = the_aircraft.location.gps_time_stamp / 1000000;
-    RF_timing = RF_timing == RF_TIMING_2SLOTS_PPS_SYNC ?
-                RF_TIMING_INTERVAL : RF_timing;
-    break;
-#endif /* EXCLUDE_MAVLINK */
-
-  case SOFTRF_MODE_NORMAL:
-  default:
-
-    now_ms = millis();
-    pps_btime_ms = SoC->get_PPS_TimeMarker();
-
-    if (pps_btime_ms) {
-      if (now_ms > pps_btime_ms + 1010)
-        pps_btime_ms += 1000;
-      uint32_t last_Commit_Time = now_ms - gnss.time.age();
-      if (pps_btime_ms <= last_Commit_Time) {
-        time_corr_neg = (last_Commit_Time - pps_btime_ms) % 1000;
-      } else {
-        time_corr_neg = 1000 - ((pps_btime_ms - last_Commit_Time) % 1000);
-      }
-      ref_time_ms = pps_btime_ms;
-    } else {
-      uint32_t last_RMC_Commit = now_ms - gnss.date.age();
-      time_corr_neg = 100;
-      if (gnss_chip)
-          time_corr_neg = gnss_chip->rmc_ms;
-      ref_time_ms = last_RMC_Commit - time_corr_neg;
-    }
-
-    int yr    = gnss.date.year();
-    if( yr > 99)
-        yr    = yr - 1970;
-    else
-        yr    += 30;
-    tm.Year   = yr;
-    tm.Month  = gnss.date.month();
-    tm.Day    = gnss.date.day();
-    tm.Hour   = gnss.time.hour();
-    tm.Minute = gnss.time.minute();
-    tm.Second = gnss.time.second();
-
-//  Time = makeTime(tm) + (gnss.time.age() - time_corr_neg) / 1000;
-    Time = makeTime(tm) + (gnss.time.age() + time_corr_neg) / 1000;
-    OurTime = (uint32_t) Time;
-    RF_time = OurTime;
-
-    break;
-  }
-
-  switch (RF_timing)
-  {
-  case RF_TIMING_2SLOTS_PPS_SYNC:
-    if ((now_ms - ts->s0.tmarker) >= ts->interval_mid) {
-      ts->s0.tmarker = ref_time_ms + ts->s0.begin - ts->adj;
-      ts->current = 0;
-    }
-    if ((now_ms - ts->s1.tmarker) >= ts->interval_mid) {
-      ts->s1.tmarker = ref_time_ms + ts->s1.begin;
-      ts->current = 1;
-    }
-    Slot = ts->current;
-    break;
-  case RF_TIMING_INTERVAL:
-  default:
-    Slot = 0;
-    break;
-  }
-
-  //uint8_t OGN = useOGNfreq(settings->rf_protocol);
-  uint8_t OGN = (settings->rf_protocol == RF_PROTOCOL_OGNTP ? 1 : 0);
-  uint8_t chan = RF_FreqPlan.getChannel(Time, Slot, OGN);
-
-#if DEBUG
-  int("Plan: "); Serial.println(RF_FreqPlan.Plan);
-  Serial.print("Slot: "); Serial.println(Slot);
-  Serial.print("OGN: "); Serial.println(OGN);
-  Serial.print("Channel: "); Serial.println(chan);
-#endif
-
-  set_channel(chan)
-}
-#endif  // original code
 
 void set_protocol_for_slot()
 {
@@ -1170,16 +1126,47 @@ void set_protocol_for_slot()
   // Transmit one packet in alt protocol once every 4 seconds:
   // In time Slot 0 for ADS-L & FLR, and in Slot 1 for OGNTP.
   // If alt protocol is OGNTP transmit in third protocol in seconds 3,11
-  // This arrangement is not used for time-slicing with FANET or P3I
+  // This arrangement is not used for time-slicing with FANET or PAW
 
   bool sec_3_7_11_15 = ((RF_time & 0x03) == 0x03);
   bool sec_3_11      = ((RF_time & 0x07) == 0x03);
 
   if (RF_current_slot == 0) {
 
-    if (dual_protocol == RF_FLR_FANET || dual_protocol == RF_FLR_P3I) {
+    if (dual_protocol == RF_FANET_PAW || dual_protocol == RF_PAW_FANET) {
+        // new for MB204: allow combined FANET & PAW, with optional FLR_ADSL too
+        if (settings->flr_adsl) {
+            curr_rx_protocol_ptr = &flr_adsl_proto_desc;
+            protocol_decode = &flr_adsl_decode;
+            if (sec_3_7_11_15) {
+                curr_tx_protocol_ptr = &adsl_proto_desc;
+                protocol_encode = &adsl_encode;
+            } else {
+                curr_tx_protocol_ptr = &latest_proto_desc;
+                protocol_encode = &legacy_encode;
+            }
+        } else {
+/*
+            if (sec_3_7_11_15) {
+                curr_rx_protocol_ptr = altprotocol_ptr;
+                protocol_decode = altprotocol_decode;
+            } else {
+                curr_rx_protocol_ptr = mainprotocol_ptr;
+                protocol_decode = mainprotocol_decode;
+            }
+*/
+            // use same rx protocol as in preceding Slot 1
+            if (current_RX_protocol == RF_PROTOCOL_PAW) {
+                curr_rx_protocol_ptr = &paw_proto_desc;
+                protocol_decode = paw_decode;
+            } else {
+                curr_rx_protocol_ptr = &fanet_proto_desc;
+                protocol_decode = fanet_decode;
+            }
+        }
+    } else if (dual_protocol == RF_FLR_FANET || dual_protocol == RF_FLR_PAW) {
         // RF_FLR_FANET may also mean FANET+ADSL or FANET+OGNTP
-        if (sec_3_11 && settings->flr_adsl) {
+        if (sec_3_7_11_15 && settings->flr_adsl) {
             curr_rx_protocol_ptr = &flr_adsl_proto_desc;
             protocol_decode = &flr_adsl_decode;
             if (settings->altprotocol == RF_PROTOCOL_ADSL) {
@@ -1189,8 +1176,8 @@ void set_protocol_for_slot()
                 curr_tx_protocol_ptr = &adsl_proto_desc;
                 protocol_encode = &adsl_encode;
             }
-        } else if (settings->rf_protocol != RF_PROTOCOL_FANET && settings->rf_protocol != RF_PROTOCOL_P3I) {
-            // mainprotocol is not FANET (or P3I), it may be LATEST or ADSL or OGNTP
+        } else if (settings->rf_protocol != RF_PROTOCOL_FANET && settings->rf_protocol != RF_PROTOCOL_PAW) {
+            // mainprotocol is not FANET (or PAW), it may be LATEST or ADSL or OGNTP
             curr_tx_protocol_ptr = mainprotocol_ptr;
             protocol_encode = mainprotocol_encode;
             if (settings->flr_adsl) {
@@ -1200,8 +1187,8 @@ void set_protocol_for_slot()
                 curr_rx_protocol_ptr = mainprotocol_ptr;
                 protocol_decode = mainprotocol_decode;
             }
-        } else if (settings->altprotocol != RF_PROTOCOL_FANET && settings->altprotocol != RF_PROTOCOL_P3I) {
-            // altprotocol is not FANET (or P3I), it may be LATEST or ADSL or OGNTP
+        } else if (settings->altprotocol != RF_PROTOCOL_FANET && settings->altprotocol != RF_PROTOCOL_PAW) {
+            // altprotocol is not FANET (or PAW), it may be LATEST or ADSL or OGNTP
             curr_tx_protocol_ptr = altprotocol_ptr;
             protocol_encode = altprotocol_encode;
             if (settings->flr_adsl && settings->altprotocol != RF_PROTOCOL_OGNTP) {
@@ -1268,14 +1255,107 @@ void set_protocol_for_slot()
             curr_rx_protocol_ptr = mainprotocol_ptr;
             protocol_decode = mainprotocol_decode;
         }
-        curr_tx_protocol_ptr = mainprotocol_ptr;
-        protocol_encode = mainprotocol_encode;
+        // new for MB204: option for some transmit & receive of FLR & ADSL
+        //   even while in single-protocol FANET or PAW mode:
+        if (settings->rf_protocol == RF_PROTOCOL_FANET || settings->rf_protocol == RF_PROTOCOL_PAW) {
+            if (settings->flr_adsl) {
+                // listen to flr_adsl instead of FANET/PAW one Slot 0
+                curr_rx_protocol_ptr = &flr_adsl_proto_desc;
+                protocol_decode = &flr_adsl_decode;
+                if (sec_3_7_11_15) {
+                    // transmit in ADS-L once every 4 seconds
+                    curr_tx_protocol_ptr = &adsl_proto_desc;
+                    protocol_encode = &adsl_encode;
+                } else {
+                    // transmit in Latest protocol in 3 of every 4 seconds
+                    curr_tx_protocol_ptr = &latest_proto_desc;
+                    protocol_encode = &legacy_encode;
+                }
+            } else {
+                // skip rx & tx in flr_adsl in Slot 0
+                // (but no actual FANET or PAW tx happens in Slot 0)
+                curr_tx_protocol_ptr = mainprotocol_ptr;
+                protocol_encode = mainprotocol_encode;
+            }
+        } else {    // single-protocol LATEST, ADSL or OGNTP
+            curr_tx_protocol_ptr = mainprotocol_ptr;
+            protocol_encode = mainprotocol_encode;
+        }
     }
 
   } else {  // slot 1
 
-    if (dual_protocol == RF_FLR_FANET) {
-#if 1
+    if (dual_protocol == RF_FANET_PAW || dual_protocol == RF_PAW_FANET) {
+        // new for MB204: allow combined FANET & PAW
+/*
+        if (sec_3_7_11_15) {
+            curr_rx_protocol_ptr = altprotocol_ptr;
+            protocol_decode = altprotocol_decode;
+        } else {
+            curr_rx_protocol_ptr = mainprotocol_ptr;
+            protocol_decode = mainprotocol_decode;
+        }
+*/
+        // PAW transmits 3x more often than FANET.
+        // Listen to FANET 3/4 of the seconds, else PAW:
+#if 0
+        //if (millis() & 0x03)
+        if (SoC->random(0,400) < 300) {
+            curr_rx_protocol_ptr = &fanet_proto_desc;
+            protocol_decode = &fanet_decode;
+        } else {
+            curr_rx_protocol_ptr = &paw_proto_desc;
+            protocol_decode = &paw_decode;
+        }
+        // TX protocol depends on a 3- or 4-step cycle:
+        if (next_tx_protocol == 0) {
+            curr_tx_protocol_ptr = &fanet_proto_desc;
+            protocol_encode = &fanet_encode;
+        } else {    // 1..3
+            curr_tx_protocol_ptr = &paw_proto_desc;
+            protocol_encode = &paw_encode;
+        }
+#else
+        // synchronize rx & tx to maximize communications between SoftRF devices,
+        // but still listen to FANET more often,and transmit PAW more often:
+        // sec  RX     TX
+        //   0  PAW    PAW
+        //   1  FANET  PAW
+        //   2  FANET  PAW   - or PAW rx if dual_protocol == RF_PAW_FANET
+        //   3  FANET  FANET
+        //   4  FANET  PAW
+        //   5  PAW    PAW
+        //   6  FANET  FANET
+        //   7  FANET  PAW
+        // but transmissions actually happen on average every 2 sec, with random variation
+        uint32_t RF_time_7 = (RF_time & 0x07);
+        if (RF_time_7 == 0 || RF_time_7 == 5 || (RF_time_7 == 2 && dual_protocol == RF_PAW_FANET)) {
+            curr_rx_protocol_ptr = &paw_proto_desc;
+            protocol_decode = &paw_decode;
+        } else {
+            curr_rx_protocol_ptr = &fanet_proto_desc;
+            protocol_decode = &fanet_decode;
+        }
+        if (RF_time_7 == 3 || RF_time_7 == 6) {
+            curr_tx_protocol_ptr = &fanet_proto_desc;
+            protocol_encode = &fanet_encode;
+        } else {
+            curr_tx_protocol_ptr = &paw_proto_desc;
+            protocol_encode = &paw_encode;
+        }
+#endif
+    } else if (dual_protocol == RF_FANET_ADSB || dual_protocol == RF_PAW_ADSB) {
+        // for future use:
+        if (sec_3_7_11_15) {
+            curr_rx_protocol_ptr = altprotocol_ptr;     // ADSB
+            protocol_decode = altprotocol_decode;
+        } else {
+            curr_rx_protocol_ptr = mainprotocol_ptr;    // FANET or PAW
+            protocol_decode = mainprotocol_decode;
+        }
+        curr_tx_protocol_ptr = mainprotocol_ptr;        // FANET or PAW
+        protocol_encode = mainprotocol_encode;
+    } else if (dual_protocol == RF_FLR_FANET) {
         // FANET+ (at least XCtracer) only transmits FLARM in Slot 1 of odd seconds (?)
         // So listen for FLARM in Slot 1 every 4 seconds in odd seconds
         // This reduces the reception of FANET by 25%
@@ -1287,15 +1367,13 @@ void set_protocol_for_slot()
                 curr_rx_protocol_ptr = &latest_proto_desc;
                 protocol_decode = &legacy_decode;
             }
-        } else
-#endif
-        {
+        } else {
             curr_rx_protocol_ptr = &fanet_proto_desc;
             protocol_decode = &fanet_decode;
         }
         curr_tx_protocol_ptr = &fanet_proto_desc;
         protocol_encode = &fanet_encode;
-    } else if (dual_protocol == RF_FLR_P3I) {
+    } else if (dual_protocol == RF_FLR_PAW) {
         curr_rx_protocol_ptr = &paw_proto_desc;
         curr_tx_protocol_ptr = &paw_proto_desc;
         protocol_decode = &paw_decode;
@@ -1330,20 +1408,14 @@ void set_protocol_for_slot()
 
   current_RX_protocol = curr_rx_protocol_ptr->type;
   current_TX_protocol = curr_tx_protocol_ptr->type;
-#if 0
-  rx_flr_adsl = (dual_protocol == RF_FLR_ADSL  // <<< does not happen unless settings->flr_adsl
-              || (settings->flr_adsl
-                  && (current_RX_protocol==RF_PROTOCOL_LATEST || current_RX_protocol==RF_PROTOCOL_ADSL)));
-#else
   rx_flr_adsl = (curr_rx_protocol_ptr == &flr_adsl_proto_desc);
-#endif
 
   if (prev_rx_protocol_ptr != curr_rx_protocol_ptr) {
       RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
       calc_txpower();
       // tx will switch to curr_tx_protocol_ptr
   }
-  RF_chip_channel(current_RX_protocol);
+  RF_chip_channel();
 
 /*
   if (dual_protocol == RF_SINGLE_PROTOCOL && current_TX_protocol != settings->rf_protocol) {
@@ -1428,16 +1500,13 @@ void RF_loop()
     RF_OK_from  = slot_base_ms + 405;
     RF_OK_until = slot_base_ms + 800;
     TxEndMarker = slot_base_ms + 795;
-    if (relay_next) {
-        TxTimeMarker = TxEndMarker;     // prevent transmission (relay bypasses this)
-        relay_next = false;
-    } else if (current_TX_protocol == RF_PROTOCOL_ADSB_1090) {
+    if (current_TX_protocol == RF_PROTOCOL_ADSB_1090) {
         TxTimeMarker = TxEndMarker;     // prevent transmission
     } else if (current_TX_protocol == RF_PROTOCOL_ADSL) {  // ADS-L slot starts at 450
         TxTimeMarker = slot_base_ms + 455 + SoC->random(0, 335);
     } else if (current_TX_protocol == RF_PROTOCOL_FANET) {
         TxTimeMarker = RF_OK_until;
-    } else if (current_TX_protocol == RF_PROTOCOL_P3I) {
+    } else if (current_TX_protocol == RF_PROTOCOL_PAW) {
         TxTimeMarker = RF_OK_until;
     } else {
         TxTimeMarker = slot_base_ms + 405 + SoC->random(0, 385);
@@ -1447,28 +1516,45 @@ void RF_loop()
 
     RF_current_slot = 1;
     set_protocol_for_slot();
+    //int neighbors;
+    //if (settings->rf_protocol == RF_PROTOCOL_FANET || settings->altprotocol == RF_PROTOCOL_FANET) {
+        //(void) Traffic_Count();   // called often enough by NMEA_Export()
+        //neighbors = fanet_acfts;
+    //}
     /* channel does _NOT_ change at PPS rollover in middle of slot 1 */
     RF_OK_from  = slot_base_ms + 805;
     RF_OK_until = slot_base_ms + 1380;
     if (current_TX_protocol == RF_PROTOCOL_FANET
-     || current_TX_protocol == RF_PROTOCOL_P3I) {
-        TxTimeMarker = RF_OK_until;          /* in Slot 1 transmit only in FANET/P3I */
+     || current_TX_protocol == RF_PROTOCOL_PAW) {
+        TxTimeMarker = RF_OK_until;                      // transmit only in FANET/PAW
         TxEndMarker = slot_base_ms + 1370;
-        if (TxTimeMarker2 == 0) {   // tx happened in previous Slot 1
+        if (TxTimeMarker2 < RF_OK_from) {                // tx happened, or was missed
             uint32_t interval;
-            if (dual_protocol == RF_FLR_FANET)
-                interval = 3805;
-            else              // RF_FLR_P3I
+            if (dual_protocol == RF_FANET_PAW || dual_protocol == RF_PAW_FANET) {
+                interval =  805;
+#if 0
+                if (fanet_acfts < 4 && next_tx_protocol > 2) {
+                    next_tx_protocol = 0;      // skip one PAW tx and go on to FANET tx
+//Serial.print("next_tx_protocol = ");
+//Serial.println(next_tx_protocol);
+                }
+#endif
+            } else if (current_TX_protocol == RF_PROTOCOL_PAW) {
                 interval = 1805;
-            uint32_t when = SoC->random(0, (565+565));
-            if (when < 565)       // 50% chance
-                when += 1000;     // tx any time in slot 1, 3 (or 4) seconds in the future
-            else if (when > 848)  // 25% chance
-                when -= 565;      // tx in second half of slot 1 but in preceding second
-            else
-                when += (2000 - 565);   // first half of slot 1, in following second
+            } else {              // FANET without PAW (may be with Latest or ADS-L)
+                interval = 3805 + 1000 * (fanet_acfts >> 1);
+            }
+            // Slot 1 for this purpose is 805..1370, length 565 ms
+            uint32_t when = SoC->random(0, 942);
+            if (when < 565)       // 60% chance
+                when += 1000;     // tx any time in slot 1, some second in the future
+            else if (when > 754)  // 20% chance
+                when -= 377;      // tx in last 33% of slot 1 but in preceding second
+            else                        // remaining 20% chance
+                when += (2000 - 565);   // in first 33% of slot 1 in following second
             TxTimeMarker2 = slot_base_ms + interval + when;
-            // average interval 3 sec for P3I and 5 sec for FANET
+            // average interval 3 sec for PAW, 5+ sec for FANET,
+            // 2 sec for alternating PAW(3x)+FANET, i.e. 2.7s for PAW and 8 for FANET
         }
     } else if (current_TX_protocol == RF_PROTOCOL_ADSB_1090) {
         TxTimeMarker = TxEndMarker;     // prevent transmission
@@ -1503,13 +1589,6 @@ void RF_loop()
     return;
   }
 
-  if (alt_relay_next) {                   // only happens when altprotocol == RF_PROTOCOL_OGNTP
-      if (sec_15) {                       // second 15, slot 1
-          TxTimeMarker = TxEndMarker;     // prevent transmission (relay bypasses this)
-          alt_relay_next = false;
-      }
-  }
-
 /*
   if (settings->debug_flags & DEBUG_DEEPER) {
       Serial.print("New freq at: ");
@@ -1520,7 +1599,7 @@ void RF_loop()
 */
 if (settings->debug_flags & DEBUG_DEEPER) {
 int rxprot = (rx_flr_adsl? 0xD : current_RX_protocol);
-uint32_t txtime = ((current_TX_protocol==RF_PROTOCOL_FANET || current_TX_protocol==RF_PROTOCOL_P3I)?
+uint32_t txtime = ((current_TX_protocol==RF_PROTOCOL_FANET || current_TX_protocol==RF_PROTOCOL_PAW)?
                         TxTimeMarker2 : TxTimeMarker);
 Serial.printf("Prot %X/%d, Slot %d set for sec %d at PPS+%d ms, PPS %d, tx ok %d - %d, gd to %d\r\n",
 rxprot, current_TX_protocol, RF_current_slot, (RF_time & 0x0F),
@@ -1532,7 +1611,7 @@ bool RF_Transmit_Happened()
 {
     if (/* dual_protocol == RF_FLR_FANET && */ current_TX_protocol == RF_PROTOCOL_FANET)
         return (TxTimeMarker2 == 0);
-    if (/* dual_protocol == RF_FLR_P3I && */ current_TX_protocol == RF_PROTOCOL_P3I)
+    if (/* dual_protocol == RF_FLR_PAW && */ current_TX_protocol == RF_PROTOCOL_PAW)
         return (TxTimeMarker2 == 0);
     //if (! TxEndMarker)
     //    return (TxTimeMarker > millis());   // for protocols handled by the original code
@@ -1545,7 +1624,7 @@ bool RF_Transmit_Ready(bool wait)
     //    return false;
     uint32_t now_ms = millis();
     if ((/* dual_protocol == RF_FLR_FANET && */ current_TX_protocol == RF_PROTOCOL_FANET)
-    ||  (/* dual_protocol == RF_FLR_P3I   && */ current_TX_protocol == RF_PROTOCOL_P3I))
+    ||  (/* dual_protocol == RF_FLR_PAW   && */ current_TX_protocol == RF_PROTOCOL_PAW))
         return (TxTimeMarker2 != 0 && now_ms > TxTimeMarker2 && now_ms < TxEndMarker);
     //if (! TxEndMarker)                     // for protocols handled by the original code
     //    return (now_ms > TxTimeMarker);
@@ -1553,12 +1632,15 @@ bool RF_Transmit_Ready(bool wait)
 }
 
 // postpone transmission by one time slot
-void RF_Transmit_Postpone()
+void RF_Transmit_Postpone(bool paw)
 {
-    if (TxTimeMarker  != 0 && TxTimeMarker  < TxEndMarker)
-        TxTimeMarker = TxEndMarker;
-    if (TxTimeMarker2 != 0 && TxTimeMarker2 < TxEndMarker)
-        TxTimeMarker2 += 1000;
+    if (paw) {
+        if (TxTimeMarker2 != 0 && TxTimeMarker2 < TxEndMarker)
+            TxTimeMarker2 += 1000;
+    } else {
+        if (TxTimeMarker != 0 && TxTimeMarker < TxEndMarker)
+            TxTimeMarker = TxEndMarker;
+    }
 }
 
 size_t RF_Encode(container_t *fop, bool wait)
@@ -1605,7 +1687,7 @@ size_t RF_Encode(container_t *fop, bool wait)
   return size;
 }
 
-bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-relay
+bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for RELAY_ONLY
 {
 //Serial.println("RF_transmit()...");
 
@@ -1620,14 +1702,6 @@ bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-r
 
   size_t RF_tx_size;
 
-#if 0
-  if (in_family(current_TX_protocol)
-   || current_TX_protocol != settings->rf_protocol
-   || dual_protocol != RF_SINGLE_PROTOCOL)
-#endif
-
-    {
-
       /* Experimental code by Moshe Braner */
 
       if (RF_Transmit_Ready(wait)) {
@@ -1640,7 +1714,7 @@ bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-r
         if (current_TX_protocol != current_RX_protocol) {
             RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
             calc_txpower();
-            RF_chip_channel(current_TX_protocol);
+            RF_chip_channel();
         }
 
         if (settings->txpower != RF_TX_POWER_OFF) {
@@ -1653,92 +1727,39 @@ bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-r
 if (settings->debug_flags & DEBUG_DEEPER) {
 Serial.printf("TX in protocol %d at %d ms, size=%d, RF_tx_size=%d\r\n",
     current_TX_protocol, millis()-ref_time_ms, size, RF_tx_size);
-    Serial.println(bytes2Hex((byte *) TxBuffer, size));
-  //Serial.println(bytes2Hex((byte *) RL_txPacket, RF_tx_size));
+if (settings->debug_flags & DEBUG_DEEPER2)
+Serial.println(bytes2Hex((byte *) TxBuffer, size));
 }
         }
 
         if (current_TX_protocol == RF_PROTOCOL_FANET
-         || current_TX_protocol == RF_PROTOCOL_P3I)
+         || current_TX_protocol == RF_PROTOCOL_PAW) {
             TxTimeMarker2 = 0;
-        else
+#if 0
+            if (dual_protocol == RF_FANET_PAW || dual_protocol == RF_PAW_FANET) {
+                ++next_tx_protocol;
+                if (next_tx_protocol > 3)
+                    next_tx_protocol = 0;
+//Serial.print("next_tx_protocol = ");
+//Serial.println(next_tx_protocol);
+            }
+#endif
+        } else {
             TxTimeMarker = RF_OK_until;
                // do not transmit again (even relay) until next slot
+        }
         /* do not set next transmit time here - it is done in RF_loop() */
         //if (curr_tx_protocol_ptr != curr_rx_protocol_ptr)
         if (current_TX_protocol != current_RX_protocol) {
             // go back to rx mode ASAP
             //delay(1);
             RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
-            RF_chip_channel(current_RX_protocol);
+            RF_chip_channel();
             //Serial.println("returned to normal protocol...");
         }
 
-//Serial.println(">");
-//Serial.printf("> tx at %d s + %d ms\r\n", OurTime, millis()-ref_time_ms);
-#if 0
-if ((settings->debug_flags & (DEBUG_DEEPER | DEBUG_LEGACY)) == (DEBUG_DEEPER | DEBUG_LEGACY)) {
-uint32_t ms = millis();
-if (ms < ref_time_ms)  ms = 0;
-else   ms -= ref_time_ms;
-if (ms > 999)  ms = 999;
-Serial.printf("> tx %d s %3d ms (%02d:%02d) timebits %2d chan %2d\r\n",
-OurTime, ms, (int)gnss.time.minute(), (int)gnss.time.second(), (RF_time & 0x0F), RF_current_chan);
-}
-#endif
-
-//Serial.printf("> tx at ms PPS + %d ms, now TxTimeMarker = PPS + %d\r\n",
-//millis()-ref_time_ms, TxTimeMarker-ref_time_ms);
-
         return (RF_tx_size != 0);
       }
-    }
-
-#if 0
-    /* original code for other protocols: */
-
-    if (!wait || millis() > TxTimeMarker) {
-
-      uint32_t timestamp = OurTime;
-
-      if (settings->txpower != RF_TX_POWER_OFF) {
-          RF_tx_size = transmit();
-          if (RF_tx_size)
-              tx_packets_counter++;
-      }
-
-      if (settings->nmea_p) {
-        StdOut.print(F("$PSRFO,"));
-        StdOut.print((uint32_t) timestamp);
-        StdOut.print(F(","));
-        StdOut.println(bytes2Hex((byte *) RL_txPacket, RF_tx_size));
-                               // RF_Payload_Size(current_TX_protocol)));
-      }
-
-      Slot_descr_t *next;
-      uint32_t adj;
-
-      switch (RF_timing)
-      {
-      case RF_TIMING_2SLOTS_PPS_SYNC:
-        next = RF_FreqPlan.Channels == 1 ? &(ts->s0) :
-               ts->current          == 1 ? &(ts->s0) : &(ts->s1);
-        adj  = ts->current ? ts->adj   : 0;
-        TxTimeMarker = next->tmarker    +
-                       ts->interval_mid +
-                       SoC->random(adj, next->duration - ts->air_time);
-        break;
-      case RF_TIMING_INTERVAL:
-      default:
-        TxTimeMarker = millis() + SoC->random(ts->interval_min, ts->interval_max) - ts->air_time;
-        break;
-      }
-
-Serial.printf("> orig-code tx at ms %d, now TxTimeMarker = %d\r\n", millis(), TxTimeMarker);
-
-      return (RF_tx_size != 0);
-    }
-#endif    // original code
 
 Serial.println("... not RF_ready");
 
@@ -1790,7 +1811,7 @@ uint8_t RF_Payload_Size(uint8_t protocol)
     case RF_PROTOCOL_LEGACY:    return legacy_proto_desc.payload_size;
     case RF_PROTOCOL_OGNTP:     return ogntp_proto_desc.payload_size;
     case RF_PROTOCOL_ADSL:      return adsl_proto_desc.payload_size;
-    case RF_PROTOCOL_P3I:       return paw_proto_desc.payload_size;
+    case RF_PROTOCOL_PAW:       return paw_proto_desc.payload_size;
     case RF_PROTOCOL_FANET:     return fanet_proto_desc.payload_size;
 #if !defined(EXCLUDE_UAT978)
     case RF_PROTOCOL_ADSB_UAT:  return uat978_proto_desc.payload_size;

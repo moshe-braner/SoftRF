@@ -42,13 +42,21 @@ float Vtcxo = 1.6;   // safe default?
 
 bool use_hardware_manchester = false;
 const rf_proto_desc_t *prev_protocol = NULL;
-uint32_t radio_setup_time = 0;
+//uint32_t radio_setup_time = 0;
 bool receive_active = false;
 volatile bool receive_complete = false;
 uint32_t receive_cb_count = 0;
 static bool transmit_complete = false;
 static float cur_freq = 868.2;
 static size_t pkt_size;
+
+// FLR, OGNTP & ADSL (MDR) share modulation, skip some radio re-config:
+static float   cached_br = 0.0;
+static float   cached_fdev = 0.0;
+static float   cached_bw = 0.0;
+static uint8_t cached_pre = 0;
+static int8_t  cached_pwr = 0;
+
 static uint32_t rssi_timer;
 static uint8_t rssi_period;
 static uint8_t rssi_sample = 0;
@@ -114,7 +122,7 @@ static void sx1276_setfreq(uint32_t ifreq)
       return;
     }
 #endif
-    // will also re-set the frequency to the stashed cur_freq after begin() in sx1276_setup()
+    // will also re-set the frequency to the stashed cur_freq in begin() in sx1276_setup()
 }
 
 static int16_t sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
@@ -143,12 +151,14 @@ static int16_t sx1276_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
   // once in a while do a complete re-setup of the radio in case it's in a bad state
   bool fast = true;
+/*
   if (millis() > radio_setup_time + 109000) {
 Serial.println("Re-setting-up radio");
       prev_protocol = NULL;
       fast = false;
       radio_setup_time = millis();
   }
+*/
 
   bool prev_lora = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_LORA);
   bool prev_fsk  = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_2FSK);
@@ -173,7 +183,7 @@ Serial.println("Re-setting-up radio");
     prev_tx = tx;
     return RADIOLIB_ERR_NONE;
   }
-  
+
   prev_protocol = NULL;   // will be set later
   prev_tx = tx;
 
@@ -339,9 +349,9 @@ cur_freq, bw, rf_protocol->syncword[0], tx_power);
 //t1 = t0 = millis();
     if (! prev_fsk) {        // need to switch to FSK
 
-  //rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false);
-  //use the "fast" version of begin() that skips the chip reset and probe:
-  rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false, fast);
+      //rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false);
+      //use the "fast" version of begin() that skips the chip reset and probe:
+      rl_state = radio_sx1276->beginFSK(cur_freq, br, fdev, bw, tx_power, preamble, false, fast);
 //t1 = millis();
     //delay(1);
 #if RADIOLIB_DEBUG_BASIC
@@ -357,19 +367,33 @@ cur_freq, bw, rf_protocol->syncword[0], tx_power);
     return rl_state;
   }
 #endif
+
     } else {    // already set up for FSK, don't call beginFSK()
 
         // frequency was set by set_protocol_for_slot() calling RF_chip_channel()
         // but call again to be sure?
         //rl_state = radio_sx1276->setFrequency(cur_freq);
 
-        rl_state = radio_sx1276->setBitRate(br);
-        rl_state = radio_sx1276->setFrequencyDeviation(fdev);
-        rl_state = radio_sx1276->setRxBandwidth(bw);
-        rl_state = radio_sx1276->setPreambleLength(rf_protocol->preamble_size * 8);
-        rl_state = radio_sx1276->setOutputPower(tx_power);  // may differ between protocols
+        if (br != cached_br)
+            rl_state = radio_sx1276->setBitRate(br);
+        if (fdev != cached_fdev)
+            rl_state = radio_sx1276->setFrequencyDeviation(fdev);
+        if (bw != cached_bw) {
+            rl_state = radio_sx1276->setRxBandwidth(bw);
+            rl_state = radio_sx1276->setAFCBandwidth(bw);
+        }
+        if (rf_protocol->preamble_size != cached_pre)
+            rl_state = radio_sx1276->setPreambleLength(rf_protocol->preamble_size << 3);
+        if (tx_power != cached_pwr)
+            rl_state = radio_sx1276->setOutputPower(tx_power);  // may differ between protocols
 
     }   // end of if(prev_fsk)
+
+    cached_br = br;
+    cached_fdev = fdev;
+    cached_bw = bw;
+    cached_pre = rf_protocol->preamble_size;
+    cached_pwr = tx_power;
 
     // >>> added in beginFSK() to try and improve rx sensitivity:
     //     setGain(0);
@@ -650,12 +674,14 @@ static int16_t sx1262_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
   // once in a while do a complete re-setup of the radio in case it's in a bad state
   bool fast = true;
+/*
   if (millis() > radio_setup_time + 109000) {
 Serial.println("Re-setting-up radio");
       prev_protocol = NULL;
       fast = false;
       radio_setup_time = millis();
   }
+*/
 
   bool prev_lora = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_LORA);
   bool prev_fsk  = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_2FSK);
@@ -868,13 +894,24 @@ Serial.println("Re-setting-up radio");
         //rl_state = radio_sx1262->setFrequency(cur_freq);
 
         // may have switched to a different protocol within FSK, so set these:
-        rl_state = radio_sx1262->setBitRate(br);
-        rl_state = radio_sx1262->setFrequencyDeviation(fdev);
-        rl_state = radio_sx1262->setRxBandwidth(bw);
-        rl_state = radio_sx1262->setPreambleLength(preamble_size);
-        rl_state = radio_sx1262->setOutputPower(tx_power);  // may differ between protocols
+        if (br != cached_br)
+            rl_state = radio_sx1262->setBitRate(br);
+        if (fdev != cached_fdev)
+            rl_state = radio_sx1262->setFrequencyDeviation(fdev);
+        if (bw != cached_bw)
+            rl_state = radio_sx1262->setRxBandwidth(bw);
+        if (rf_protocol->preamble_size != cached_pre)
+            rl_state = radio_sx1262->setPreambleLength(preamble_size);
+        if (tx_power != cached_pwr)
+            rl_state = radio_sx1262->setOutputPower(tx_power);  // may differ between protocols
 
     }   // end of if(prev_fsk)
+
+    cached_br = br;
+    cached_fdev = fdev;
+    cached_bw = bw;
+    cached_pre = rf_protocol->preamble_size;
+    cached_pwr = tx_power;
 
     uint8_t *syncword = (uint8_t *) rf_protocol->syncword;
     uint8_t syncword_size = rf_protocol->syncword_size;
@@ -1343,12 +1380,14 @@ static int16_t lr1110_setup(const rf_proto_desc_t *rf_protocol, bool tx)
 
   // once in a while do a complete re-setup of the radio in case it's in a bad state
   bool fast = true;
+/*
   if (millis() > radio_setup_time + 109000) {
 Serial.println("Re-setting-up radio");
       prev_protocol = NULL;
       fast = false;
       radio_setup_time = millis();
   }
+*/
 
   bool prev_lora = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_LORA);
   bool prev_fsk  = (prev_protocol != NULL && prev_protocol->modulation_type == RF_MODULATION_TYPE_2FSK);
@@ -1540,13 +1579,24 @@ Serial.println(RF_FreqPlan.Protocol);
         //rl_state = radio_lr1110->setFrequency(cur_freq);
 
         // may have switched to a different protocol within FSK, so set these:
-        rl_state = radio_lr1110->setBitRate(br);
-        rl_state = radio_lr1110->setFrequencyDeviation(fdev);
-        rl_state = radio_lr1110->setRxBandwidth(bw);
-        rl_state = radio_lr1110->setPreambleLength(preamble_size);
-        rl_state = radio_lr1110->setOutputPower(tx_power);  // may differ between protocols
+        if (br != cached_br)
+            rl_state = radio_lr1110->setBitRate(br);
+        if (fdev != cached_fdev)
+            rl_state = radio_lr1110->setFrequencyDeviation(fdev);
+        if (bw != cached_bw)
+            rl_state = radio_lr1110->setRxBandwidth(bw);
+        if (rf_protocol->preamble_size != cached_pre)
+            rl_state = radio_lr1110->setPreambleLength(preamble_size);
+        if (tx_power != cached_pwr)
+            rl_state = radio_lr1110->setOutputPower(tx_power);  // may differ between protocols
 
     }   // end of if(prev_fsk)
+
+    cached_br = br;
+    cached_fdev = fdev;
+    cached_bw = bw;
+    cached_pre = rf_protocol->preamble_size;
+    cached_pwr = tx_power;
 
     rl_state = radio_lr1110->fixedPacketLengthMode(pkt_size);
 

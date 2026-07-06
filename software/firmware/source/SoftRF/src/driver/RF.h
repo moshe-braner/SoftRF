@@ -166,7 +166,7 @@ void    RF_SetChannel(void);
 void    RF_loop(void);
 bool    RF_Transmit_Happened();
 bool    RF_Transmit_Ready(bool wait);
-void    RF_Transmit_Postpone(void);
+void    RF_Transmit_Postpone(bool paw);
 size_t  RF_Encode(container_t *cip, bool wait);
 bool    RF_Transmit(size_t size, bool wait);
 bool    RF_Receive(void);
@@ -191,7 +191,7 @@ extern const rf_proto_desc_t  *curr_tx_protocol_ptr;
 
 extern const rfchip_ops_t *rf_chip;
 extern bool use_hardware_manchester;
-extern uint8_t tx_power;
+extern int8_t tx_power;
 extern bool receive_active;
 extern volatile bool receive_complete;
 extern bool RF_SX12XX_RST_is_connected;

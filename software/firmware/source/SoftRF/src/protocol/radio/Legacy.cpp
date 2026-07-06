@@ -575,7 +575,7 @@ void pflam_decode(void *buffer, container_t *cip, ufo_t *fop) {     // fop has a
 
     uint8_t pflam_type = bp[6];
 #if 1
-    if (pflam_type == PFLAM_UCST || (pflam_type >= PFLAM_VER && pflam_type <= PFLAM_METAR)) {
+    if (pflam_type > PFLAM_VER) {
         if (settings->debug_flags & 0x10000000) {
           /* output the raw non-traffic packet as a whole, as hex */
           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
