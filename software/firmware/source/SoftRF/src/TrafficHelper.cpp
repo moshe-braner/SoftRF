@@ -317,8 +317,8 @@ static int8_t Alarm_Distance(container_t *this_aircraft, container_t *fop)
 {
   int8_t rval = ALARM_LEVEL_NONE;
 
-  if (no_pg_alarm && fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
-      return ALARM_LEVEL_NONE;
+  //if (no_pg_alarm && fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
+  //    return ALARM_LEVEL_NONE;
 
   float distance = fop->distance;
   if (distance > ALARM_ZONE_CLOSE
@@ -529,8 +529,12 @@ static int8_t Alarm_Vector(container_t *this_aircraft, container_t *fop)
  */
 static int8_t Alarm_Latest(container_t *this_aircraft, container_t *fop)
 {
-  if (no_pg_alarm && fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
-      return ALARM_LEVEL_NONE;
+  if (fop->aircraft_type == AIRCRAFT_TYPE_PARAGLIDER) {
+      if (no_pg_alarm)
+          return ALARM_LEVEL_NONE;
+      if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_PARAGLIDER)
+          return Alarm_Distance(this_aircraft, fop);
+  }
 
   if (fop->distance > 2*ALARM_ZONE_CLOSE) {    // 3km
     return ALARM_LEVEL_NONE;
@@ -854,9 +858,9 @@ void logOneTraffic(container_t *fop, const char *label, bool detailed)
           (int)(wind_speed * (1.0 / _GPS_MPS_PER_KNOT)), (int)wind_direction);
     } else {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
-          PSTR("%s,%d,%d,%d,%06x,%d,%d\r\n"),
+          PSTR("%s,%d,%d,%d,%06x,%d,%d,%d\r\n"),
           label, alarm_level, fop->protocol, fop->aircraft_type, addr,
-          (int)fop->distance, (int)fop->bearing);
+          (int)fop->distance, (int)fop->bearing, (int)fop->alt_diff);
     }
     //Serial.print(NMEABuffer);
     NMEAOutD();
@@ -893,13 +897,15 @@ void logCloseTraffic()
         fop = &Container[i];
         if (fop->addr == 0)
             continue;
-        if (fop->airborne == 0)
-            continue;
-        if (fop->adj_distance > 1000  // meters, adjusted for altitude difference
-                && fop->alarm_level == ALARM_LEVEL_NONE)
-            continue;
-        if (OurTime > fop->timestamp + 3 /*seconds*/ )
-            continue;
+        if (settings->logflight != FLIGHT_LOG_TRAFFIC_ALL) {    // only close
+            if (fop->airborne == 0)
+                continue;
+            if (fop->adj_distance > 1000  // meters, adjusted for altitude difference
+                    && fop->alarm_level == ALARM_LEVEL_NONE)
+                continue;
+            if (OurTime > fop->timestamp + 3 /*seconds*/ )
+                continue;
+        }
         // no need to log the towplane repeatedly
         if (towing && fop->addr == tow_addr) {
             if (tow_logged)
@@ -1774,11 +1780,11 @@ void Traffic_setup()
     Alarm_Level = &Alarm_Vector;
     break;
   case TRAFFIC_ALARM_LATEST:
+  case TRAFFIC_ALARM_PG_HILL:
   case TRAFFIC_ALARM_PG_NONE:
     Alarm_Level = &Alarm_Latest;
     break;
   case TRAFFIC_ALARM_DISTANCE:
-  case TRAFFIC_ALARM_PG_HILL:
   default:
     Alarm_Level = &Alarm_Distance;
     break;

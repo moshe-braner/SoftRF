@@ -613,7 +613,8 @@ void this_airborne(bool validfix)
       airborne_changed = true;
       Landed_time = 0;  // even if landed and took off again
       ground_status == GROUND_STATUS_AIRBORNE;
-      if (ThisAircraft.aircraft_type == AIRCRAFT_TYPE_PARAGLIDER
+      if ((ThisAircraft.aircraft_type == AIRCRAFT_TYPE_PARAGLIDER
+           || ThisAircraft.aircraft_type == AIRCRAFT_TYPE_HANGGLIDER)
       &&  (settings->alarm == TRAFFIC_ALARM_PG_HILL || settings->alarm == TRAFFIC_ALARM_PG_NONE))
           no_pg_alarm = true;
 //#if defined(ESP32)
