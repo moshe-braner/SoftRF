@@ -250,11 +250,8 @@ void setup()
   Serial.printf("\r\nID_method: %d, chip_ID: %06X, settings_ID: %06X, used_ID: %06X\r\n\r\n",
   settings->id_method, chip_id, settings->aircraft_id, ThisAircraft.addr);
 
-  // if both battery & USB power, shut down and just charge
-#if defined(ESP32)
-  ESP32_charge_mode();
-#endif
 #if defined(ARDUINO_ARCH_NRF52)
+  // if both battery & USB power, shut down and just charge
   nRF52_charge_mode();
 #endif
 
@@ -262,6 +259,14 @@ void setup()
 
   // do this before Baro_setup - Wire.begin() happens there
   hw_info.display = SoC->Display_setup();
+
+  Buzzer_setup();
+
+#if defined(ESP32)
+  // if both battery & USB power, shut down and just charge
+  // - will display a message & sound the buzzer
+  ESP32_charge_mode();
+#endif
 
 //Serial.println(F("calling Baro_setup()..."));
   // do this before Filesys_setup since this tickles pins 13,2
@@ -292,7 +297,7 @@ Serial.println(ESP.getFreePsram());
   hw_info.rf = RF_setup();
   delay(100);
 
-  Buzzer_setup();
+  // Buzzer_setup();  // moved above to before ESP32_charge_mode()
   Strobe_setup();
 
 #if defined(ENABLE_AHRS)
@@ -764,7 +769,7 @@ if (rx_success) which_rx_try = 2;
     if (msnow > IGCTimeMarker && ms_since_pps > 270
             && ms_since_pps < ((settings->debug_flags & DEBUG_SIMULATE)? 800 : 370)) {
       logFlightPosition();
-      if (settings->logflight == FLIGHT_LOG_TRAFFIC) {
+      if (settings->logflight >= FLIGHT_LOG_TRAFFIC) {
           // don't report quite as often as the logging interval
           static uint32_t trafficlog_time = 0;
           if (msnow > trafficlog_time + 7100) {

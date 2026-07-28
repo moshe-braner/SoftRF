@@ -3196,6 +3196,7 @@ void ESP32_charge_mode()
 
     Serial.println("\r\nCHARGE MODE");
     //delay(500);
+    Buzzer_fini();   // will play descending tones
     ESP32_Display_fini(SOFTRF_SHUTDOWN_CHARGE);
     ESP32_Button_fini();
     ESP32_fini(SOFTRF_SHUTDOWN_CHARGE);  // set blue LED to charge mode & shut down

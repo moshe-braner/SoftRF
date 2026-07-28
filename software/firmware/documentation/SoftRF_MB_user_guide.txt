@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 6, 2026 to fit software version MB204
+This version last updated July 27, 2026 to fit software version MB205
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -251,7 +251,7 @@ Region (band): you must choose your geographical region, otherwise the radio wil
 
 Aircraft type: E.g., glider, powered plane, etc.  This is important for collision avoidance and situational awareness, and also for OGN tracking.  This version of SoftRF added the aircraft type "winch", see the relevant section below.
 
-Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.  Select "PG Hill" to avoid alarms until leaving vicinity of PG launch hill, distance-based alarms later.  Select "No PG" to avoid all alarms about paragliders, but use Latest algorithm to warn about other aircraft types.
+Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.  Select "PG Hill" to avoid alarms about paragliders until leaving vicinity of the launch hill.  Select "No PG" to avoid all alarms about paragliders.  The latter two use the Latest algorithm to warn about other aircraft types.
 
 Volume: if a piezo buzzer is attached to the board for audible collision warnings, choose "Loud" here.  (It is not quite loud enough.)  If you get audible warnings via a connected device, e.g., XCsoar, then you can set the buzzer Volume to Low or Off.
 

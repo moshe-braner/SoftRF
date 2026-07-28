@@ -242,7 +242,7 @@ static void init_stgdesc()
   stgcomment[STG_BAND]       = "1=EU 2=US ...";
   stgcomment[STG_ACFT_TYPE]  = "1=GL 2=TOWPL 6=HG 7=PG 0=landed out";
   stgcomment[STG_ID_METHOD]  = "1=ICAO 2=device 5=FANET";
-  stgcomment[STG_ALARM]      = "3=Latest 2=Vect 1=Dist 0=None 4=PG";
+  stgcomment[STG_ALARM]      = "3=Latest 2=Vect 1=Dist 0=None 4=PGhill 5=noPG";
   stgcomment[STG_HRANGE]     = "km";
   stgcomment[STG_VRANGE]     = "x100m";
   stgcomment[STG_TXPOWER]    = "0=off 1=low 2=full";
@@ -288,7 +288,7 @@ static void init_stgdesc()
   stgcomment[STG_LEAPSECS]   = "leap seconds - automatic";
   stgcomment[STG_ALARMLOG]   = yesno;
   stgcomment[STG_LOG_NMEA]   = "1=log NMEA output to SD card";
-  stgcomment[STG_LOGFLIGHT]  = "0=off 1=always 2=airborne 3=traffic";
+  stgcomment[STG_LOGFLIGHT]  = "0=off 1=always 2=airborne 3=close traffic 4=all";
   stgcomment[STG_LOGINTERVAL]= "seconds, 1-255";
 #if defined(ESP32)
   stgcomment[STG_COMPFLASH]  = "0=log to RAM, 1=also compress to flash";
@@ -329,6 +329,19 @@ void Adjust_Settings()
     if (settings->mode == SOFTRF_MODE_MORENMEA)   // obsolete
       settings->mode = SOFTRF_MODE_NORMAL;
 
+    if (settings->rf_protocol > RF_PROTOCOL_ADSL)
+        settings->rf_protocol = RF_PROTOCOL_LATEST;
+    if (settings->altprotocol > RF_PROTOCOL_ADSL)
+        settings->altprotocol = RF_PROTOCOL_NONE;
+    if (settings->rf_protocol == RF_PROTOCOL_NONE)  // old settings files before coding change
+        settings->rf_protocol = RF_PROTOCOL_LATEST;
+    if (settings->rf_protocol == RF_PROTOCOL_LEGACY && settings->altprotocol != RF_PROTOCOL_LATEST)
+        settings->altprotocol = RF_PROTOCOL_NONE; 
+    if (settings->altprotocol == RF_PROTOCOL_LEGACY && settings->rf_protocol != RF_PROTOCOL_LATEST)
+        settings->altprotocol = RF_PROTOCOL_NONE;
+    if (settings->altprotocol == settings->rf_protocol)
+        settings->altprotocol = RF_PROTOCOL_NONE;
+
 #if defined(ARDUINO_ARCH_NRF52)
     if (settings->mode != SOFTRF_MODE_GPSBRIDGE
 #if !defined(EXCLUDE_TEST_MODE)
@@ -339,7 +352,6 @@ void Adjust_Settings()
       settings->mode = SOFTRF_MODE_NORMAL;
     }
 
-#if defined(ARDUINO_ARCH_NRF52)
     // try not to lose connection to the device due to bad settings
     if (settings->nmea_out2 != DEST_BLUETOOTH && settings->nmea_out2 != DEST_USB) {
         if (settings->nmea_out == DEST_BLUETOOTH) {
@@ -353,20 +365,7 @@ void Adjust_Settings()
     }
     if (settings->nmea_out == DEST_BLUETOOTH || settings->nmea_out2 == DEST_BLUETOOTH)
         settings->bluetooth = BLUETOOTH_LE_HM10_SERIAL;
-#endif
 
-    if (settings->rf_protocol > RF_PROTOCOL_ADSL)
-        settings->rf_protocol = RF_PROTOCOL_LATEST;
-    if (settings->altprotocol > RF_PROTOCOL_ADSL)
-        settings->altprotocol = RF_PROTOCOL_NONE;
-    if (settings->rf_protocol == RF_PROTOCOL_NONE)  // old settings files before coding change
-        settings->rf_protocol = RF_PROTOCOL_LATEST;
-    if (settings->rf_protocol == RF_PROTOCOL_LEGACY && settings->altprotocol != RF_PROTOCOL_LATEST)
-        settings->altprotocol = RF_PROTOCOL_NONE; 
-    if (settings->altprotocol == RF_PROTOCOL_LEGACY && settings->rf_protocol != RF_PROTOCOL_LATEST)
-        settings->altprotocol = RF_PROTOCOL_NONE;
-    if (settings->altprotocol == settings->rf_protocol)
-        settings->altprotocol = RF_PROTOCOL_NONE;
     /*
      * Enforce legacy protocol setting for SX1276
      * if other value (UAT) left in EEPROM from other (UATM) radio
@@ -417,6 +416,7 @@ void Adjust_Settings()
     }
 #endif
 #endif /* CONFIG_IDF_TARGET_ESP32 */
+
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
     if (settings->bluetooth != BLUETOOTH_OFF) {
 #if defined(CONFIG_IDF_TARGET_ESP32S3)

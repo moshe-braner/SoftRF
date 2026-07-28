@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 3, 2026 to fit software version MB204
+This version last updated July 15, 2026 to fit software version MB205
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -73,8 +73,9 @@ d1090 - Dump1090: yet another local data output protocol, usually leave Off (0).
 
 gdl90_in - GDL90 input: this is for importing data from an external ADS-B receiver in GLD90 format, else leave Off.  GDL90 uses UDP port 4000, while NMEA uses 10110.  Cannot use the same port for both input and output.  Values: same codes as for nmea_out: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT 6=secondary serial.
 
-logflight - IGC flight log: 0=off, 1=always, 2=when airborne, 3=when airborne and also report near traffic
-loginterval - interval (seconds) between flight log position records, 1 to 155
+logflight - IGC flight log: 0=off, 1=always, 2=when airborne, 3=when airborne and also report near traffic, 4=also report far-away and non-airborne traffic (not recommended unless you have an SD card attached)
+
+loginterval - interval (seconds) between flight log position records, 1 to 255
 
 compflash - On a T-Beam with an SD card this setting is ignored.  On a T-Beam without SD card: 0=log to RAM only, 1=also compress to IGZ file in flash.  On a T-Echo, M1 or T1000-E: 0=record uncompressed IGC files, 1=record compressed IGZ files.  See the "Flight logging" section in the user guide for decompressing instructions.
 
