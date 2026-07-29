@@ -1073,8 +1073,9 @@ void handleSettings() {
 <select name='logflight'>\
 <option %s value='%d'>Off</option>\
 <option %s value='%d'>Always</option>\
-<option %s value='%d'>Airborne</option>\
-<option %s value='%d'>Traffic</option>\
+<option %s value='%d'>When Airborne</option>\
+<option %s value='%d'>Traffic (close)</option>\
+<option %s value='%d'>Traffic (all)</option>\
 </td>\
 </tr>\
 <tr>\
@@ -1087,6 +1088,7 @@ void handleSettings() {
   (settings->logflight==FLIGHT_LOG_ALWAYS   ? "selected" : ""), FLIGHT_LOG_ALWAYS,
   (settings->logflight==FLIGHT_LOG_AIRBORNE ? "selected" : ""), FLIGHT_LOG_AIRBORNE,
   (settings->logflight==FLIGHT_LOG_TRAFFIC  ? "selected" : ""), FLIGHT_LOG_TRAFFIC,
+  (settings->logflight==FLIGHT_LOG_TRAFFIC_ALL  ? "selected" : ""), FLIGHT_LOG_TRAFFIC_ALL,
    settings->loginterval);
 
     len = strlen(offset);

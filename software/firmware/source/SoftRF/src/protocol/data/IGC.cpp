@@ -1109,8 +1109,7 @@ void logFlightPosition()
         // to be used to start the flight log once it is opened
         if (FlightLogFail)
             return;
-        if (settings->logflight != FLIGHT_LOG_AIRBORNE
-         && settings->logflight != FLIGHT_LOG_TRAFFIC)
+        if (settings->logflight < FLIGHT_LOG_AIRBORNE)
             return;
         prepositioning = true;
     } else if (prepositioning) {   // but now FlightLogOpen

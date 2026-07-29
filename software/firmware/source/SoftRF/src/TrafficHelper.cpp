@@ -102,8 +102,7 @@ void startlogs()
     SD_log(NMEABuffer);
 #endif
     // and, if flight-logging, start now:
-    if (settings->logflight == FLIGHT_LOG_AIRBORNE
-     || settings->logflight == FLIGHT_LOG_TRAFFIC) {
+    if (settings->logflight >= FLIGHT_LOG_AIRBORNE) {
         openFlightLog();
     }
 }
@@ -880,7 +879,7 @@ void logrelayed(container_t *cip)
         NMEAOutD();
     else
         Serial.print(NMEABuffer);
-    if (FlightLogOpen && settings->logflight == FLIGHT_LOG_TRAFFIC)
+    if (FlightLogOpen && settings->logflight >= FLIGHT_LOG_TRAFFIC)
         FlightLogComment(NMEABuffer+4);   // it will prepend the LSRF
 }
 
@@ -1092,8 +1091,8 @@ void Traffic_Update(container_t *fop)
 //#if defined(USE_SD_CARD)
       if (fop->alarm_level > old_alarm_level /* && FlightLogOpen */) {
           // do not wait until logFlightPosition()
-          if (settings->logalarms || settings->logflight == FLIGHT_LOG_TRAFFIC)
-              logOneTraffic(fop, "LSRFA", (settings->logflight == FLIGHT_LOG_TRAFFIC));
+          if (settings->logalarms || settings->logflight >= FLIGHT_LOG_TRAFFIC)
+              logOneTraffic(fop, "LSRFA", (settings->logflight >= FLIGHT_LOG_TRAFFIC));
       }
 //#endif
   }
@@ -1316,7 +1315,7 @@ void air_relay(container_t *cip)
 
     if (cip->timerelayed == 0) {           // first relay (since new or expired)
         cip->timerelayed = 1;              // may be overwritten below with real timestamp
-        if (relayed /* && ! landed_out */ && settings->logflight == FLIGHT_LOG_TRAFFIC) {
+        if (relayed /* && ! landed_out */ && settings->logflight >= FLIGHT_LOG_TRAFFIC) {
             snprintf_P(NMEABuffer, sizeof(NMEABuffer),
               PSTR("$PSRLY,%02d:%02d,%06x,%s\r\n"),
               gnss.time.hour(), gnss.time.minute(), cip->addr, cip->callsign);

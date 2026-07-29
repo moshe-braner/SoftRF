@@ -490,7 +490,7 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg)
       return;
 
   // record first-time periodic info, and all broadcasts, in flight log
-  if (settings->logflight == FLIGHT_LOG_TRAFFIC &&
+  if (settings->logflight >= FLIGHT_LOG_TRAFFIC &&
         (type == PFLAM_BCST || ((cip->pflam & (1<<type)) == 0))) {
 /*
       if (as_hex)
