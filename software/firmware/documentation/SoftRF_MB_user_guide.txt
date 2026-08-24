@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 27, 2026 to fit software version MB205
+This version last updated Aug 10, 2026 to fit software version MB205
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -308,7 +308,7 @@ And so forth.  Note that after each "click" or "touch", it will take about 2 sec
 * press the reset button to reboot without changing the settings.
 The settings accessible via this method are:
 * AIRCRAFT TYPE:Glider, Towplane Helicopter, Powered, Hangglider, Paraglider, Dropplane, Parachute, Balloon, UAV, Static.
-* RF PROTOCOL: LATEST, LEGACY, OGNTP, PAW, FANET, ADS-L.
+* RF PROTOCOL: LATEST, OGNTP, PAW, FANET, ADS-L.
 * ALTERNATE PROTOCOL: same list
 * RF BAND (REGION): EU, US, UK, AU, NZ, RU, CN, IN, IL, KR.  (UK only for P3I.)
 * Collision prediction algorithm: Latest, Vector, Distance, None.

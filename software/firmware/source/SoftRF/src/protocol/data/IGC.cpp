@@ -721,6 +721,7 @@ void closeFlightLog()
     if (FlightLogFail)
         return;
     completeFlightLog();         // can still be extended
+    compfileOpen = false;
     FlightLogOpen = false;
     FlightLogClosed = millis();
     //FlightLogPath[0] = '\0';   // leave intact for Web.cpp/flightlogfile()
@@ -1004,7 +1005,8 @@ void openFlightLog()
 #endif
 
 #if defined(ESP32)
-    if (PSRAMbufUsed) {       // already have data in PSRAMbuf
+    if (PSRAMbufUsed && ! settings->compflash) {
+        // already have data in PSRAMbuf and not logging to flash
         // keep on adding to same "file" - FlightLogPosition kept as it was
         data_block_used = 0;  // was also done when completing the previous "file"
         FlightLogOpen = true;
@@ -1012,7 +1014,7 @@ void openFlightLog()
     }
 #endif
 
-    // get here if no PSRAMbuf or first use of PSRAMbuf
+    // get here if no PSRAMbuf or first use of PSRAMbuf or also logging to flash
 
 #if defined(ESP32)
     bool have_space = true;

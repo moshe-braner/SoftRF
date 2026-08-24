@@ -540,7 +540,7 @@ void this_airborne(bool validfix)
       initial_altitude  = ThisAircraft.altitude;
     }
 
-    int was_airborne = airborne;
+    int prev_airborne = airborne;
     float speed = ThisAircraft.speed;
 
     if (! validfix) {
@@ -659,7 +659,7 @@ void this_airborne(bool validfix)
     if (airborne_changed)
         NMEA_PFLAJ();
 
-    if (airborne != was_airborne) {
+    if (airborne != prev_airborne) {
       if ((settings->nmea_d || settings->nmea2_d) && (settings->debug_flags & DEBUG_PROJECTION)) {
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("$PSTAA,this_airborne: %d, %.1f, %.5f, %.5f, %.0f\r\n"),
@@ -688,7 +688,7 @@ void this_airborne(bool validfix)
     if (airborne_changed) {
       snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("%s: %d/%02d/%02d %02d:%02d %.5f,%.5f\r\n"),
-          (airborne? "takeoff" : "landing"),
+          (ThisAircraft.airborne? "takeoff" : "landing"),
           gnss.date.year(), gnss.date.month(), gnss.date.day(),
           gnss.time.hour(), gnss.time.minute(),
           ThisAircraft.latitude, ThisAircraft.longitude);
