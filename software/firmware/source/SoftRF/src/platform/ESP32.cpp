@@ -88,7 +88,7 @@ lmic_pinmap lmic_pins = {
     .rxe  = LMIC_UNUSED_PIN,
     .rst  = SOC_GPIO_PIN_RST,
     .dio  = {LMIC_UNUSED_PIN, LMIC_UNUSED_PIN, LMIC_UNUSED_PIN},
-    .busy = SOC_GPIO_PIN_TXE,
+    .busy = LMIC_UNUSED_PIN,    // was SOC_GPIO_PIN_TXE,
     .tcxo = LMIC_UNUSED_PIN,
 };
 
@@ -573,6 +573,11 @@ static void ESP32_setup()
       esp32_board    = ESP32_TTGO_V2_OLED;
       lmic_pins.rst  = SOC_GPIO_PIN_TBEAM_RF_RST_V05;
       lmic_pins.busy = SOC_GPIO_PIN_TBEAM_RF_BUSY_V08;
+    } else {
+      hw_info.model    = SOFTRF_MODEL_STANDALONE;
+      esp32_board      = ESP32_DEVKIT;
+      lmic_pins.busy   = LMIC_UNUSED_PIN;
+      lmic_pins.dio[0] = SOC_GPIO_PIN_DIO0;
     }
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
     esp32_board      = ESP32_S2_T8_V1_1;
@@ -780,7 +785,8 @@ static void ESP32_setup()
   } else if (esp32_board == ESP32_S2_T8_V1_1) {
     lmic_pins.nss  = SOC_GPIO_PIN_T8_S2_LORA_SS;
     lmic_pins.rst  = SOC_GPIO_PIN_T8_S2_LORA_RST;
-    lmic_pins.busy = LMIC_UNUSED_PIN;
+    //lmic_pins.busy = LMIC_UNUSED_PIN;
+    //lmic_pins.dio[0] = LMIC_UNUSED_PIN;
 
     pinMode(SOC_GPIO_PIN_T8_S2_PWR_EN, INPUT_PULLUP);
 
