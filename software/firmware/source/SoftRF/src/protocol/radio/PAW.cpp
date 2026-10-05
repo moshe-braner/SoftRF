@@ -21,6 +21,7 @@
 #include <protocol.h>
 
 #include "../../../SoftRF.h"
+#include "../../TrafficHelper.h"
 #include "../../driver/RF.h"
 #include "../../driver/Settings.h"
 
@@ -108,6 +109,11 @@ bool p3i_decode(void *p3i_pkt, container_t *this_aircraft, ufo_t *fop)
   if (fop->addr == ThisAircraft.addr)
          return false;                 /* same ID as this aircraft - ignore */
 
+  for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+      if (excess[i].addr == fop->addr)             // known as far and not tracked
+          return false;
+  }
+
   fop->addr_type = (fop->addr >= 0xFF0000? ADDR_TYPE_FLARM : ADDR_TYPE_ICAO);
 
   fop->timestamp = (uint32_t) this_aircraft->timestamp;
@@ -119,6 +125,7 @@ bool p3i_decode(void *p3i_pkt, container_t *this_aircraft, ufo_t *fop)
   fop->aircraft_type = (pkt->aircraft & 0x0F);   // higher bits signal packet is relayed
   fop->course = (float) pkt->track;
   fop->speed = (float) pkt->knots;
+  fop->airborne = (pkt->knots > 30 ? 1 : 0);
 
   fop->vs = 0;
   fop->stealth = 0;

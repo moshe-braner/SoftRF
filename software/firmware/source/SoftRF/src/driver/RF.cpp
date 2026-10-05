@@ -65,6 +65,7 @@ uint8_t RL_rxPacket[RADIOLIB_MAX_DATA_LENGTH];
 uint32_t tx_packets_counter = 0;
 uint32_t rx_packets_counter = 0;
 uint32_t adsb_packets_counter = 0;
+uint32_t fanet_packets_counter = 0;
 
 static uint32_t invalid_manchester_packets = 0;
 static uint8_t  invalid_manchester_counter = 0;
@@ -679,6 +680,8 @@ Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms, RSSI %d\r\n",
   if (success) {
       if (curr_rx_protocol_ptr->type == RF_PROTOCOL_ADSB_1090)
           ++adsb_packets_counter;
+      else if (curr_rx_protocol_ptr->type == RF_PROTOCOL_FANET)
+          ++fanet_packets_counter;
       else if (curr_rx_protocol_ptr->type != RF_PROTOCOL_PAW)
           ++rx_packets_counter;
       // else wait to see if ADSL decoding of the PAW payload will succeed
@@ -1510,6 +1513,12 @@ void RF_loop()
         TxTimeMarker = RF_OK_until;
     } else {
         TxTimeMarker = slot_base_ms + 405 + SoC->random(0, 385);
+        if (current_TX_protocol == RF_PROTOCOL_LATEST
+            && (RF_time & 0x0F) == 0 /* && SoC->get_PPS_TimeMarker() == 0 */ ) {
+            // assume timing is inaccurate, avoid transmitting possible bad encryption
+            if (TxTimeMarker < slot_base_ms + 605)
+                TxTimeMarker = RF_OK_until;    // in 50% of the cases no tx in slot 0 in sec 0
+        }
     }
 
   } else if (ms_since_pps >= 800 && ms_since_pps < 1300) {

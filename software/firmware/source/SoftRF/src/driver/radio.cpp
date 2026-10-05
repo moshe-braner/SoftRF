@@ -542,7 +542,7 @@ Serial.println("sx1276 rx error");
   }
 #if 0
   Serial.print(F("rcvd "));
-  Serial.print(pkt_size);
+  Serial.print(length);
   Serial.print(F(" bytes, getRSSI(): "));
   Serial.println(RF_last_rssi);
 #endif
@@ -1063,7 +1063,7 @@ Serial.println(rl_state);
 
 #if RADIOLIB_DEBUG_BASIC
   Serial.print(F("rcvd "));
-  Serial.print(pkt_size);
+  Serial.print(length);
   Serial.print(F(" bytes, getRSSI(): "));
   Serial.println(RF_last_rssi);
 #endif
@@ -1405,6 +1405,8 @@ Serial.println("Re-setting-up radio");
       }
       rl_state = radio_lr1110->setSyncWord(syncword, (size_t) syncword_size);
       //rl_state = radio_lr1110->fixedPacketLengthMode(pkt_size);
+    } else if (rf_protocol->modulation_type == RF_MODULATION_TYPE_LORA) {
+      radio_lr1110->explicitHeader();
     }
     prev_tx = tx;
     return RADIOLIB_ERR_NONE;
@@ -1485,7 +1487,7 @@ Serial.println(RF_FreqPlan.Protocol);
     } else {   // already set up for LORA, don't call begin()
 
         // nothing to do?
-        //rl_state = radio_lr1110->explicitHeader();   // Vlad says to do this every time
+        rl_state = radio_lr1110->explicitHeader();   // Vlad says to do this every time
 
     }
 
@@ -1743,7 +1745,7 @@ Serial.println(rl_state);
 
 if (settings->debug_flags & DEBUG_DEEPER2) {
   Serial.print(F("rcvd "));
-  Serial.print(pkt_size);
+  Serial.print(length);
   Serial.print(F(" bytes, getRSSI(): "));
   Serial.println(RF_last_rssi);
 }

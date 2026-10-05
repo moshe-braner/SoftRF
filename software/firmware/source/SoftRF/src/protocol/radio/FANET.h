@@ -144,8 +144,11 @@ extern const uint8_t aircraft_type_from_fanet[];
    AIRCRAFT_TYPE_UNKNOWN : pgm_read_byte(&aircraft_type_from_fanet[(x)]))
 
 extern uint8_t fanet_sos_count;
+extern uint8_t fn_tx_pending_buf[];
+extern uint8_t fn_tx_pending_len;
 
 bool fanet_decode(void *, container_t *, ufo_t *);
 size_t fanet_encode(void *, container_t *);
+//void FN_transmit_ack(uint8_t dest_mfr, uint16_t dest_id);
 
 #endif /* PROTOCOL_FANET_H */

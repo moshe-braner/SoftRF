@@ -35,7 +35,7 @@
 #include <raspi/raspi.h>
 #endif /* RASPBERRY_PI */
 
-#define SOFTRF_FIRMWARE_VERSION "MB206"
+#define SOFTRF_FIRMWARE_VERSION "MB208"
 #define SOFTRF_IDENT            "SoftRF"
 #define SOFTRF_USB_FW_VERSION   0x0101
 
@@ -305,11 +305,12 @@ enum
 enum
 {
 // models supported by this version of SoftRF:
-	SOFTRF_MODEL_PRIME_MK2, // Lilygo T-Beam (not "Supreme")
-	SOFTRF_MODEL_BADGE,     // Lilygo T-Echo
-	SOFTRF_MODEL_CARD,      // Seeed Studios T1000-E
-	SOFTRF_MODEL_HANDHELD,  // Elecrow Thinknode M1
-	SOFTRF_MODEL_POCKET,    // Elecrow Thinknode M3
+	SOFTRF_MODEL_PRIME_MK2, // 0 Lilygo T-Beam (not "Supreme")
+	SOFTRF_MODEL_BADGE,     // 1 Lilygo T-Echo
+	SOFTRF_MODEL_CARD,      // 2 Seeed Studios T1000-E
+	SOFTRF_MODEL_HANDHELD,  // 3 Elecrow Thinknode M1
+	SOFTRF_MODEL_POCKET,    // 4 Elecrow Thinknode M3
+	SOFTRF_MODEL_CARD_MK3,  // 5 Seeed Studios X1
 // models not supported by this version of SoftRF:
 	SOFTRF_MODEL_UNKNOWN,
 	SOFTRF_MODEL_STANDALONE,

@@ -561,49 +561,45 @@ static void setup_UBX()
     Serial.println(F("WARNING: Unable to disable NMEA GLL."));
   }
 
-  bool enable = ((settings->nmea_g | settings->nmea2_g) & NMEA_G_GSA);
-  if (enable) {
-    GNSS_DEBUG_PRINTLN(F("Setting NMEA GSA: "));
-    msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGSA), (enable ? enaGSA : disGSA));
-    sendUBX(GNSSbuf, msglen);
-    gnss_set_sucess = getUBX_ACK(0x06, 0x01);
-    if (!gnss_set_sucess) {
-      //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GSA."));
-      Serial.println(F("WARNING: Unable to set NMEA GSA."));
-    } else {
-      Serial.print(F("Set GNSS NMEA GSA to "));
-      Serial.println(enable);
-    }
+  uint8_t nmea_g = (settings->nmea_g | settings->nmea2_g);
+
+  bool enable = (nmea_g & NMEA_G_GSA);
+  //GNSS_DEBUG_PRINTLN(F("Setting NMEA GSA: "));
+  msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGSA), (enable ? enaGSA : disGSA));
+  sendUBX(GNSSbuf, msglen);
+  gnss_set_sucess = getUBX_ACK(0x06, 0x01);
+  if (!gnss_set_sucess) {
+    //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GSA."));
+    Serial.println(F("WARNING: Unable to set NMEA GSA."));
+  } else {
+    Serial.print(F("Set GNSS NMEA GSA to "));
+    Serial.println(enable);
   }
 
-  enable = ((settings->nmea_g | settings->nmea2_g) & NMEA_G_GST);
-  if (enable) {
-    GNSS_DEBUG_PRINTLN(F("Setting NMEA GST: "));
-    msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGST), (enable ? enaGST : disGST));
-    sendUBX(GNSSbuf, msglen);
-    gnss_set_sucess = getUBX_ACK(0x06, 0x01);
-    if (!gnss_set_sucess) {
-      //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GST."));
-      Serial.println(F("WARNING: Unable to set NMEA GST."));
-    } else {
-      Serial.print(F("Set GNSS NMEA GST to "));
-      Serial.println(enable);
-    }
+  enable = (nmea_g & NMEA_G_GST);
+  //GNSS_DEBUG_PRINTLN(F("Setting NMEA GST: "));
+  msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGST), (enable ? enaGST : disGST));
+  sendUBX(GNSSbuf, msglen);
+  gnss_set_sucess = getUBX_ACK(0x06, 0x01);
+  if (!gnss_set_sucess) {
+    //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GST."));
+    Serial.println(F("WARNING: Unable to set NMEA GST."));
+  } else {
+    Serial.print(F("Set GNSS NMEA GST to "));
+    Serial.println(enable);
   }
 
-  enable = ((settings->nmea_g | settings->nmea2_g) & NMEA_G_GSV);
-  if (enable) {
-    GNSS_DEBUG_PRINTLN(F("Setting NMEA GSV: "));
-    msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGSV), (enable ? enaGSV : disGSV));
-    sendUBX(GNSSbuf, msglen);
-    gnss_set_sucess = getUBX_ACK(0x06, 0x01);
-    if (!gnss_set_sucess) {
-      //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GSV."));
-      Serial.println(F("WARNING: Unable to set NMEA GSV."));
-    } else {
-      Serial.print(F("Set GNSS NMEA GSV to "));
-      Serial.println(enable);
-    }
+  enable = (nmea_g & NMEA_G_GSV);
+  //GNSS_DEBUG_PRINTLN(F("Setting NMEA GSV: "));
+  msglen = makeUBXCFG(0x06, 0x01, sizeof(enaGSV), (enable ? enaGSV : disGSV));
+  sendUBX(GNSSbuf, msglen);
+  gnss_set_sucess = getUBX_ACK(0x06, 0x01);
+  if (!gnss_set_sucess) {
+    //GNSS_DEBUG_PRINTLN(F("WARNING: Unable to set NMEA GSV."));
+    Serial.println(F("WARNING: Unable to set NMEA GSV."));
+  } else {
+    Serial.print(F("Set GNSS NMEA GSV to "));
+    Serial.println(enable);
   }
 
   GNSS_DEBUG_PRINTLN(F("Switching off NMEA VTG: "));
@@ -1540,19 +1536,16 @@ static bool ag33_setup()
   Serial_GNSS_Out.write("$PAIR062,4,1*3B\r\n");   /* RMC 1s */  delay(250);
 
   Serial_GNSS_Out.write("$PAIR062,1,0*3F\r\n");   /* GLL OFF */ delay(250);
-  Serial_GNSS_Out.write("$PAIR062,3,0*3D\r\n");   /* GSV OFF */ delay(250);
+  if ((settings->nmea_g | settings->nmea2_g) & NMEA_G_GSA)
+      { Serial_GNSS_Out.write("$PAIR062,2,1*3D\r\n"); /* GSA 1s */  delay(250); }
+  else
+      { Serial_GNSS_Out.write("$PAIR062,2,0*3C\r\n"); /* GSA OFF */  delay(250); }
+  if ((settings->nmea_g | settings->nmea2_g) & NMEA_G_GSV)
+      { Serial_GNSS_Out.write("$PAIR062,3,4*3D\r\n");   /* GSV 4s */ delay(250); }
+  else
+      { Serial_GNSS_Out.write("$PAIR062,3,0*3D\r\n");   /* GSV OFF */ delay(250); }
   Serial_GNSS_Out.write("$PAIR062,5,0*3B\r\n");   /* VTG OFF */ delay(250);
   Serial_GNSS_Out.write("$PAIR062,6,0*38\r\n");   /* ZDA OFF */ delay(250);
-#if defined(NMEA_TCP_SERVICE)
-  if (settings->nmea_out == NMEA_TCP ||       // SD
-      settings->nmea_out == NMEA_BLUETOOTH) { // SD
-    Serial_GNSS_Out.write("$PAIR062,2,1*3D\r\n"); /* GSA 1s */
-  }
-  else
-#endif /* NMEA_TCP_SERVICE */
-  {
-    Serial_GNSS_Out.write("$PAIR062,2,0*3C\r\n"); /* GSA OFF */
-  }
   delay(250);
 
   /*
@@ -1570,6 +1563,9 @@ static bool ag33_setup()
    * (for example, hovering and cruising)
    */
   Serial_GNSS_Out.write("$PAIR080,0*2E\r\n"); /* Normal Mode */ delay(250);
+
+  // https://github.com/lyusupov/SoftRF/commit/7b4ad4d61907eefd49c72efa2e9590b04c83e721
+  Serial_GNSS_Out.write("$PAIR154,0*26\r\n");     /* RLM OFF */ delay(250);
 
 #if 0
   if (hw_info.model == SOFTRF_MODEL_CARD) {
@@ -2229,6 +2225,11 @@ uint8_t Try_GNSS_sentence() {
               strncpy(GPGGA_Copy, gb, write_size);  // for traffic alarm logging
               GPGGA_Copy[write_size] = '\0';
           } else {
+if (! badGGA) {
+Serial.println(F("GGA sentence too short:"));
+gb[write_size] = '\0';
+Serial.println(gb);
+}
               badGGA = true;
               GNSS_fix_cache = false;
               GPGGA_Copy[7] = '\0';

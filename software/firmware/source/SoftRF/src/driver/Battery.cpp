@@ -63,10 +63,12 @@ uint8_t Battery_charge() {
 
 /*
  * When set to run on external power but with a battery installed, allow running on the
- * battery as long as still airborne.  Shut down after at least an hour of operation,
- * once external power is turned off, and battery voltage is somewhat down.
+ * battery as long as still airborne.  Shut down once external power is turned off,
+ * if not airborne, after at least an hour of operation, and after battery voltage is
+ * somewhat down, or a long time has passed since external power was turned off.
  */
-static bool had_ext_power = false;
+//static bool had_ext_power = false;
+static uint32_t when_had_ext_power = 0;
 static bool follow_ext_power_shutoff(float voltage)
 {
     if (! settings->power_ext)
@@ -83,18 +85,22 @@ static bool follow_ext_power_shutoff(float voltage)
     // - but if settings->power_ext is off then no problem
 #endif
     {
-        had_ext_power = true;
+        when_had_ext_power = millis();
         return false;
     }
-    if (had_ext_power == false)
+    if (when_had_ext_power == 0)  // no auto-shutdown unless was on external power
         return false;
-    if (ThisAircraft.airborne)
+    if (ThisAircraft.airborne)    // no auto-shutdown while still flying
         return false;
-    if (voltage >= 3.9)
+    if (voltage < 3.65)       // battery < 20% & settings->power_ext & no ext power, shut down early
+        return true;
+    if (millis() < 3600000)   // total runtime < 1 hour, keep running
         return false;
-    if (millis() < 3600000)
-        return false;
-    return true;
+    if (voltage < 3.85)       // battery under 50%, shut down before timer expires
+        return true;
+    if (millis() > when_had_ext_power + (3*3600000))   // timer-based shutdown
+        return true;
+    return false;
 }
 
 void Battery_loop()

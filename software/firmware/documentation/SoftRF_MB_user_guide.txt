@@ -3,7 +3,7 @@ Basic Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated Aug 10, 2026 to fit software version MB205
+This version last updated Sep 29, 2026 to fit software version MB208
 The latest version of this document is always here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -41,6 +41,7 @@ What can my version of SoftRF do that the mainline version cannot?
 My version can receive and transmit in the new FLARM protocol (V7) that went into effect in March 2024.  My version also fixes some radio protocol bugs, making interoperability with FLARM more reliable.  My version correctly transmits the curved path of the aircraft (if circling) so that FLARM units receiving the data can predict collisions accordingly.  My version also receives and interprets the curved path of other aircraft as sent by FLARM units, and predicts collisions based on that.  And it does so even when the aircraft are subject to significant wind drift.  My version also offers built-in audible collision warnings in 3 levels of urgency, similar to what PowerFLARM Portable does.  My version also offers some conveniences, such as assigning an ID to this aircraft, and specifying other IDs to ignore or to follow.  And now also an option to record IGC flight log files.  My version can transmit in an alternate protocol (OGNTP, ADS-L, FANET or PilotAware) once every few seconds, and can receive up to 4 protocols at once.  Additionally, my version has the option to add a hardware module to receive ADS-B signals from aircraft that do not have FLARM, and even as re-broadcast from air traffic control ground stations.  This offers users awareness of some non-FLARM traffic, although the same is not true in reverse.
 
 And recent version of my SoftRF can also be configured to:
+* send and receive FLARM and FANET text messages (pilot name, callsign, ad-hoc broadcast and unicast)
 * Relay selected other FLARM traffic, for increased range
 * Or, relay selected ADS-B traffic, if so equipped, for the benefit of nearby SoftRF that is not
 
@@ -69,7 +70,7 @@ HOW TO USE SOFTRF
 
 Hardware choices
 
-At this time my version of SoftRF runs specifically on certain devices with "system on a chip" CPU.  Namely the device from the LilyGo (TTGO) company they call the "T-Beam" (not the "T-Beam Supreme"), and also several NRF52840-based devices including the LilyGo the T-Echo and T-Echo Plus, the Thinknode M1 and M3, and the Sensecap T1000-E (not the T1000-A). The T-Beam and T-Echo are also called the "Prime Mark II" and "Badge" editions of SoftRF, respectively.  And the M1, M3 and T1000-E are also called the Handheld, Pocket and Card editions, respectively.
+At this time my version of SoftRF runs specifically on certain devices with "system on a chip" CPU.  Namely the device from the LilyGo (TTGO) company they call the "T-Beam" (not the "T-Beam Supreme"), and also several NRF52840-based devices including the LilyGo T-Echo and T-Echo Plus, the Thinknode M1 and M3, and the Sensecap T1000-E (not the T1000-A). The T-Beam and T-Echo are also called the "Prime Mark II" and "Badge" editions of SoftRF, respectively.  And the M1, M3 and T1000-E are also called the Handheld, Pocket and Card editions, respectively.
 
 If you are buying a device, be sure to order the version that fits your regional radio frequencies.  I.e., in Europe the 868 MHz version, in the USA the 915 MHz version, etc.  I suspect the two mentioned are really the same board, but with possibly different antennas.  The 433/470 MHz board (for use in China) is definitely different!
 
@@ -115,7 +116,7 @@ Another alternative to the built-in GNSS module is to add an external one.  See 
 
 The T-Echo (or Thinknode M1) offers a 1.5-inch e-paper display, which makes the device more self-contained.  But adjusting the settings on the T-Echo is more difficult than on the T-Beam, because the T-Echo does not have WiFi connectivity.  It also transmits at lower power, and the stock antenna is nice-looking but has low performance.  And it is more difficult to attach other devices to it.
 
-The Thinknode M3 offers the ability to run SoftRF in a very compact self-contained unit. The Sensecap T1000-E is similarly compact, and also has extra flash memory which allows it to record flight logs, as can the T-Beam and T-Echo and M1 but not the M3.  If you choose the T1000-E, be sure to read the instructions on how to do the necessary downgrade of the bootloader.
+The Thinknode M3 offers the ability to run SoftRF in a very compact self-contained unit. The Sensecap T1000-E is similarly compact, and also has extra flash memory which allows it to record flight logs, as can the T-Beam and T-Echo and M1 but not the M3.  If you choose the T1000-E, be sure to read the instructions on how to do the necessary downgrade of the bootloader before installing SoftRF on it.
 
 See also Jim Hogue's detailed document:
 https://github.com/moshe-braner/SoftRF/blob/master/documents/Guide_to_Building_SoftRF_and_SkyView-Jim_Hogue.pdf
@@ -159,7 +160,7 @@ The Thinknode M1 turns on and off the same way as the T-Echo.
 
 To turn on the Thinknode M3 or the T1000-E, click the button.  Press and hold the button to turn it off.  The LED will show red while booting and while shutting down, otherwise green or blue (see below).
 
-On the Thinknode M3 and T1000-E, too, when connected to (or disconnected from) USB power, will start up briefly but then go back to sleep and just charge the battery.  (Before going back to sleep, and also when booting normally, the M1, M3 and T1000-E will make from 1 to 5 beeps to indicate the state of charge of the battery, from one low pitched beep for an empty battery, to 5 short high pitched beeps for a full battery.)  To make these devices boot normally while attached to USB power, can either first let it fully boot on battery power, then connect USB power, or, enable the "power_ext" setting (mentioned above).
+On the Thinknode M3 and T1000-E, too, when connected to (or disconnected from) USB power, will start up briefly but then go back to sleep and just charge the battery.  (Before going back to sleep, and also when booting normally, the M1, M3 and T1000-E will make from 1 to 5 beeps to indicate the state of charge of the battery, from one low pitched beep for an empty battery, to 5 short high pitched beeps for a full battery.)  To make these devices boot normally while attached to USB power, can either first let it fully boot on battery power and only then connect USB power, or, enable the "power_ext" setting (mentioned above).
 
 After booting, SoftRF waits for the GNSS module to determine its location.  On a T-Beam (v1.x) the blue LED blinks rapidly (4 times per second) until a "fix" is achieved, at which point the GNSS red LED starts blinking slowly (once per second).  One can also see the number of satellites on the OLED display.  After that, if transmissions are off the blue LED is off.  If transmissions are on, the blue LED stays lit, unless the battery voltage is low, in which case it blinks slowly.
 
@@ -170,9 +171,6 @@ On the M3 the LED will change from green to blue once a GNSS fix is attained.
 On the T1000-E the green LED will blink rapidly while waiting for a fix, and will stay lit once it is attained (or slow blinking it battery is low).
 
 If a buzzer is installed on a T-Beam, it will emit a series of 4 beeps rising in pitch when done booting.  On the M1, M3 and T1000-E, an early beep (and turn-on of red LED) while booting, then when booting is complete a single beep followed by 1-5 short beeps to report the battery charge state (see above).  Later the busser will emit 2 shorter beeps rising in pitch when a GNSS fix is achieved.
-
-FLARM does not generate collision warnings while it is not airborne.  My version of SoftRF follows that rule.  But to allow testing on the ground, my version does give such warnings - and sends signals out pretending to be airborne - for one minute after it is has booted and has acquired a GNSS fix.  If a strobe is connected, it will fire during the first 9 seconds, despite not being airborne, for testing.
-
 
 Installing firmware for the first time
 
@@ -230,7 +228,7 @@ But that tool does not offer the "Latest" alarm trigger method as a choice.  And
 
 Another method is to connect the T-Echo (or T-Beam, for that matter) via a USB cable to a computer with has a "terminal" program that can access the USB port as if it was a serial port.  Alternatively, use a Bluetooth terminal app.  Then look up the "Settings via NMEA" section in the "under the hood" document.
 
-A NEW and much better method is now available, and works for the T-Echo, M1, M3 and T1000-E: use the fantastic web page by Vlad Belayev (can be downloaded and used off-line too, at least via Bluetooth):  https://skysignals.app/mysoftrf/  Open it in a browser that supports Web-BLE, e.g., Chrome or Edge, on a laptop or phone.  It connects to the device via Bluetooth LE, shows device status and settings (and traffic), and allows an easy way to change the settings.  It also allows connection via USB instead of Bluetooth (on some systems).  Turn on Bluetooth on your phone (or laptop), but do not "pair" the phone with the SoftRF device.  Instead, tap "BLE" (or "USB") in that web page, and select the SoftRF device in the list it shows.  This tool is still under development, so check back.  To use off-line on Android, tap the file in a file manager app and ask to open it in Chrome.  Chrome does not allow entering (nor bookmarking) the URL.  Tip: CX File Explorer allows adding a shortcut to the file to its home page.
+A NEW and much better method is now available, and works for the T-Echo, M1, M3 and T1000-E: use the fantastic "Configurator" web page by Vlad Belayev: https://skysignals.app/mysoftrf/  It can be downloaded and used off-line too, at least via Bluetooth.  Open it in a browser that supports Web-BLE, e.g., Chrome or Edge, on a laptop or phone.  It connects to the device via Bluetooth LE, shows device status and settings (and traffic), and allows an easy way to change the settings.  It also allows connection via USB instead of Bluetooth (on some systems).  Turn on Bluetooth on your phone (or laptop), but do not "pair" the phone with the SoftRF device.  Instead, tap "BLE" (or "USB") in that web page, and select the SoftRF device in the list it shows.  This tool is still under development, so check back.  To use off-line on Android, tap the file in a file manager app and ask to open it in Chrome.  Chrome does not allow entering (nor bookmarking) the URL.  Tip: CX File Explorer allows adding a shortcut to the file to its home page.  Note: For compatibility with Vlad's Configurator (and direct configuration via NMEA), do not include the characters '$', '#' and '!' in any settings, such as fanet_name, igc_cs, etc.  If you have to include such a character (e.g., it is part of the SSID or password for a WiFi network), enter it into the settings.txt file directly.
 
 
 Description of the basic settings:
@@ -247,11 +245,11 @@ ID type to use: You can choose ICAO (the ID entered above), or Device (the fixed
 
 Protocol:  Choose "Latest" for compatibility with the new (2024) FLARM radio protocol.  OGNTP and ADS-L are visible to OGN stations but invisible to FLARMS.  If you are using this device to see and be seen by other FLARM-equipped aircraft, choose "Latest".  The FANET and PilotAware protocols are also available choices, commonly used by paragliders, and by light planes in the UK, respectively.  Can also choose the ADS-L protocol.  Note that you can also choose to operate in two or more protocols at once, see the "under the hood" document.
 
-Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.  On devices other than the T-Beam the default region is "automatic", will be set upon first GNSS fix, but only saved for the future if the settings are saved manually.
+Region (band): you must choose your geographical region, otherwise the radio will be on the wrong frequency and fail to communicate with the devices in other aircraft in your area.  E.g., choose EU (868 MHz) in Europe, and US (915 MHz) in the USA and Canada.  On devices other than the T-Beam the default region is "automatic", will be set upon first GNSS fix, but only saved for the future if the settings are saved manually.  Note: "automatic" does not work for all regions, it fails for CN, RU, KR... so set the region manually.
 
 Aircraft type: E.g., glider, powered plane, etc.  This is important for collision avoidance and situational awareness, and also for OGN tracking.  This version of SoftRF added the aircraft type "winch", see the relevant section below.
 
-Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.  Select "PG Hill" to avoid alarms about paragliders until leaving vicinity of the launch hill.  Select "No PG" to avoid all alarms about paragliders.  The latter two use the Latest algorithm to warn about other aircraft types.
+Alarm trigger: this setting chooses an algorithm to base collision warnings on.  Recommended: "Latest" (unique to my version), which mimics what FLARM does, predicting near-future paths of circling aircraft.  If neither aircraft is circling, this algorithm will automatically revert to the "Vector" method, which extrapolates straight lines.  And if movement is not determined, that (in my version) will revert to "Distance", which warns simply by the distance between the aircraft.  Thus, if you select "Latest", then ALL the algorithms are used as appropriate.  If you select "None" then you will not get collision warnings.  Select "PG Hill" to avoid alarms about paragliders until leaving vicinity of the launch hill.  Select "No PG" to avoid all alarms about paragliders.  The latter two use the Latest algorithm to warn about other aircraft types.  Note: FLARM does not generate collision warnings while it is not airborne.  My version of SoftRF follows that rule.
 
 Volume: if a piezo buzzer is attached to the board for audible collision warnings, choose "Loud" here.  (It is not quite loud enough.)  If you get audible warnings via a connected device, e.g., XCsoar, then you can set the buzzer Volume to Low or Off.
 
@@ -311,7 +309,7 @@ The settings accessible via this method are:
 * RF PROTOCOL: LATEST, OGNTP, PAW, FANET, ADS-L.
 * ALTERNATE PROTOCOL: same list
 * RF BAND (REGION): EU, US, UK, AU, NZ, RU, CN, IN, IL, KR.  (UK only for P3I.)
-* Collision prediction algorithm: Latest, Vector, Distance, None.
+* Collision prediction algorithm: Latest, Vector, Distance, PGhill, noPG, None.
 * Relay mode: None, Landed, All.
 * Display units: Metric, Imperial, Mixed.
 * Display orientation: Track Up, North Up.
@@ -636,6 +634,7 @@ https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/binaries/nR
          (see short video here: https://github.com/lyusupov/SoftRF/wiki/Card-Edition.-Quick-start )
     - or, for any of these devices, connect from https://skysignals.app/mysoftrf/ and click "update firmware"
     - or, on any device, from a terminal program, send it the NMEA sentence $PSRFC,DFU*2F
+    (the last 2 methods are available only after SoftRF version MB202+ is already installed)
 * A virtual mass storage device labeled TECHOBOOT, T1000-E or ThinknodeM1/3 will then appear in your computer.
 * Drag the .uf2 firmware file and drop it into the window showing the virtual drive contents.
 * Wait until the file transfer is complete, it takes about 30 seconds.  The window will disappear and the device will normally reboot itself.

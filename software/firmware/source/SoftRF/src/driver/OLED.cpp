@@ -79,6 +79,7 @@ static bool OLED_display_titles = false;
 static uint32_t prev_tx_packets_counter = (uint32_t) -1;
 static uint32_t prev_rx_packets_counter = (uint32_t) -1;
 static uint32_t prev_adsb_packets_counter = (uint32_t) -1;
+static uint32_t prev_fanet_packets_counter = (uint32_t) -1;
 static bool prev_rx1090found = false;
 // extern uint32_t tx_packets_counter, rx_packets_counter, adsb_packets_counter;
 
@@ -303,6 +304,9 @@ static void OLED_radio()
     } else if (settings->gdl90_in != DEST_NONE) {
         u8x8->drawString(8, 4, RX_text);
         u8x8->drawString(7, 6, "GDL");
+    } else if (dual_protocol == RF_FLR_FANET) {
+        u8x8->drawString(8, 4, RX_text);
+        u8x8->drawString(7, 6, "FNT");
     } else {
         //u8x8->drawString(10, 4, RX_text);
         u8x8->drawString(8, 4, RX_text);
@@ -317,7 +321,8 @@ static void OLED_radio()
       prev_rx_packets_counter = (uint32_t) -1;
     }
 
-    prev_adsb_packets_counter = -1;
+    prev_adsb_packets_counter  = -1;
+    prev_fanet_packets_counter = -1;
 
     if (settings->mode        == SOFTRF_MODE_RECEIVER ||
         settings->rf_protocol == RF_PROTOCOL_ADSB_UAT ||
@@ -365,8 +370,11 @@ static void OLED_radio()
   }
 
   bool show_adsb = false;
+  bool show_fanet = false;
   if (settings->rx1090 != ADSB_RX_NONE || settings->gdl90_in != DEST_NONE)
       show_adsb = true;
+  else if (dual_protocol == RF_FLR_FANET)
+      show_fanet = true;
 
   if (rx_packets_counter != prev_rx_packets_counter) {
     disp_value = rx_packets_counter % 1000;
@@ -380,22 +388,6 @@ static void OLED_radio()
     }
     //u8x8->draw2x2String(10, ((settings->rx1090 || (settings->gdl90_in != DEST_NONE))? 4 : 5), buf);
     u8x8->draw2x2String(10, 4, buf);
-    if (! show_adsb) {                     // then show max RSSI instead
-      if (maxrssi != prev_maxrssi) {
-        if (maxrssi < 0) {
-          disp_value = maxrssi;
-          if (disp_value < -99)
-              disp_value = -99;
-          itoa(disp_value, buf, 10);
-          if (disp_value > -10)
-              strcat_P(buf,PSTR(" "));
-          u8x8->draw2x2String(10, 6, buf);
-        } else {
-          u8x8->draw2x2String(10, 6, "---");
-        }
-        prev_maxrssi = maxrssi;
-      }
-    }
     prev_rx_packets_counter = rx_packets_counter;
   }
 
@@ -415,6 +407,33 @@ static void OLED_radio()
       }
       prev_adsb_packets_counter = adsb_packets_counter;
       prev_rx1090found = rx1090found;
+    }
+  } else if (show_fanet) {
+    if (fanet_packets_counter != prev_fanet_packets_counter) {
+      disp_value = fanet_packets_counter % 1000;
+      itoa(disp_value, buf, 10);
+      if (disp_value < 10) {
+          strcat_P(buf,PSTR("  "));
+      } else if (disp_value < 100) {
+          strcat_P(buf,PSTR(" "));
+      }
+      u8x8->draw2x2String(10, 6, buf);
+      prev_fanet_packets_counter = fanet_packets_counter;
+    }
+  } else {   // show RSSI
+    if (maxrssi != prev_maxrssi) {
+      if (maxrssi < 0) {
+        disp_value = maxrssi;
+        if (disp_value < -99)
+            disp_value = -99;
+        itoa(disp_value, buf, 10);
+        if (disp_value > -10)
+            strcat_P(buf,PSTR(" "));
+        u8x8->draw2x2String(10, 6, buf);
+      } else {
+        u8x8->draw2x2String(10, 6, "---");
+      }
+      prev_maxrssi = maxrssi;
     }
   }
 

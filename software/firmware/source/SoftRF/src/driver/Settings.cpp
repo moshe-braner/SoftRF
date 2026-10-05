@@ -42,6 +42,7 @@ uint8_t settings_used;
 
 uint8_t ground_status = GROUND_STATUS_INITIAL;
 
+bool eeprom_started = false;       // set to true once SoC->EEPROM_begin() returns success
 bool use_eeprom = false;           // set to true if mode & SOFTRF_MODE_EEPROM
 
 bool do_alarm_demo = false;        // activated by middle button on T-Beam
@@ -213,8 +214,8 @@ static void init_stgdesc()
   stgdesc[STG_EPD_VMODE]  = { "vmviewmode",   (char*)&settings->viewmode,   epd_only(STG_UINT1), HIDE_CP };
   stgdesc[STG_EPD_AGHOST] = { "ghantighost",  (char*)&settings->antighost,  epd_only(STG_UINT1), HIDE_CP };
   stgdesc[STG_EPD_TEAM]   = { "tmteam",       (char*)&settings->team,       epd_only(STG_HEX6), HIDE_CP };
-  stgdesc[STG_CALLSIGN]   = { "cscallsign",   (char*)&settings->callsign,   sizeof(settings->callsign), 0 };
-  stgdesc[STG_AUTO_SOS]   = { "asauto_sos",  (char*)&settings->auto_sos,    STG_UINT1, 0 };
+  stgdesc[STG_CALLSIGN]   = { "csfanet_name", (char*)&settings->callsign,   sizeof(settings->callsign), 0 };
+  stgdesc[STG_AUTO_SOS]   = { "asauto_sos",   (char*)&settings->auto_sos,   STG_UINT1, 0 };
   stgdesc[STG_DEBUG_FLAGS]= { "dgdebug_flags",(char*)&settings->debug_flags,STG_HEX8, 0 };
 
   // ensure no null labels in the array
@@ -880,7 +881,7 @@ void Settings_defaults()
 
     settings->version = 0;        // SOFTRF_SETTINGS_VERSION will come from file
     settings->altprotocol = RF_PROTOCOL_NONE;
-    settings->flr_adsl    = 1;    // nudge towards cross-systems inter-operability
+    settings->flr_adsl    = 0;    // or nudge towards cross-systems inter-operability?
     settings->rx1090x     = 100;
     settings->hrange      = 27;   // km
     settings->vrange      = 20;   // 2000m
@@ -1015,6 +1016,8 @@ void show_settings_short()
 #if defined(INCLUDE_EEPROM)
 void save_settings_to_EEPROM(bool inclusive)
 {
+  if (eeprom_started == false)
+      return;
   Serial.println(F("Saving settings to EEPROM..."));
   eeprom_block.field.magic = SOFTRF_EEPROM_MAGIC;
   char *p = eeprom_block.field.text;
@@ -1106,8 +1109,11 @@ void save_settings_to_file(bool reboot)
 int find_setting(const char *p, bool sh)
 {
     if (! sh) {
-        if (strcmp(p,"nmea_l")==0)   p = "nmea_t";   // to accept old settings files
-        if (strcmp(p,"nmea2_l")==0)  p = "nmea2_t";
+        // to accept old settings files:
+        if (strcmp(p,"nmea_l")==0)    p = "nmea_t";
+        if (strcmp(p,"nmea2_l")==0)   p = "nmea2_t";
+        if (strcmp(p,"callsign")==0)  p = "fanet_name";
+        if (strcmp(p,"fanet_sos")==0) p = "auto_sos";
     }
     for (int i=STG_VERSION; i<STG_END; i++) {
         if (sh) {
@@ -1301,6 +1307,11 @@ bool load_settings_from_file()
 
 bool load_settings()
 {
+#if defined(INCLUDE_EEPROM)
+    // start up EEPROM unconditionally, to allow $PSRFC,EEP
+    eeprom_started = SoC->EEPROM_begin(sizeof(eeprom_t));
+#endif
+
 #if defined(FILESYS)
     //if (use_eeprom) {
     //    Serial.println(F("File system assumed broken"));
@@ -1314,7 +1325,7 @@ bool load_settings()
 
     // settings file not found, try and read settings from EEPROM block
 
-    if (SoC->EEPROM_begin(sizeof(eeprom_t)) == false) {
+    if (eeprom_started == false) {
         Serial.println(F("WARNING! cannot access EEPROM. Using defaults..."));
         return false;
     }

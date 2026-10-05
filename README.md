@@ -9,8 +9,9 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### Latest major additions:
 
+* vMB208: supports FANET messaging and connected apps
 * vMB204: allows FANET+PAW+FLR+ADSL multiprotocol mode, revised relaying again
-* vMB203: supports FLARM and FANET messaging (PFLAM)
+* vMB203: supports FLARM (PFLAM) messaging
 * vMB202: using RadioLib, now supports the Sensecap T1000-E and Thinknode M3 (& M1)
 * vMB179: added FANET id_method, auto-region by default, buzz at first GNSS fix
 * vMB174: dual-protocol FANET (or PAW) plus FLARM (or ADS-L) modes
@@ -18,12 +19,11 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 * vMB171: revised relaying of ADS-B traffic, including "relay only" mode 
 * vMB159: capability to periodically transmit in an alternate protocol
 * vMB155: collect statistics on reception range by relative direction 
-* vMB153: record compressed flight logs in flash memory (T-Beam & T-Echo)
+* vMB153: record compressed flight logs in flash memory
 * vMB152: settings stored in an editable text file
 * vMB138: supports using add-on GNSS modules, on the T-Beam
 * vMB130: supports the GNS5892R ADS-B receiver module, on the T-Beam
 * vMB120: supports the latest 2024 radio protocol
-* vMB110: added second serial port and data bridging (only on T-Beam)
 
 ### Beyond Lyusupov's version:
 
@@ -43,6 +43,7 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 * Louder buzzer via 2-pin differential drive, or external
 * Collision-danger traffic VOICE warnings!
 * Includes strobe-control logic
+* Second serial port and data bridging
 * Option to connect to ambient WiFi network instead of creating one
 * Option to send data as TCP client instead of TCP server
 * Specify server's IP address for TCP client, and choice of 2 ports
@@ -53,7 +54,7 @@ DIY, multifunctional, compatible, sub-1 GHz ISM band radio based proximity aware
 
 ### What is here:
 
-Source code, and compiled binaries for [ESP32 (T-Beam)](https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/binaries/ESP32/SoftRF) and [nRF52 (T-Echo, M1, M3 & T1000-E)](https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/binaries/nRF52840/SoftRF/MassStorage) (only).  Note: a new T1000-E requires [downgrading the bootloader](https://raw.githubusercontent.com/moshe-braner/SoftRF/refs/heads/master/software/firmware/documentation/SoftRF_MB_user_guide.txt) before loading SoftRF.
+Source code, and compiled binaries for [ESP32 (classic T-Beam - NOT the "Supreme"!)](https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/binaries/ESP32/SoftRF) and [nRF52 (T-Echo, M1, M3 & T1000-E)](https://github.com/moshe-braner/SoftRF/tree/master/software/firmware/binaries/nRF52840/SoftRF/MassStorage) (only).  Note: a new T1000-E requires [downgrading the bootloader](https://raw.githubusercontent.com/moshe-braner/SoftRF/refs/heads/master/software/firmware/documentation/SoftRF_MB_user_guide.txt) before loading SoftRF.
 <br>
 <br>
 

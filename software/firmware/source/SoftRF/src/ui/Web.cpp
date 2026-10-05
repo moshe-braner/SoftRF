@@ -95,18 +95,6 @@ byte getVal(char c)
 }
 
 //#if DEBUG
-#if 0
-void Hex2Bin(String str, byte *buffer)
-{
-  char hexdata[2 * PKT_SIZE + 1];
-  
-  str.toCharArray(hexdata, sizeof(hexdata));
-  for(int j = 0; j < PKT_SIZE * 2 ; j+=2)
-  {
-    buffer[j>>1] = getVal(hexdata[j+1]) + (getVal(hexdata[j]) << 4);
-  }
-}
-#endif
 
 // Compiler said:
 //  Global variables use 63296 bytes of dynamic memory, maximum is 327680 bytes.
@@ -1287,15 +1275,19 @@ void handleRoot() {
   else
       strcpy(str_vusb,"????");
 
-  char adsb_s[88];
-  if (settings->rx1090 == ADSB_RX_NONE && settings->gdl90_in == DEST_NONE) {
-      adsb_s[0] = '\0';
-  } else if (settings->rx1090 != ADSB_RX_NONE && ! rx1090found) {
-      strcpy(adsb_s, "<tr><th align=left>ADS-B receiver not present</th></tr>");
-  } else {
-      snprintf(adsb_s, 88,
+  char special_s[88];
+  if (settings->rx1090 != ADSB_RX_NONE && ! rx1090found) {
+      strcpy(special_s, "<tr><th align=left>ADS-B receiver not present</th></tr>");
+  } else if (settings->rx1090 != ADSB_RX_NONE || settings->gdl90_in != DEST_NONE) {
+      snprintf(special_s, 88,
          "<tr><th align=left>ADS-B Packets</th><td>&nbsp;</td><td align=right>%d</td></tr>",
          adsb_packets_counter);
+  } else if (dual_protocol == RF_FLR_FANET) {
+      snprintf(special_s, 88,
+         "<tr><th align=left>FANET Packets</th><td>&nbsp;</td><td align=right>%d</td></tr>",
+         fanet_packets_counter);
+  } else {
+      special_s[0] = '\0';
   }
 
   char tx_s[8];
@@ -1306,11 +1298,13 @@ void handleRoot() {
   }
 
   char traffics[24];
-  int acrfts_counter = Traffic_Count();   // maxrssi and adsb_acfts are byproducts
+  int acrfts_counter = Traffic_Count();   // maxrssi and adsb_acfts and fanet_acfts are byproducts
   if (acrfts_counter == 0) {
       traffics[0] = '\0';
   } else if (adsb_acfts > 0) {
       snprintf(traffics, 24, "(%d ADS-B)", adsb_acfts);
+  } else if (dual_protocol == RF_FLR_FANET && fanet_acfts > 0) {
+      snprintf(traffics, 24, "(%d FANET)", fanet_acfts);
   } else {
       snprintf(traffics, 24, "(max RSSI %d)", maxrssi);
   }
@@ -1428,7 +1422,7 @@ void handleRoot() {
 #endif /* ENABLE_AHRS */
     hr, min % 60, sec % 60, ESP.getFreeHeap(),
     (low_voltage==1? "red" : (low_voltage==0? "green": "black")), str_vbat, str_vusb,
-    tx_s, rx_packets_counter, adsb_s, acrfts_counter, traffics,
+    tx_s, rx_packets_counter, special_s, acrfts_counter, traffics,
     (ground_status == GROUND_STATUS_NEED_RIDE? "Active" : "Off"),
     (ground_status == GROUND_STATUS_NEED_RIDE? "Stop" : "Activate"),
     ((hw_info.model == SOFTRF_MODEL_PRIME_MK2) ?

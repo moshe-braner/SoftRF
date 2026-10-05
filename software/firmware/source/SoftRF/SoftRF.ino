@@ -472,17 +472,22 @@ void reboot()
 static uint32_t lastsuccess = 0;
 #endif
 
-// borrowed from freqplan.h but uses float lat/lon:
+// adapted from freqplan.h but uses float lat/lon
+// note this cannot handle some regions such as CN, RU, KR, IL
 uint8_t calcBand(float lat, float lon)
 {
     if( (lon>=(-20.0f)) && (lon<=(60.0f)) )
         return RF_BAND_EU;  // between -20 and 60 deg Lon => Europe + Africa: 868MHz band
-    if( lat<(20.0f) ) {     // below 20deg latitude
+    if (lat >= 5.0f && lat <= 40.0f && lon >= 69.0f && lon <= 89.0f)
+        return RF_BAND_IN;  // Indian subcontinent: 866 MHz
+    if( lat<(25.0f) ) {     // below 25deg latitude
         if( ( lon>(164.0f)) && (lat<(-30.0f)) && (lat>(-48.0f)) )
             return RF_BAND_NZ;
         return RF_BAND_AU;  // => Australia + South America: upper half of 915MHz band
     }
-    return RF_BAND_US; 
+    if( (lon>=(-169.0f)) && (lon<=(-52.0f)) )
+        return RF_BAND_US; 
+    return RF_BAND_AUTO;     // unresolved
 }
 
 void normal()

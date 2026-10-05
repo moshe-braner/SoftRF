@@ -131,6 +131,11 @@ bool ogntp_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   if (fop->addr == ThisAircraft.addr)
          return true;                  /* same ID as this aircraft - ignore */
 
+  for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+      if (excess[i].addr == fop->addr)             // known as far and not tracked
+          return false;
+  }
+
   if (ogn_rx_pkt.Packet.Header.Other) {
     if (ogn_rx_pkt.Packet.isInfo() && ogn_rx_pkt.Packet.goodInfoCheck()) {
         char callsign[17];
@@ -156,6 +161,7 @@ bool ogntp_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
   fop->aircraft_type = ogn_rx_pkt.Packet.Position.AcftType;
   fop->course    = ogn_rx_pkt.Packet.DecodeHeading() * 0.1;
   fop->speed     = (ogn_rx_pkt.Packet.DecodeSpeed() * 0.1) / _GPS_MPS_PER_KNOT;
+  fop->airborne  = (fop->speed > 30.0f ? 1 : 0);
   fop->vs        = (ogn_rx_pkt.Packet.DecodeClimbRate() * 0.1) * (_GPS_FEET_PER_METER * 60.0);
   fop->hdop      = (ogn_rx_pkt.Packet.DecodeDOP() + 10) * 10;
 

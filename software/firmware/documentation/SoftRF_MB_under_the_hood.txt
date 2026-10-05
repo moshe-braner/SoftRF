@@ -4,7 +4,7 @@ Preliminary Documentation for Moshe Braner's version of SoftRF
 
 By Moshe Braner
 
-This version last updated July 15, 2026 to fit software version MB205
+This version last updated Oct 5, 2027 to fit software version MB208
 Get the latest version here:
   https://github.com/moshe-braner/SoftRF/blob/master/software/firmware/documentation
 or direct link:
@@ -45,14 +45,14 @@ expire - number of seconds to keep reporting traffic not heard from - 1-30, defa
 
 altprotocol - default=0, meaning none.  Set to 1 (OGNTP), 6 (Legacy), 7 (Latest) or 8 (ADS-L MDR) to transmit in an alternative protocol once every 4 seconds.  This is if the main protocol is also 1, 6, 7 or 8.  The motivation being to take advantage of the better Forward Error Correction that is incorporated into the OGNTP to get effective tracking by ground stations to longer distances.  Or, to add ADS-L e-conspicuity where required or desired.  If altprotocol=1 and relay is enabled and there is landed-out traffic to be relayed, it is also relayed in the OGNTP protocol, taking priority over self-reporting, once per 16 seconds.  New version mb204: Can mix Latest (or ADS-L) and either FANET or PAW, or even FANET & PAW, and time-slicing will be used to transmit and receive in both protocols.  Note that the same ID will be transmitted in all protocols used, including FANET (ignoring the convention for FANET to use a "vendor ID for the first 2 hex digits").  If you have registered a FANET ID, and you don't want to change it, then use the "override" id_method setting to force that ID - but that ID will then be sent in the other protocols too.
 
-flr_adsl - default=1.  If set to 1, some reception will be in simultaneous Latest+ADS-L mode, and also some transmission will happen in those protocols.  In dual-protocol modes Latest+FANET, Latest+PAW and Latest+OGNTP, will also transmit in ADS-L occasionally.  In dual-protocol modes PAW+FANET and FANET+PAW, enabling flr_adsl means SoftRF will transmit and receive in *four* protocols at once.
+flr_adsl - default=0.  If set to 1, some reception will be in simultaneous Latest+ADS-L mode, and also some transmission will happen in those protocols.  In dual-protocol modes Latest+FANET, Latest+PAW and Latest+OGNTP, will also transmit in ADS-L occasionally.  In dual-protocol modes PAW+FANET and FANET+PAW, enabling flr_adsl means SoftRF will transmit and receive in *four* protocols at once.  Recommendation: set flr_adsl=1 in the EU, where ADS-L is already being used by some aircraft.
 
 nmea_out and nmea_out2 - NMEA output destination codes are: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=Bluetooth 6=secondary serial.  Some destinations are not available on some devices, e.g., the T-Echo, M1, M3 and T1000-E have BT (BLE) but not UDP nor TCP nor secondary serial.
 
 Some settings are now bitfields (can set more than one bit) - these are two hexadecimal digits:
 nmea_g & nmea2_g - 1 for basic (GGA+RMC), 2 for GSA (3 for basic+GSA), 4=GST 8=GSV F=all
 nmea_s & nmea2_s - 1 for basic (PGRMZ), 2 for LK8EX1 (3 for both)
-nmea_t & nmea2_t - 1 for PFLAU+PFLAA, 2 for PFLAJ, 4 for PFLAM, 8 for FNNGB
+nmea_t & nmea2_t - 1 for PFLAA, 2 for PFLAJ, 4 for PFLAM, 8 for FNNGB (turn off PFLAA)
 nmea_e & nmea2_e - 1 for "tunnel" from connected devices, 2 for generated (strobe, alarm)
 
 debug_flags - now a 32-bit bitfield, see DEBUG_* values in Settings.h
@@ -71,7 +71,7 @@ gdl90 - GDL90 output: this is for a different local data transfer protocol, usua
 
 d1090 - Dump1090: yet another local data output protocol, usually leave Off (0).  If used, should not choose the same destination (e.g., UDP) as an NMEA output destination.
 
-gdl90_in - GDL90 input: this is for importing data from an external ADS-B receiver in GLD90 format, else leave Off.  GDL90 uses UDP port 4000, while NMEA uses 10110.  Cannot use the same port for both input and output.  Values: same codes as for nmea_out: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT 6=secondary serial.
+gdl90_in - GDL90 input: this is for importing data from an external ADS-B receiver (such as Stratux) in GLD90 format, else leave Off.  GDL90 uses UDP port 4000, while NMEA uses 10110.  Cannot use the same port for both input and output.  Values: same codes as for nmea_out: 0=off 1=serial 2=UDP 3=TCP 4=USB 5=BT 6=secondary serial.  Incoming GDL90 data is filtered with the distance and relative-altitude limits specified in the settings "hrange1090" (km) and "vrange1090" (hundreds of meters).
 
 logflight - IGC flight log: 0=off, 1=always, 2=when airborne, 3=when airborne and also report near traffic, 4=also report far-away and non-airborne traffic (not recommended unless you have an SD card attached)
 
@@ -79,7 +79,7 @@ loginterval - interval (seconds) between flight log position records, 1 to 255
 
 compflash - On a T-Beam with an SD card this setting is ignored.  On a T-Beam without SD card: 0=log to RAM only, 1=also compress to IGZ file in flash.  On a T-Echo, M1 or T1000-E: 0=record uncompressed IGC files, 1=record compressed IGZ files.  See the "Flight logging" section in the user guide for decompressing instructions.
 
-alarmlog - Alarms Log: If enabled (1), every time a traffic alarm is issued (whether audible or not), a line of text is written into the alarmlog.txt file (in flash).  This line includes the date, time, lat/lon, alarm level (1-3), count of alarming traffic, aircraft ID, relative heading, and horizontal and vertical separation (in meters).  On the T-Beam, if you want to download the alarm log, use the web interface and click the "Alarm Log: [Download]" button at the bottom of the status page.  The existing file is normally appended to.  If space in the flash file system is low, the alarm log file is erased and a new one created.  You can also do that manually by clicking the "Alarm Log: [Clear]" button on the status page.  If flight logging, and either alarmlog is enabled or logging includes "traffic", similar data is also inserted into the flight log as an LSRFA comment every time the alarm level of an aircraft increases.  These comment lines include the following fields: alarm level (0-3), protocol (coding as in the setting), aircraft type (ditto), aircraft ID, distance (meters), bearing (degrees), speed (knots), course, turnrate, relative heading,  relative altitude, relative vertical speed, this aircraft's speed course and turnrate, and estimated wind speed and direction.  (Fewer fields if the log is compressed.)
+alarmlog - 0=disabled, 1=enabled.  See the "Alarms Log" section below for more information.
 
 log_nmea - option to log all NMEA output to an attached SD card (T-Beam only).  Logging starts only when a GNSS fix is attained, using the date to name the file, similar to the IGC flight log file naming.  E.g., 52B1NMEA.txt.
 
@@ -93,7 +93,7 @@ power_save - 1 to turn Wifi or Bluetooth off after 10 minutes to save power (ext
 
 power_ext - 1 to automatically shut down after a while if external power was disconnected, in a device that also has an internal battery - see "How to power the SoftRF device" section in the user guide.  This setting also prevents the device from entering "charging mode" instead of fully booting when both USB and battery power are present.  If no internal battery is installed, this setting is irrelevant.
 
-callsign - sent as "pilot name" in FANET protocol.  In Latest protocol, if "messaging" is enabled, the igc_cs is used for the ACALL transmissions, unless it is blank, in which case the "callsign" is used.
+fanet_name - sent as "pilot name" in FANET protocol.  In Latest protocol, if "messaging" is enabled, the igc_cs is used for the ACALL transmissions, unless it is blank, in which case the fanet_name is used instead.  For compatibility with Vlad's Configurator (and direct configuration via NMEA), do not include the characters '$', '#' and '!' in any settings, such as fanet_name,.
 
 auto_sos - 0=off 1=manual 2=auto.  See the "FANET messages" section below.
 
@@ -111,8 +111,8 @@ mode_s - The GNS5892 module can also receive Mode S (but not Mode C) transponder
 
 rx1090x - the GNS5892 "comparator offset".  The default is 100.  This value can affect the reception of weak signals.  For awareness of nearby traffic the default is fine.
 
-hrange1090 - horizontal reporting range for ADS-B traffic, in km 
-vrange1090 - vertical reporting range for ADS-B traffic, in hundreds of meters
+hrange1090 - horizontal reporting range for ADS-B (or GDL90_in) traffic, in km 
+vrange1090 - vertical reporting range for ADS-B (or GDL90_in) traffic, in hundreds of meters
 
 strobe - if an LED or strobe is connected to the T-Beam, choose one of 4 modes:
 0 = Strobe off - never flashes
@@ -295,6 +295,14 @@ Alternating-seconds modes:
           - but it will receive each FANET & PAW traffic only every 10 seconds or so
             - setting 'expire' to 10+ seconds is recommended
 * PAW + FANET - same as FANET + PAW, but listens to PAW for 3 out of every 8 seconds (rather than 2).
+
+Alarms Log
+
+If the "alarmlog" setting is enabled (1), every time a traffic alarm is issued (whether audible or not), a line of text is written into the alarmlog.txt file (in flash).  This line includes the date, time, lat/lon, alarm level (1-3), count of alarming traffic, aircraft ID, relative heading, and horizontal and vertical separation (in meters).  The alarmlog also lists the date, time and lat/lon of each takeoff and landing.  When landing, it also reports the maximum altitude of the flight (meters MSL) - especially useful for tow planes.
+
+On the T-Beam, if you want to download the alarm log, use the web interface and click the "Alarm Log: [Download]" button at the bottom of the status page.  The existing file is normally appended to.  If space in the flash file system is low, the alarm log file is erased and a new one created.  You can also do that manually by clicking the "Alarm Log: [Clear]" button on the status page.
+
+If flight logging, and either alarmlog is enabled or logging includes "traffic", similar data is also inserted into the flight log as an LSRFA comment every time the alarm level of an aircraft increases.  These comment lines include the following fields: alarm level (0-3), protocol (coding as in the setting), aircraft type (ditto), aircraft ID, distance (meters), bearing (degrees), speed (knots), course, turnrate, relative heading,  relative altitude, relative vertical speed, this aircraft's speed course and turnrate, and estimated wind speed and direction.  (Fewer fields if the log is compressed.)
 
 Air Relay
 
@@ -607,17 +615,23 @@ FLARM messaging
 
 Starting in version MB203:  When receiving FLARM text messages (transmitted by FLARMs with $PFLAC,S,MSG,1 in their config file), SoftRF decodes them and outputs a $PFLAM NMEA sentence.  And, every once in a while (about twice per minute) SoftRF transmits, in a format that FLARM and SoftRF can decode, a text message with one of the following bits of text, if configured: callsign, pilot name, aircraft type, or aircraft registration.  These periodical message types are interpreted by XCsoar based on the $PFLAM NMEA output.  This information is also included in flight logs generated by SoftRF, in LSRFM comment lines (if the logflight setting is set to 3).  And, this information is used to fill in the "callsign" of tracked aircraft (if not filled in from some other source), and will thus be included in $PFLAA sentences as long as the pflaa_cs setting is enabled.
 
-Messaging - both incoming and outgoing - are activated via the "pflam" (8) bit in the nmea_t and nmea2_t settings.  Messaging is reciprocal: if neither nmea_t nor nmea2_t have the "pflam" (8) bit set, or if stealth or no_track are enabled, then both reception and transmission of text messages is disabled.  If using serial (or USB) NMEA output, the baud rate must be at least 38400, otherwise the "pflam" bit is cleared for that output port.  (It may still be enabled for another port, e.g., Bluetooth.)  Baud rates lower than 38400 are not recommended in any case, as they may not keep up with traffic data when it is heavy.
+Messaging - both incoming and outgoing - are activated via the "pflam" (4) bit in the nmea_t and nmea2_t settings.  Messaging is reciprocal: if neither nmea_t nor nmea2_t have the "pflam" (4) bit set, or if stealth or no_track are enabled, then both reception and transmission of FLARM text messages is disabled.  If using serial (or USB) NMEA output, the baud rate must be at least 38400, otherwise the "pflam" bit is cleared for that output port.  (It may still be enabled for another port, e.g., Bluetooth.)  Baud rates lower than 38400 are not recommended in any case, as they may not keep up with traffic data when it is heavy.
 
 FANET messaging
 
-Starting in version MB203, when receiving FANET transmissions, SoftRF decodes FANET text messages, including pilot-name, broadcast, and unicast messages.  The problem is how to output them to a device that will display them.  Currently SoftRF outputs these as FLARM messaging ($PFLAM) sentences, which are limited to 17 characters of text.  Supposedly XCsoar can interpret those.  (Vlad Belayev's fork of SoftRF can output them in #FNF sentences which are interpreted by some paragliding-oriented apps.)  Additionally, received FANET pilot names are inserted into the "callsign" of the tracked aircraft, and thus may appear in $PFLAA sentences to be displayed as traffic labels by some attached navigation apps.
+Starting in version MB203, when receiving FANET transmissions, SoftRF decodes FANET text messages, including pilot-name, broadcast, and unicast messages.  The problem is how to output them to a device that will display them.  Currently SoftRF offers 2 options.  Either output these as FLARM messaging ($PFLAM) sentences, which are limited to 17 characters of text.  Supposedly XCsoar can interpret those.  Additionally, received FANET pilot names are inserted into the "callsign" of the tracked aircraft, and thus may appear in $PFLAA sentences to be displayed as traffic labels by some attached navigation apps.  Alternatively, this fork of SoftRF (versions MB207+) can output them in #FNF sentences which are interpreted by some paragliding-oriented apps.  The #FNF mode is activated automatically when connected to those apps.  Those apps also allow the user to receive, compose and send broadcast and unicast FANET messages via the connected SoftRF.
+
+When *not* in #FNF mode, SoftRF also offers the option to output traffic data in the $FNNGB format instead of $PFLAA.  Some connected apps interpret those.  For each of the two NMEA output routes, one must choose either PFLAA or FNNGB, not both.  Note: PFLAU is always output, once per second, even when there is no traffic to report, even in #FNF mode.
 
 Outgoing messages can report a distress situation, possibly automatically (3 minutes after landing, if not manually canceled by double-click).  Can double-click the button (on a T1000-E) to manually start (or stop) sending "distress" ground status, as long as the auto_sos setting is not set to 0 (off).  In any case, FANET tracking messages are continued after landing, using the FANET ground tracking protocol, but reporting the status "landed OK" (9) by default.  If rebooted, in FANET protocol, SoftRF will transmit air tracking data, even if still on the ground.
 
 Transition of PilotAware to ADS-L packet format
 
 Starting in version MB201 of SoftRF the PilotAware protocol uses the ADS-L O-band low-data-rate packet format, as described in "issue 2" of ADS-L and adopted by PilotAware.  Unlike the commercial PilotAware devices, SoftRF now *only* transmits the new packet format, even in the presence of devices that still transmit in the old PilotAware protocol.  But, in version MB203, restored decoding of incoming messages using the old PilotAware protocol, if decoding of a message in the new protocol fails.
+
+Optimizations for congested airspace
+
+From version MB207, this fork of SoftRF attempts to both reduce CPU load and improve the reporting of traffic in situations where there are more aircraft being received from than there is room in the internal traffic table.  The table only holds data on up to 8 aircraft.  (And only up to 6 are reported in PFLAA output.)  Now SoftRF also keeps a table holding just the IDs of up to another 8.  These are known to have been recently received from but were farther than the 8 in the main tracking table.  ("Farther" here also accounts for altitude difference.)  Thus, for the next 2 or 3 seconds, received messages with these IDs are ignored, saving the CPU time that would have been used to decrypt and decode them.
 
 
 KNOWN ISSUES

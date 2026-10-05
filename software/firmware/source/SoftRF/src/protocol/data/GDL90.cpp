@@ -566,13 +566,19 @@ void process_traffic_message(char* buf)
   if (ulatlon & 0x800000)  ulatlon |= 0xFF000000;
   int32_t ilatlon = (int32_t) ulatlon;
   fo.latitude = ((float) ilatlon) * (180.0 / 0x800000);
-  if (fabs(fo.latitude - ThisAircraft.latitude) > 0.25)  // 15 nm
+  // 1 degree latitude = about 111 km
+  float latdiffkm = fabs(fo.latitude - ThisAircraft.latitude) * 111.3f;
+  float hrangekm = (float) settings->hrange1090;
+  if (latdiffkm > hrangekm)
       return;
   ulatlon = pack24bit(tp->longitude);
   if (ulatlon & 0x800000)  ulatlon |= 0xFF000000;
   ilatlon = (int32_t) ulatlon;
   fo.longitude = ((float) ilatlon) * (180.0 / 0x800000);
-  if (fabs(fo.longitude - ThisAircraft.longitude) > 0.25 * InvCosLat())  // 15 nm
+  float londiffkm = fabs(fo.longitude - ThisAircraft.longitude) * 111.3f * CosLat();
+  if (londiffkm > hrangekm)
+      return;
+  if (latdiffkm*latdiffkm + londiffkm*londiffkm > hrangekm*hrangekm)
       return;
   // tp->misc is really the LSNibble of alt
   // the real misc is in bits 8-11 of tp->altitude
@@ -587,7 +593,7 @@ void process_traffic_message(char* buf)
       fo.altitude += ThisAircraft.baro_alt_diff;
   else
       fo.altitude += average_baro_alt_diff;
-  if (fabs(fo.altitude - ThisAircraft.altitude) > 2000)  // meters
+  if (fabs(fo.altitude - ThisAircraft.altitude) > (float)(100*(uint32_t)settings->vrange1090))  // meters
       return;
   fo.airborne = ((misc & 0x08) != 0);
   // similar mess:

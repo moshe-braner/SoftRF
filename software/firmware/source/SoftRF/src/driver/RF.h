@@ -209,6 +209,7 @@ extern uint8_t RF_last_rx_len;      // for variable-length FANET packets
 extern uint32_t rx_packets_counter;
 extern uint32_t tx_packets_counter;
 extern uint32_t adsb_packets_counter;
+extern uint32_t fanet_packets_counter;
 extern uint32_t receive_cb_count;
 
 /* #define TIMETEST */
