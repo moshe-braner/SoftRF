@@ -35,6 +35,7 @@
 #include "../../driver/RF.h"
 #include "../../driver/Settings.h"
 //#include "../../protocol/data/NMEA.h"
+#include "../../protocol/data/FNF.h"
 //#include "../../driver/Bluetooth.h"
 
 const rf_proto_desc_t fanet_proto_desc = {
@@ -157,14 +158,44 @@ static void payload_absolut2coord(float *lat, float *lon, uint8_t *buf)
 
 /* ------------------------------------------------------------------------- */
 
+// The current scheme only queues one ack and one normal message.
+// It is possible for a new message to overwrite the one already queued.
+// But given that FANET transmissions are only once in 5 seconds or more,
+// a situation where many messages queue up is not viable anyway.
+
+/* Pending FANET ACK TX queue - transmitted in next available TX slot */
+static uint8_t  fnf_queued_ack_vendor = 0;
+static uint16_t fnf_queued_ack_id     = 0;
+
+// Pending FANET TX queue
+// pre-built frame queued here and transmitted in next available TX slot
+uint8_t  fn_tx_pending_buf[MAX_PKT_SIZE];
+uint8_t  fn_tx_pending_len = 0;
+
+static uint32_t fanet_name_last_ms = 0;
+uint32_t fanet_sos_last_ms  = 0;
+uint8_t  fanet_sos_count    = 0;
+
+#define FANET_SOS_INTERVAL_MS  30000  /* broadcast SOS message every 30 seconds */
+#define FANET_SOS_MAX_COUNT    3      /* send SOS message this many times, then stop */
+
 bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
 
   fanet_packet_t *pkt = (fanet_packet_t *) fanet_pkt;
+  uint8_t *raw = (uint8_t *) fanet_pkt;
   unsigned int altitude;
-  uint8_t speed_byte, climb_byte, offset_byte;
-  int speed_int, climb_int, offset_int;
+  uint8_t speed_byte, climb_byte;
+  int speed_int, climb_int;
+#if defined(FANET_NEXT)
+  uint8_t offset_byte;
+  int offset_int;
+#endif
+  size_t payload_offset = FANET_HEADER_SIZE;   /* 4 bytes basic header */
+  size_t payload_len = 0;
+  bool unicast = false;
+  bool ack_requested = false;
 
-  uint32_t addr = (pkt->vendor << 16) | pkt->address;
+  uint32_t sender_addr = (pkt->vendor << 16) | pkt->address;
 
   /* ignore this device own (relayed) packets */
   //if (pkt->vendor  == SOFRF_FANET_VENDOR_ID &&
@@ -172,8 +203,14 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
   //    /* pkt->forward == 1 */) {
   //  return rval;
   //}
-  if (addr == this_aircraft->addr)
+  if (sender_addr == this_aircraft->addr)
       return false;
+
+// since FANET transmits once in 5s, this is not useful:
+//  for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+//      if (excess[i].addr == sender_addr)                 // known as far and not tracked
+//          return false;
+//  }
 
   bool has_ext = (pkt->ext_header != 0);
 
@@ -181,7 +218,7 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
   if (pkt->type == 1 || pkt->type == 7) {
     if (has_ext)
         return false;
-    fop->addr = addr;
+    fop->addr = sender_addr;
     fop->protocol = RF_PROTOCOL_FANET;
     fop->addr_type = ADDR_TYPE_FLARM;    // i.e., device - was ADDR_TYPE_FANET
     fop->timestamp = this_aircraft->timestamp;
@@ -189,6 +226,8 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     payload_absolut2coord(&(fop->latitude), &(fop->longitude),
       ((uint8_t *) pkt) + FANET_HEADER_SIZE);
   }
+
+  bool rval = false;
 
   if (pkt->type == 1) {  /* Tracking  */
 
@@ -199,6 +238,8 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     fop->altitude = (float) altitude;
 
     fop->aircraft_type = AT_FROM_FANET(pkt->aircraft_type);
+
+    fop->airborne = 1;     // implied by packet type 1
 
     fop->course = (float) pkt->heading * 360.0 / 256.0;
 
@@ -258,11 +299,14 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
       NMEAOutD();
     }
 
+    rval = true;
+
   } else if (pkt->type == 7) {  /* Ground Tracking */
 
     uint8_t status = ((uint8_t *) fanet_pkt)[FANET_HEADER_SIZE + 6];
 
-    fop->altitude = this_aircraft->altitude;     /* use own alt as estimate */
+    fop->airborne = 0;                                  // implied by packet type 7
+    fop->altitude = this_aircraft->altitude;            // use own alt as estimate
     fop->aircraft_type = ((status >> 4) & 0x0F) + 32;   // no overlap with aircraft type codes
     fop->course = 0;
     fop->speed = 0;
@@ -271,94 +315,87 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
     fop->no_track = !(status & 0x01);
     if (settings->debug_flags & DEBUG_RELAY)  fop->no_track = 0;
 
-  } else if (pkt->type == 2 || pkt->type == 3 || pkt->type == 4) {  /* pilot name, or text message */
+    rval = true;
 
-    uint8_t *raw = (uint8_t *) fanet_pkt;
+  } else if (pkt->type == 0 || pkt->type == 2 || pkt->type == 3 || pkt->type == 4) {
+    /* ACK, pilot name, text message or weather */
+
     //uint8_t vendor = raw[1];
     //uint16_t address = raw[2] | ((uint16_t)raw[3] << 8);
 
-    // find this aircraft in the tracking table
-    container_t *cip = NULL;
-    for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
-        if (Container[i].addr == addr) {
-            cip = &Container[i];
-            break;
-        }
-    }
-    if (cip == NULL)
-        return false;   // ignore text messages from non-tracked aircraft
-
     /* Calculate actual payload offset - skip extended header if present */
     //bool has_ext = raw[0] & 0x80;
-    bool unicast = false;
-    //bool ack_requested = false;
-    size_t payload_offset = FANET_HEADER_SIZE;   /* 4 bytes basic header */
-    size_t payload_len = (RF_last_rx_len > payload_offset) ? RF_last_rx_len - payload_offset : 0;
+    if (RF_last_rx_len > payload_offset)
+        payload_len = RF_last_rx_len - payload_offset;
     if (has_ext && payload_len > 0) {
-        //ack_requested = raw[payload_offset] & (1 << 6);
-        unicast = raw[payload_offset] & (1 << 5);
+        ack_requested = raw[4] & (1 << 6);
+        unicast =  (RF_last_rx_len >= 8) && (raw[4] & (1 << 5));
         payload_offset += 1;                      /* +1 ext header byte */
-        if (unicast) {
+        payload_len -= 1;
+        if (unicast && payload_len >= 3) {
             payload_offset += 3;                  /* +3 dest addr bytes */
+            payload_len -= 3;
         }
+    }
+
+    /* Drop unicast messages not addressed to us - only broadcast (dst 000000)
+     * or unicast-to-our-address frames should be forwarded to the app. */
+    uint32_t dest_addr;
+    if (unicast) {
+        uint32_t dest_mfr = raw[5];
+        uint32_t dest_id = raw[6] | ((uint16_t)raw[7] << 8);
+        dest_addr = (dest_mfr << 16) | dest_id;
+        if (dest_addr != ThisAircraft.addr) {
+            Serial.print("FANET unicast message Type ");
+            Serial.print(pkt->type);
+            Serial.print(" to ");
+            Serial.print(dest_mfr, HEX);
+            Serial.print(",");
+            Serial.print(dest_id, HEX);
+            Serial.println(" (not us, ignored)");
+            return false;
+        }
+    }
+
+    if (pkt->type == 0) {  /* ACK */
+#if defined(INCLUDE_FNF)
+        if (FNF_dest != DEST_NONE) {
+            /* ACK must be unicast to us */
+            if (unicast) {
+                // type 0 is handled by FN_check_ack(), do not forward to app
+                // this will generate a #FNR ACK to the app if matched
+                FN_check_ack(pkt->vendor, pkt->address, 0);
+            } else {
+                Serial.println("Type 0 but not unicast - ignoring");
+            }
+        }
+#else
+        Serial.print("FANET Type 0 ACK from ");
+        Serial.println(sender_addr, HEX);
+#endif
+        return false;    // do not forward Type 0 ACK to app as #FNF
     }
 
     Serial.print("FANET message RX Type ");
     Serial.print(pkt->type);
     Serial.print(" from ");
-    Serial.print(addr, HEX);
+    Serial.print(sender_addr, HEX);
     Serial.print(" len=");
     Serial.print(payload_len);
     if (pkt->type == 3) {
         Serial.print(unicast ? " unicast" : " broadcast");
-        if (unicast && RF_last_rx_len >= 8) {
-            Serial.print(" to ");
-            Serial.print(raw[5], HEX);
-            Serial.print(",");
-            Serial.print(raw[6] | ((uint16_t)raw[7] << 8), HEX);
-        }
+        //if (unicast && RF_last_rx_len >= 8) {
+        //    Serial.print(" to ");
+        //    Serial.print(dest_addr, HEX);
+        //}
+        Serial.print("\r\nFANET message payload: \"");
+        Serial.print(filter_printable(&raw[payload_offset], payload_len, (char *)NULL));
+        Serial.print("\"");
     }
     Serial.println();
 
-#if 0
-  if (settings->nmea_t & NMEA_T_FNF || settings->nmea2_t & NMEA_T_FNF) {
-    /* Build #FNF sentence into NMEABuffer */
-    int len = snprintf(NMEABuffer, sizeof(NMEABuffer), "#FNF %X,%X,%X,%X,%X,%X,",
-        (unsigned)vendor,       /* src_manufacturer */
-        (unsigned)address,      /* src_id */
-        (unsigned)(unicast ? 0 : 1),  /* 1=broadcast, 0=unicast */
-        0,                      /* signature (not used in SoftRF) */
-        (unsigned)type,         /* FANET frame type */
-        (unsigned)payload_len); /* payload length */
-
-    /* Append payload bytes with leading zeros */
-    for (size_t i = 0; i < payload_len && len < (int)sizeof(NMEABuffer) - 3; i++) {
-        len += snprintf(NMEABuffer + len, sizeof(NMEABuffer) - len, "%02X",
-                        raw[payload_offset + i]);
-    }
-    NMEABuffer[len++] = '\n';
-    NMEABuffer[len] = '\0';
-    // output how?
-  }
-#endif
-
-    // for callsign and for PFLAM limit text length
-    if (payload_len > CALLSIGN_LEN-1)
-        payload_len = CALLSIGN_LEN-1;
-    raw[payload_offset+payload_len] = '\0';  // OK since  MAX_PKT_SIZE > CALLSIGN_LEN
-    if (pkt->type == 2 && (! has_ext) && (cip->callsign[0]=='\0' || cip->callsign[CALLSIGN_LEN-1]=='?')) {
-        /* copy FANET name (plus nullchar) into callsign */
-        //strncpy((char *)cip->callsign, (char *)&raw[payload_offset], payload_len+1);
-        //cip->callsign[payload_len] = '\0';
-        strcpy((char *)cip->callsign, (char *)&raw[payload_offset]);
-        cip->callsign[CALLSIGN_LEN-1] = '\0';
-    }
-    uint8_t pflam_type = PFLAM_BCST;
-    if (pkt->type == 2)  pflam_type = PFLAM_PNAME;
-    else if (unicast)    pflam_type = PFLAM_UCST;
-    NMEA_PFLAM(pflam_type, cip, &raw[payload_offset]);
-
-    return false;  /* packet is not a traffic position report */
+    /* rval = false; */
+    /* packet is not a traffic position report */
 
   } else {
 
@@ -366,7 +403,68 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
 
   }
 
-  return true;
+#if defined(INCLUDE_FNF)
+  /* Send raw FANET frame as #FNF to XCGuide (if connected via BLE with high MTU).
+   * Use RF_last_rx_len (actual LoRa received length) not rx_size (fixed struct size),
+   * since FANET types 2/3 are variable-length. */
+  // this is now done here, after unicast filtering, rather than in ParseData()
+  if (FNF_dest != DEST_NONE) {
+      // Some apps send a type 3 message instead of (or as well as) the Type 0 ACK once
+      // the message is displayed/read - so call FN_check_ack() on all unicast messages:
+      // this will NOT generate a #FNR ACK to the app, but will clear the waiting for an ack
+      if (unicast)
+          FN_check_ack(pkt->vendor, pkt->address, pkt->type);
+      NMEA_FNF_Out((const uint8_t *)fanet_pkt, RF_last_rx_len);
+  }
+#endif
+
+  //if (pkt->type == 2 || pkt->type == 3 || pkt->type == 4)
+  if (rval == false) {   // not a position message
+    // for callsign and for PFLAM limit text length
+    if (payload_len > CALLSIGN_LEN-1)
+        payload_len = CALLSIGN_LEN-1;
+    raw[payload_offset+payload_len] = '\0';
+      // - OK since  MAX_PKT_SIZE > CALLSIGN_LEN, and NMEA_FNF_Out() already called
+    container_t *cip = NULL;
+    // find this aircraft in the tracking table
+    for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+        if (Container[i].addr == sender_addr) {
+            cip = &Container[i];
+            break;
+        }
+    }
+    if (pkt->type == 2 && (! has_ext)) {
+      if (cip != NULL && (cip->callsign[0]=='\0' || cip->callsign[CALLSIGN_LEN-1]=='?')) {
+        /* copy FANET name (plus nullchar) into callsign */
+        //strncpy((char *)cip->callsign, (char *)&raw[payload_offset], payload_len+1);
+        //cip->callsign[payload_len] = '\0';
+        strcpy((char *)cip->callsign, (char *)&raw[payload_offset]);
+        cip->callsign[CALLSIGN_LEN-1] = '\0';
+      }
+    }
+    uint8_t pflam_type = PFLAM_BCST;
+    if (pkt->type == 2)  pflam_type = PFLAM_PNAME;
+    else if (unicast)    pflam_type = PFLAM_UCST;
+    if (cip != NULL)
+        NMEA_PFLAM(pflam_type, cip, &raw[payload_offset]);  // limited to length 17 or 13
+  }
+
+  /* For unicast message with ack requested, send Type 0 ACK back to the sender
+   * so they know the message was delivered to this device.
+   * When the pilot presses OK in XCGuide, the app sends a separate
+   * "read ACK" (#FNT) which we transmit later as a second acknowledgement. */
+  if (unicast && ack_requested) {
+      Serial.print("FANET: staging delivery ACK to ");
+      Serial.print(pkt->vendor, HEX);
+      Serial.print(",");
+      Serial.println(pkt->address, HEX);
+      // Queue for transmission - only need to store the destination,
+      // will build the packet later before transmission.
+      fnf_queued_ack_vendor = pkt->vendor;
+      fnf_queued_ack_id     = pkt->address;
+  }
+
+  return rval;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -374,20 +472,16 @@ bool fanet_decode(void *fanet_pkt, container_t *this_aircraft, ufo_t *fop) {
 // Additional FANET transmission packet types
 // Code courtesy of Vlad Belayev
 
-static uint32_t fanet_name_last_ms = 0;
-uint32_t fanet_sos_last_ms  = 0;
-uint8_t  fanet_sos_count    = 0;
-
-#define FANET_SOS_INTERVAL_MS  30000  /* broadcast SOS message every 30 seconds */
-#define FANET_SOS_MAX_COUNT    3      /* send SOS message this many times, then stop */
-
 /*
  * Encode a FANET Type 0 (ACK) packet.
  * ACK is unicast to the specified address, no payload.
+ * Building this packet here, just before actual transmission,
+ *    avoids overwriting fn_tx_pending_buf[]
  */
-static size_t fanet_type0_encode(void *fanet_pkt, uint8_t dest_mfr, uint16_t dest_id)
+static size_t fanet_type0_encode(void *fanet_pkt)
 {
-    uint8_t *frame = ((uint8_t *) fanet_pkt);
+    uint8_t *frame = (uint8_t *) fanet_pkt;
+
     uint32_t id = ThisAircraft.addr;
 
     /* Byte 0: type=0, forward=0, ext_header=1 */
@@ -399,14 +493,12 @@ static size_t fanet_type0_encode(void *fanet_pkt, uint8_t dest_mfr, uint16_t des
     /* Extended header: no ACK, unicast */
     frame[4] = (1 << 5);  /* unicast bit */
     /* Destination address */
-    frame[5] = dest_mfr;
-    frame[6] = dest_id & 0xFF;
-    frame[7] = (dest_id >> 8) & 0xFF;
+    frame[5] = fnf_queued_ack_vendor;
+    frame[6] = fnf_queued_ack_id & 0xFF;
+    frame[7] = (fnf_queued_ack_id >> 8) & 0xFF;
 
-    //Serial.print("FN_transmit_ack: Type 0 ACK queued to ");
-    //Serial.print(dest_mfr, HEX);
-    //Serial.print(",");
-    //Serial.println(dest_id, HEX);
+    fnf_queued_ack_vendor = 0;
+    fnf_queued_ack_id     = 0;
 
     return 8;
 }
@@ -580,6 +672,24 @@ static size_t fanet_type1_encode(void *fanet_pkt, container_t *this_aircraft) {
  */
 size_t fanet_encode(void *fanet_pkt, container_t *this_aircraft) {
 
+  if (fnf_queued_ack_id != 0) {
+      // Encode and transmit a FANET ACK frame if needed
+      // - uses and clears fnf_queued_ack_vendor, fnf_queued_ack_id
+      Serial.println("FN_TX: transmitting queued ACK to ");
+      Serial.print(fnf_queued_ack_vendor, HEX);
+      Serial.print(",");
+      Serial.println(fnf_queued_ack_id, HEX);
+      return (fanet_type0_encode(fanet_pkt));
+  } else if (fn_tx_pending_len > 0) {
+      // Transmit pending FANET frame if any, instead of encoding a new one.
+      size_t len = fn_tx_pending_len;
+      memcpy(fanet_pkt, fn_tx_pending_buf, len);
+      fn_tx_pending_len = 0;   /* clear before transmit so re-entry is safe */
+      Serial.print("FN_TX: transmitting queued FANET frame, len=");
+      Serial.println(len);
+      return len;
+  }
+
   uint32_t now = millis();
 
   /* Distress mode: alternate SOS message and DISTRESS tracking */
@@ -591,8 +701,9 @@ size_t fanet_encode(void *fanet_pkt, container_t *this_aircraft) {
       fanet_sos_last_ms = now;
       fanet_sos_count++;
       char sos_msg[60];
-      snprintf(sos_msg, sizeof(sos_msg), "SOS Pilot in distress %.5f,%.5f",
-               this_aircraft->latitude, this_aircraft->longitude);
+      snprintf(sos_msg, sizeof(sos_msg), "SOS %s %.4f,%.4f,%0f",
+          (ground_status == GROUND_STATUS_NEED_MED? "NEED MED" : "DISTRESS"),
+          this_aircraft->latitude, this_aircraft->longitude, this_aircraft->altitude);
       return fanet_type3_encode(fanet_pkt, this_aircraft, sos_msg);
     }
     // SOS message every 30 sec, ground tracking every few seconds:
@@ -609,10 +720,11 @@ size_t fanet_encode(void *fanet_pkt, container_t *this_aircraft) {
 
   // If distress mode then it is caught above.
   // If AUTO_DISTRESS then wait until landing situation is clear before sending ground status
-  if (ground_status > GROUND_STATUS_COUNTDOWN)
+  if (ground_status > GROUND_STATUS_COUNTDOWN /* || ground_status == GROUND_STATUS_INITIAL */ )
       return fanet_type7_encode(fanet_pkt, this_aircraft);
 
   /* Otherwise send normal Air Tracking (Type 1) */
+  // >>> what if not airborne, still in ground_status=initial, should send type-7? Or send nothing?
   return fanet_type1_encode(fanet_pkt, this_aircraft);
 }
 

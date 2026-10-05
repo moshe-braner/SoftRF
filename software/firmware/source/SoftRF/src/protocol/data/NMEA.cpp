@@ -22,6 +22,7 @@
 #include <TimeLib.h>
 
 #include "NMEA.h"
+#include "FNF.h"
 #include "GDL90.h"
 #include "../radio/ES1090.h"
 #include "../../driver/GNSS.h"
@@ -441,6 +442,7 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg)
       return;   // not implemented
       break;
   }
+
   char igc_text[18];
   int i=0;
   int j=0;
@@ -450,7 +452,7 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg)
       if (c == '\0')
           break;
       if ((c & 0xC0) != 0xC0) {
-          if (c=='$' || c=='*' || c=='!' || c=='\\' || c=='^' || c=='~' || c<' ' || c>'}')
+          if (c < ' ' || c=='$' || c=='*' || c=='!' || c=='\\' || c=='^' || c=='~' || c<' ' || c>'}')
               igc_text[j++] = '_';
           else
               igc_text[j++] = c;
@@ -469,6 +471,7 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg)
       i += more;       // skip over the rest of the group
   }
   igc_text[j] = '\0';
+
   uint8_t *hex_text = msg;
   if (as_hex) {
       hex_text = (uint8_t *) bytes2Hex((byte *)msg, count, nullterm);
@@ -486,22 +489,19 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg)
                cip->addr_type, cip->addr, MsgTypeLabel, (as_hex? hex_text : msg));
   NMEAOutC(NMEA_T_PFLAM);
 
+  // debug output as printable, also used below for flight log
+  snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("PFLAM,%d,%06X,%s,%s\r\n"),
+           cip->addr_type, cip->addr, MsgTypeLabel, igc_text);
+  NMEAOutD();
+
   if (type > PFLAM_ACALL && type != PFLAM_BCST)
       return;
 
   // record first-time periodic info, and all broadcasts, in flight log
+  // note: this keeps unicast messages out of the flight log, for privacy
   if (settings->logflight >= FLIGHT_LOG_TRAFFIC &&
-        (type == PFLAM_BCST || ((cip->pflam & (1<<type)) == 0))) {
-/*
-      if (as_hex)
-          snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("M,%d,%06X,%d,%s"),
-               cip->addr_type, cip->addr, type, hex_text);
-          FlightLogComment(NMEABuffer);   // LSRFM
-      }
-*/
-      snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("M,%d,%06X,%s,%s"),
-               cip->addr_type, cip->addr, MsgTypeLabel, igc_text);
-      FlightLogComment(NMEABuffer);   // LSRFM
+          (type == PFLAM_BCST || ((cip->pflam & (1<<type)) == 0))) {
+      FlightLogComment(NMEABuffer+4);   // "LSRF" implicit
       if (type <= PFLAM_ACALL)
           cip->pflam |= (1<<type);  // mark to not output again (unless entry expires)
   }
@@ -817,6 +817,11 @@ if (NMEA_Source != DEST_NONE) {     // only external sources
   case DEST_BLUETOOTH:
     {
       if (BTactive && SoC->Bluetooth_ops) {
+        if (settings->debug_flags & DEBUG_BLUETOOTH) {
+          Serial.print("BT_TX: ");
+          Serial.write(buf, size);
+          Serial.println();
+        }
         SoC->Bluetooth_ops->write((const byte *) buf, size);
         if (nl)
           SoC->Bluetooth_ops->write((const byte *) "\r\n", 2);
@@ -927,17 +932,19 @@ void NMEA_bridge_send(char *buf, int len)
     Serial.print(NMEA_Source);
     Serial.print("): ");
     //Serial.write(buf, len);
-    Serial.print(buf);
+    Serial.println(buf);
 #endif
     // First check whether it is GNSS or FLARM sentences, skip them (assume echo)
     if (buf[1]=='G' && buf[2]=='P')
         return;
-    if (buf[1]=='P' && buf[2]=='F' && buf[3]=='L' && buf[4]=='A')
+    if (buf[1]=='P' && buf[2]=='F' && buf[3]=='L' && buf[4]=='A') {
+        // >>> TBD: PFLAM commands will be trapped here
         return;
+    }
 
 #if defined(USE_NMEA_CFG)
     // Also trap PSRF/PSKV config sentences, process internally instead
-    if (len > 6 && buf[1]=='P' && buf[2]=='S') {
+    if (len > 6 && buf[0]=='$' && buf[1]=='P' && buf[2]=='S') {
       if ((buf[3]=='R' && buf[4]=='F') || (buf[3]=='K' && buf[4]=='V')) {
 //Serial.print("SKV (len:=");
 //Serial.print(len);
@@ -976,7 +983,23 @@ void NMEA_bridge_send(char *buf, int len)
     }
 #endif
 
-    // remaining are sentences that are NOT GNSS, FLARM or PSRF/PSKV
+#if defined(INCLUDE_FNF)
+    // Also trap #FN / #SYC commands, process internally instead
+    if (buf[0] == '#') {
+        // no checksum required
+        // either of these commands triggers FNF mode
+        bool rval = false;
+        if (buf[1] == 'F' /* && buf[2] == 'N' */)
+            rval = FN_process_command(buf, len);
+        else if (buf[1] == 'S' /* && buf[2] == 'Y' */)
+            rval = SYC_process_command(buf, len);
+        if (rval)
+            NMEA_bridge_sent = true;
+        return;
+    }
+#endif
+
+    // remaining are sentences that are NOT GNSS, FLARM, FANET, PSRF/PSKV nor FN/SYC
     // forward them to configured outputs, but do not echo to source
 
 #if 1
@@ -984,15 +1007,15 @@ void NMEA_bridge_send(char *buf, int len)
     Serial.print(NMEA_Source);
     Serial.print("): ");
     //Serial.write(buf, len);
-    Serial.print(buf);
+    Serial.println(buf);
 #endif
 
     if (settings->nmea_e && settings->nmea_out != NMEA_Source) {
-        NMEA_Out(settings->nmea_out, buf, len, false);
+        NMEA_Out(settings->nmea_out, buf, len, true);
         NMEA_bridge_sent = true;
     }
     if (settings->nmea2_e && settings->nmea_out2 != NMEA_Source) {
-        NMEA_Out(settings->nmea_out2, buf, len, false);
+        NMEA_Out(settings->nmea_out2, buf, len, true);
         NMEA_bridge_sent = true;
     }
 }
@@ -1001,29 +1024,35 @@ void NMEA_bridge_send(char *buf, int len)
 // this is the common code for all these buffers:
 void NMEA_bridge_buf(char c, char* buf, int& n)
 {
-    if (c == '$') {
+    if (c == '$' || c == '!' || c == '#') {
         n = 0;
         // start new sentence, drop any preceding data
         // fall through to buf[n++] = c;
-    } else if (n == 0) {      // wait for a '$' (or '!')
-        if (c != '!')
-            return;
-        // if '!', start new sentence of some related protocols
-        // fall through to buf[n++] = c;
+    } else if (n == 0) {
+        // wait for a '$' (or '!' or '#')
+        return;
     } else if (c=='\r' || c=='\n') {
-        if (n > 5 && n <= 128) {
-            // sentences missing "*xx" ending are ignored unless started with '!'
-            // >>> or could forward all sentences even without checksum?
-            if (buf[0] == '!' || buf[n-3] == '*') {
-                buf[n++] = '\r';
-                buf[n++] = '\n';      // add a proper line-ending
-                buf[n]   = '\0';
-                NMEA_bridge_send(buf, n);
+        if (n > 3) {
+#if 0
+            /* Debug: log complete sentences received from BLE */
+            if (NMEA_Source == DEST_BLUETOOTH) {
+                buf[n] = '\0';
+                Serial.print("BLE_RX: ");
+                Serial.println(buf);
             }
+#endif
+            // sentences missing "*xx" ending are ignored unless started with '!' or '#'
+            // >>> or could forward all sentences even without checksum?
+            if (buf[0] == '!' || buf[0] == '#' || buf[n-3] == '*')
+                NMEA_bridge_send(buf, n);
         }
         n = 0;
         return;
-    } else if (n >= 128) {
+#if defined(INCLUDE_FNF)
+    } else if (n >= (NMEA_Source == DEST_BLUETOOTH ? 256-3 : 128-3)) {
+#else
+    } else if (n >= 128-3) {
+#endif
         n = 0;
         return;
     }
@@ -1155,13 +1184,32 @@ void NMEA_loop()
   }  // end if (is_a_prime_mk2)
 #endif
 
+#if defined(INCLUDE_FNF)
+    static char bt_buf[256+3];   // extra room for #FN sentences
+#else
     static char bt_buf[128+3];
+#endif
     static int bt_n = 0;
     if (SoC->Bluetooth_ops) {
       gdl90 = (settings->gdl90_in == DEST_BLUETOOTH);
       while (BTactive && SoC->Bluetooth_ops->available() > 0) {
           NMEA_Source = DEST_BLUETOOTH;
           int c = SoC->Bluetooth_ops->read();
+          if ((settings->debug_flags & DEBUG_BLUETOOTH) && c >= 0) {
+              static bool ble_rx_tracing = false;
+              if (c >= 0x20 && c < 0x7F) {
+                  if (! ble_rx_tracing)
+                      Serial.print("BT_RX: ");
+                  ble_rx_tracing = true;
+                  Serial.write((char)c);
+              } else if (c == '\r' || c == '\n') {
+                  if (ble_rx_tracing)
+                      Serial.println();
+                  ble_rx_tracing = false;
+              } else {
+                  Serial.write((char)'.');
+              }
+          }
 #if defined(ESP32)
           if (gdl90)
               GDL90_bridge_buf(c, bt_buf, bt_n);
@@ -1403,7 +1451,11 @@ void NMEA_Export()
     }
 #endif /* EXCLUDE_SOFTRF_HEARTBEAT */
 
-    if (! (settings->nmea_t || settings->nmea2_t))
+#if defined(INCLUDE_FNF)
+    FN_check_ack_timeout();
+#endif
+
+    if (settings->nmea_t==0 && settings->nmea2_t==0)
          return;
 
     container_t *cip, *fop;
@@ -1552,6 +1604,14 @@ void NMEA_Export()
          // since it will be in the PFLAU sentence - but XCsoar etc
          // seem to ignore the PFLAU, so report the HP object both ways
          //if (total_objects < MAX_NMEA_OBJECTS || fop->addr != HP_addr) {
+
+         // don't send PFLAA nor FNNGB if target is being reported via FNF
+         uint8_t saved_nmea_t  = settings->nmea_t;
+         uint8_t saved_nmea2_t = settings->nmea2_t;
+         if (fop->protocol == RF_PROTOCOL_FANET) {
+             if (settings->nmea_out == FNF_dest)  settings->nmea_t = 0;
+             else if (settings->nmea_out2 == FNF_dest)  settings->nmea2_t = 0;
+         }
 
          uint8_t addr_type = fop->addr_type;
          if (addr_type > ADDR_TYPE_FLARM)
@@ -1707,10 +1767,12 @@ void NMEA_Export()
 
         }  // end of if (NMEA_T_PFLAA)
 
-        if (fop->tx_type > TX_TYPE_S
-        &&  ((settings->nmea_t | NMEA_T_FNNGB) || (settings->nmea2_t | NMEA_T_FNNGB))) {
+        // $FNNGB sentences for FANET traffic with known pilot names.
+        // Suppressed when XCGuide is connected - it gets names via #FNF type 2.
+        // - that is now done via settings->nmea_t=0 above
+        if (/* FNF_dest == DEST_NONE && */ fop->tx_type > TX_TYPE_S
+        &&  ((settings->nmea_t & NMEA_T_FNNGB) || (settings->nmea2_t & NMEA_T_FNNGB))) {
 
-            // $FNNGB sentences for FANET traffic with known pilot names
             const char *actype_label = Aircraft_Type[AIRCRAFT_TYPE_UNKNOWN];
             if (fop->aircraft_type < 32)
                 actype_label = Aircraft_Type[fop->aircraft_type];
@@ -1741,6 +1803,9 @@ void NMEA_Export()
 
         }  // end of if (NMEA_T_FNNGB)
 
+        settings->nmea_t  = saved_nmea_t;
+        settings->nmea2_t = saved_nmea2_t;
+
         if (fop->next >= MAX_TRACKING_OBJECTS)  break;    /* belt and suspenders */
 
         fop = &Container[fop->next];
@@ -1748,9 +1813,14 @@ void NMEA_Export()
       }  // end of for() loop
     }
 
-    if ((settings->nmea_t & NMEA_T_PFLAA) || (settings->nmea2_t & NMEA_T_PFLAA)) {
+    //if ((settings->nmea_t & NMEA_T_PFLAA) || (settings->nmea2_t & NMEA_T_PFLAA))
 
-      /* One PFLAU NMEA sentence is mandatory regardless of traffic reception status */
+    if ((settings->nmea_t & (NMEA_T_PFLAA | NMEA_T_FNNGB))
+    ||  (settings->nmea2_t & (NMEA_T_PFLAA | NMEA_T_FNNGB))) {
+
+      // One PFLAU NMEA sentence is mandatory regardless of traffic reception status.
+      // Note: PFLAU is sent even to FNF or FNNGB dest
+
       int power_status = (voltage > 0 && voltage < Battery_threshold()) ?
                            POWER_STATUS_BAD : POWER_STATUS_GOOD;
 
@@ -1828,7 +1898,8 @@ void NMEA_Export()
                   PFLAU_EXT1_ARGS );
       }
 
-      NMEAOutC(NMEA_T_PFLAA);
+      //NMEAOutC(NMEA_T_PFLAA);
+      NMEAOutC(NMEA_T_PFLAA | NMEA_T_FNNGB);
 
     }
 
@@ -2113,7 +2184,13 @@ void NMEA_Process_SRF_SKV_Sentences()
       if (strncmp(C_Version.value(), "LST", 3) == 0) {             // $PSRFC,LST*33
           // reply in the same format as the settings file, but EXCLUDING comments
           delay(20);
-          snprintf(CONFBuffer, sizeof(CONFBuffer), "SoftRF,%s\r\n", SOFTRF_FIRMWARE_VERSION);              
+#if defined(ESP32)
+          snprintf(CONFBuffer, sizeof(CONFBuffer), "SoftRF,%s,ESP32\r\n", SOFTRF_FIRMWARE_VERSION);
+#elif defined(ARDUINO_ARCH_NRF52)
+          snprintf(CONFBuffer, sizeof(CONFBuffer), "SoftRF,%s,nRF52\r\n", SOFTRF_FIRMWARE_VERSION);
+#else
+          snprintf(CONFBuffer, sizeof(CONFBuffer), "SoftRF,%s,?????\r\n", SOFTRF_FIRMWARE_VERSION);
+#endif
           nmea_cfg_reply(false);
           for (int i=STG_MODE; i<STG_END; i++) {
              if (hidden_setting(i))
@@ -2176,27 +2253,38 @@ void NMEA_Process_SRF_SKV_Sentences()
 
       } else if (strncmp(C_Version.value(), "GS", 2) == 0) {
           char c = C_Version.value()[2];
-          if (c)
+          if (c) {
             Serial.print(F("set ground_status: "));
-          switch (c) {
-            case '8':
-            case '9':
-              ground_status = c - '0';
-              Serial.println(ground_status);
-              break;
-            case 'C':
-            case 'D':
-            case 'E':
-              ground_status = c - 'A' + 10;
-              Serial.println(ground_status);
-              break;
-            case '\0':   // PSRFC,GS used as a query
-              snprintf_P(CONFBuffer, sizeof(CONFBuffer),
-                PSTR("$PSRFC,GS%X*"), ground_status);              
-              nmea_cfg_reply();
-              break;
-            default:
-              Serial.println(F("invalid value"));
+            switch (c) {
+              case '8':
+              case '9':
+                ground_status = c - '0';
+                Serial.println(ground_status);
+                ThisAircraft.airborne = 0;  /* explicit ground command - force ground mode */
+                break;
+              case 'C':
+              case 'D':
+              case 'E':
+                ground_status = c - 'A' + 10;
+                Serial.println(ground_status);
+                ThisAircraft.airborne = 0;  /* explicit ground command - force ground mode */
+                break;
+              case '0':
+                // >>> GS0 (sent by a "clear state" button in SkySignals)
+                ground_status = 0;   // INITIAL
+                Serial.println("initial");
+                // >>> do not change airborne status
+                break;
+              default:
+                Serial.println(F("invalid value"));
+                // >>> do not change airborne status
+                break;
+            }
+          } else {
+            // PSRFC,GS used as a query
+            snprintf_P(CONFBuffer, sizeof(CONFBuffer),
+              PSTR("$PSRFC,GS%X*"), ground_status);              
+            nmea_cfg_reply();
           }
 
       } else if (strncmp(C_Version.value(), "?", 1) == 0) {        // $PSRFC,?*47
@@ -2558,11 +2646,18 @@ void NMEA_Process_SRF_SKV_Sentences()
 }
 #endif /* USE_NMEA_CFG */
 
+#if defined(INCLUDE_FNF)
+static char hexbuf[256];  // larger, to hold FNF payloads
+#else
 static char hexbuf[NMEA_BUFFER_SIZE];
-char *bytes2Hex(byte *buffer, size_t size, bool nullterm)
+#endif
+
+char *bytes2Hex(const byte *buffer, size_t size, bool nullterm)
 {
   char *p = hexbuf;
-  for (int i=0; i < size && i < NMEA_BUFFER_SIZE/2-1; i++) {
+  if (nullterm || size > (sizeof(hexbuf)/2-1))
+      size = (sizeof(hexbuf)/2-1);
+  for (int i=0; i < size ; i++) {
     byte c = buffer[i];
     if (nullterm && c == '\0')
         break;
@@ -2573,4 +2668,38 @@ char *bytes2Hex(byte *buffer, size_t size, bool nullterm)
   }
   *p = '\0';
   return hexbuf;
+}
+
+bool hex2bytes(const char *hex, uint8_t *buffer, size_t size)
+{
+    for (unsigned int i = 0; i < size; i++) {
+        unsigned int byte_val;
+        if (*hex == '\0') {
+            buffer[i] = 0;
+        } else {
+            if (sscanf(hex, "%2X", &byte_val) != 1)
+                return false;
+            buffer[i] = (uint8_t)byte_val;
+            hex += 2;
+        }
+    }
+    return true;
+}
+
+// pass printable ASCII chars but mask other values with '.'
+char *filter_printable(const unsigned char *source, size_t size, char *dest)
+{
+    if (dest == NULL)
+        dest = hexbuf;
+    if (size > NMEA_BUFFER_SIZE-3)
+        size = NMEA_BUFFER_SIZE-3;
+    char *p = dest;
+    while (size-- != 0) {
+        char b = *source++;
+        if (b < 0x20 || b >= 0x7F)
+            b = '.';
+        *p++ = b;
+    }
+    *p = '\0';
+    return dest;
 }

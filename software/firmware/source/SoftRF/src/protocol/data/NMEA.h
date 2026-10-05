@@ -48,6 +48,13 @@
 #define PSKVC_VERSION       2
 //#define MAX_PSKVC_LEN       96
 
+#if defined(ARDUINO_ARCH_NRF52) || defined(ARDUINO_ARCH_NRF52840)
+#define INCLUDE_FNF
+extern bool FNF_enabled;
+void NMEA_FNF_Out(const uint8_t *raw, size_t raw_len);
+void FN_check_ack(const uint8_t *raw, size_t raw_len);
+#endif
+
 void NMEA_setup(void);
 void NMEA_loop(void);
 void flushNMEAlog();
@@ -71,7 +78,9 @@ void NMEA_PFLAM(uint8_t type, container_t *cip, uint8_t *msg);
 
 int WiFi_transmit_TCP(const char *buf, size_t size);
 
-char *bytes2Hex(byte *, size_t, bool nullterm=false);
+char *bytes2Hex(const byte *, size_t, bool nullterm=false);
+bool hex2bytes(const char *hex, uint8_t *buffer, size_t size);
+char *filter_printable(const unsigned char *source, size_t size, char *dest=NULL);
 
 extern uint8_t NMEA_Source;
 extern char GPGGA_Copy[NMEA_BUFFER_SIZE];
