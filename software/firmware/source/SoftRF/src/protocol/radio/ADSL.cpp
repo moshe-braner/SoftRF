@@ -163,6 +163,8 @@ bool adsl_decode(void *pkt, container_t *this_aircraft, ufo_t *fop) {
       return false;
 
   for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+    if (excess[i].addr == fop->addr)        // known as far and not tracked
+        return false;
     container_t *cip = &Container[i];
     if (cip->addr == fop->addr) {
       if (cip->protocol == RF_PROTOCOL_LATEST

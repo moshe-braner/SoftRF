@@ -452,13 +452,13 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
 
     int32_t round_lat;
     if (ref_lat < 0.0)
-        round_lat = -(((int32_t) (-ref_lat * 1e7) + 26) / 52);
+        round_lat = -(((int32_t) (-ref_lat * 1e7f) + 26) / 52);
     else
-        round_lat = ((int32_t) (ref_lat * 1e7) + 26) / 52;
+        round_lat = ((int32_t) (ref_lat * 1e7f) + 26) / 52;
     int32_t ilat = pkt->lat;
     ilat = (ilat - round_lat) & 0x0FFFFF;
     if (ilat >= 0x080000) ilat -= 0x100000;
-    float lat = (float)((ilat + round_lat) * 52) * 1e-7;
+    float lat = (float)((ilat + round_lat) * 52) * 1e-7f;
 //Serial.printf("latitude: %f\n", lat);
     fop->latitude = lat;
 
@@ -466,13 +466,13 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
 
     int32_t round_lon;
     if (ref_lon < 0.0)
-        round_lon = -(((int32_t) (-ref_lon * 1e7) + (d>>1)) / d);
+        round_lon = -(((int32_t) (-ref_lon * 1e7f) + (d>>1)) / d);
     else
-        round_lon = ((int32_t) (ref_lon * 1e7) + (d>>1)) / d;
+        round_lon = ((int32_t) (ref_lon * 1e7f) + (d>>1)) / d;
     int32_t ilon = pkt->lon;
     ilon = (ilon - round_lon) & 0x0FFFFF;
     if (ilon >= 0x080000) ilon -= 0x0100000;
-    float lon = (float)((ilon + round_lon) * d) * 1e-7;
+    float lon = (float)((ilon + round_lon) * d) * 1e-7f;
 //Serial.printf("longitude: %f\n", lon);
     fop->longitude = lon;
 
@@ -483,11 +483,11 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
 
     int16_t speed10 = descale(pkt->speed,8,2,0);
 //Serial.printf("speed10: %d\n", speed10);           // speed, in units of tenths of meters per second
-    fop->speed = (1.0 / (10.0 * _GPS_MPS_PER_KNOT)) * (float)speed10;
+    fop->speed = (float)(1.0 / (10.0 * _GPS_MPS_PER_KNOT)) * (float)speed10;
 //Serial.printf("speed: %.1f knots\n", fop->speed);
 
     int vs10 = descale(pkt->vs,6,2,1);
-    fop->vs = ((float) vs10) * (_GPS_FEET_PER_METER * 6.0);
+    fop->vs = ((float) vs10) * (float)(_GPS_FEET_PER_METER * 6.0);
 //Serial.printf("VS10? %d\n", vs10);
 
     int course = ((((uint32_t)pkt->course) & 0x03FF) >> 1);    // course as degrees 0-360
@@ -519,7 +519,7 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
         if (settings->debug_flags & DEBUG_DEEPER) {
           /* also output ownship data */
           float speedf = this_aircraft->speed * _GPS_MPS_PER_KNOT; /* m/s */
-          float fvs10 = this_aircraft->vs * (10.0/ (_GPS_FEET_PER_METER * 60.0)); /* vs10 */
+          float fvs10 = this_aircraft->vs * (float)(10.0/ (_GPS_FEET_PER_METER * 60.0)); /* vs10 */
           snprintf_P(NMEABuffer, sizeof(NMEABuffer),
             PSTR("$PSRFA,%ld,%06X,%.6f,%.6f,%.0f,%.0f,%.0f,%.1f,%.1f\r\n"),
             timestamp, fop->addr,
@@ -550,7 +550,7 @@ void pflam_decode(void *buffer, container_t *cip, ufo_t *fop) {     // fop has a
 
     if ((settings->nmea_t & NMEA_T_PFLAM == 0) && (settings->nmea2_t & NMEA_T_PFLAM == 0))
         return;
-    // - also done in NMEA_PFLAM()
+    // - also done in NMEA_PFLAM(), but check here, to avoid wasting CPU time decrypting PFLAM
 
     /* find this aircraft in the tracking table
          - already done in legacy_decode(), cip passed
@@ -603,10 +603,13 @@ void pflam_decode(void *buffer, container_t *cip, ufo_t *fop) {     // fop has a
 
     // try and relay some messages from landed-out aircraft
     if (ground_status == GROUND_STATUS_AIRBORNE) {
-      if (pflam_type == PFLAM_ATYPE /* || pflam_type == PFLAM_BCST */) {
-        if (strcmp(cp, "DISTRESS") == 0 || strcmp(cp, "LANDED OUT") == 0) {
+      if (pflam_type == PFLAM_ATYPE || pflam_type == PFLAM_BCST) {
+        legacy_packet_t *pkt = (legacy_packet_t *) buffer;
+        if (pkt->addr_type < 3) {   // not already relayed
+          if (strcmp(cp, "DISTRESS") == 0 || strcmp(cp, "LANDED OUT") == 0) {
             memcpy( (void *)&message_to_relay, buffer, sizeof(latest_packet_t) );
             have_message_to_relay = true;
+          }
         }
       }
     }
@@ -671,6 +674,8 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
               return false;
         }
         break;
+      } else if (excess[i].addr == fop->addr) {        // not tracked but known as far
+          return false;
       }
     }
     fop->last_crc = RF_last_crc;
@@ -745,19 +750,19 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     // this section revised by MB on 220526
     int32_t round_lat, round_lon;
     if (ref_lat < 0.0)
-        round_lat = -(((int32_t) (-ref_lat * 1e7) + 0x40) >> 7);
+        round_lat = -(((int32_t) (-ref_lat * 1e7f) + 0x40) >> 7);
     else
-        round_lat = ((int32_t) (ref_lat * 1e7) + 0x40) >> 7;
+        round_lat = ((int32_t) (ref_lat * 1e7f) + 0x40) >> 7;
     int32_t ilat = ((int32_t)pkt->lat - round_lat) & 0x07FFFF;
     if (ilat >= 0x040000) ilat -= 0x080000;
-    float lat = (float)((ilat + round_lat) << 7) * 1e-7;
+    float lat = (float)((ilat + round_lat) << 7) * 1e-7f;
     if (ref_lon < 0.0)
-        round_lon = -(((int32_t) (-ref_lon * 1e7) + 0x40) >> 7);
+        round_lon = -(((int32_t) (-ref_lon * 1e7f) + 0x40) >> 7);
     else
-        round_lon = ((int32_t) (ref_lon * 1e7) + 0x40) >> 7;
+        round_lon = ((int32_t) (ref_lon * 1e7f) + 0x40) >> 7;
     int32_t ilon = ((int32_t)pkt->lon - round_lon) & 0x0FFFFF;
     if (ilon >= 0x080000) ilon -= 0x0100000;
-    float lon = (float)((ilon + round_lon) << 7) * 1e-7;
+    float lon = (float)((ilon + round_lon) << 7) * 1e-7f;
 
     // do some sanity checks on the data
     if (fabs(lat - this_aircraft->latitude) > 1.0
@@ -772,7 +777,7 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     float ewf = (float) (((int) pkt->ew[0]) << smult);
     float course = R2D * atan2(ewf, nsf);
     if (course < 0.0)
-        course += 360.0;
+        course += 360.0f;
     float speed4 = hypot(nsf, ewf);
     float interval, factor;
     if (pkt->aircraft_type == AIRCRAFT_TYPE_TOWPLANE) {      // known 4-second intervals
@@ -795,17 +800,17 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     if (speed4 > 0) {
       float nextcourse = R2D * atan2((float)pkt->ew[1], (float)pkt->ns[1]);
       if (nextcourse < 0.0)
-          nextcourse += 360.0;
+          nextcourse += 360.0f;
       float turnangle = (nextcourse - course);
-      if (turnangle >  270.0) turnangle -= 360.0;
-      if (turnangle < -270.0) turnangle += 360.0;
+      if (turnangle >  270.0f) turnangle -= 360.0f;
+      if (turnangle < -270.0f) turnangle += 360.0f;
       turnrate = turnangle * factor;
       /* adjust course direction for turning during time between "now" and [0] */
       // it appears that the time of [0] after "now" is same as the interval between [0] & [1]
       // course -= interval * turnrate;
       course -= turnangle;
-      if (course >  360.0) course -= 360.0;
-      if (course < -360.0) course += 360.0;
+      if (course >  360.0f) course -= 360.0f;
+      if (course < -360.0f) course += 360.0f;
     }
 
     uint16_t vs_u16 = pkt->vs;
@@ -828,9 +833,9 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
     if (unk2 == 2)   // appears with implausible data in speed fields
         implausible = true;
     /* if (fop->relayed) */ {   // additional sanity checks
-        if (speed4 > 600.0)
+        if (speed4 > 600.0f)
             implausible = true;
-        if (fabs(turnrate) > 100.0)
+        if (fabs(turnrate) > 100.0f)
             implausible = true;
     }
     if (implausible) {
@@ -847,18 +852,18 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
 
     /* adjust position to "now" - it sent a position 2 sec into future */
     float course2 = course - turnrate;     // average course over the previous 2 seconds
-    float offset = speed4 * (2.0 / 4.0 / 111300.0);   // degslat/sec * 2 sec = degs moved
+    float offset = speed4 * (float)(2.0 / 4.0 / 111300.0);   // degslat/sec * 2 sec = degs moved
     fop->latitude  = lat - (offset * cos(D2R * course2));
     fop->longitude = lon - (offset * sin(D2R * course2) * InvCosLat());
 
     fop->altitude = (float) alt;   // was  - this_aircraft->geoid_separation;
-    fop->speed = (1.0 / (4.0 * _GPS_MPS_PER_KNOT)) * speed4;
+    fop->speed = (float)(1.0 / (4.0 * _GPS_MPS_PER_KNOT)) * speed4;
     fop->aircraft_type = pkt->aircraft_type;
     fop->course = course;
 //    fop->heading = heading;
     fop->turnrate = turnrate;
          /* this is as reported by FLARM, which is ground-reference - at time [0]? */
-    fop->vs = ((float) vs10) * (_GPS_FEET_PER_METER * 6.0);
+    fop->vs = ((float) vs10) * (_GPS_FEET_PER_METER * 6.0f);
     fop->stealth = pkt->stealth;
     fop->no_track = pkt->no_track;
     /* There is no need to keep the ns[] & ew[] data  */
@@ -914,6 +919,7 @@ bool pflam_encode(latest_packet_t *pkt)
     if (have_message_to_relay && ground_status == GROUND_STATUS_AIRBORNE) {
         // relay messages from other landed-out aircraft instead of ours
         memcpy ((uint8_t *)pkt, (uint8_t *)&message_to_relay, sizeof(legacy_packet_t));
+        pkt->addr_type |= 4;   // mark as relayed
         have_message_to_relay = false;
         return true;
     }
@@ -1046,14 +1052,14 @@ Serial.printf("RF_time=%d but should be %d\r\n", (uint32_t) RF_time, timestamp);
     float lon = aircraft->longitude;
 
     if (lat < 0.0)
-        pkt->lat = (uint32_t) (-(((int32_t) (-lat * 1e7) + 26) / 52)) & 0x0FFFFF;
+        pkt->lat = (uint32_t) (-(((int32_t) (-lat * 1e7f) + 26) / 52)) & 0x0FFFFF;
     else
-        pkt->lat = (((uint32_t) (lat * 1e7) + 26) / 52) & 0x0FFFFF;
+        pkt->lat = (((uint32_t) (lat * 1e7f) + 26) / 52) & 0x0FFFFF;
     int d = londiv((int)fabs(lat));
     if (lon < 0.0)
-        pkt->lon = (uint32_t) (-(((int32_t) (-lon * 1e7) + (d>>1)) / d)) & 0x0FFFFF;
+        pkt->lon = (uint32_t) (-(((int32_t) (-lon * 1e7f) + (d>>1)) / d)) & 0x0FFFFF;
     else
-        pkt->lon = (((uint32_t) (lon * 1e7) + (d>>1)) / d) & 0x0FFFFF;
+        pkt->lon = (((uint32_t) (lon * 1e7f) + (d>>1)) / d) & 0x0FFFFF;
 
     int32_t alt = (int32_t) aircraft->altitude;    // was   + ThisAircraft.geoid_separation
     pkt->alt = enscale(alt+1000,12,1,0);  // 13 bits total, unsigned (with offset)
@@ -1249,13 +1255,13 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
 
     // this section revised by MB on 220526
     if (lat < 0.0)
-        pkt->lat = (uint32_t) (-(((int32_t) (-lat * 1e7) + 0x40) >> 7)) & 0x07FFFF;
+        pkt->lat = (uint32_t) (-(((int32_t) (-lat * 1e7f) + 0x40) >> 7)) & 0x07FFFF;
     else
-        pkt->lat = (((uint32_t) (lat * 1e7) + 0x40) >> 7) & 0x07FFFF;
+        pkt->lat = (((uint32_t) (lat * 1e7f) + 0x40) >> 7) & 0x07FFFF;
     if (lon < 0.0)
-        pkt->lon = (uint32_t) (-(((int32_t) (-lon * 1e7) + 0x40) >> 7)) & 0x0FFFFF;
+        pkt->lon = (uint32_t) (-(((int32_t) (-lon * 1e7f) + 0x40) >> 7)) & 0x0FFFFF;
     else
-        pkt->lon = (((uint32_t) (lon * 1e7) + 0x40) >> 7) & 0x0FFFFF;
+        pkt->lon = (((uint32_t) (lon * 1e7f) + 0x40) >> 7) & 0x0FFFFF;
 
     if (alt < 0) {
         alt = 0;    // cannot be negative

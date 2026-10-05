@@ -23,30 +23,30 @@
 #include "driver/RF.h"
 
 /* for DISTANCE method: traffic beyond ALARM_ZONE_NONE is invisible */
-#define ALARM_ZONE_NONE       15000 /* zone range is 1500m <-> 15000m */
-#define ALARM_ZONE_CLOSE      1500  /* zone range is 1000m <->  1500m */
-#define ALARM_ZONE_LOW        1000  /* zone range is  700m <->  1000m */
-#define ALARM_ZONE_IMPORTANT  700   /* zone range is  400m <->   700m */
-#define ALARM_ZONE_URGENT     400   /* zone range is    0m <->   400m */
-#define ALARM_ZONE_EXTREME    250
+#define ALARM_ZONE_NONE      15000.0f   /* zone range is 1500m <-> 15000m */
+#define ALARM_ZONE_CLOSE      1500.0f   /* zone range is 1000m <->  1500m */
+#define ALARM_ZONE_LOW        1000.0f   /* zone range is  700m <->  1000m */
+#define ALARM_ZONE_IMPORTANT   700.0f   /* zone range is  400m <->   700m */
+#define ALARM_ZONE_URGENT      400.0f   /* zone range is    0m <->   400m */
+#define ALARM_ZONE_EXTREME     250.0f
 
 /* for VECTOR method: */
-#define ALARM_VECTOR_ANGLE    10
-#define ALARM_VECTOR_SPEED   2.0    // was 0.3 (m/s) which may have caused alarms on tow
-#define ALARM_TIME_CLOSE      30
-#define ALARM_TIME_LOW        19
-#define ALARM_TIME_IMPORTANT  13
-#define ALARM_TIME_URGENT     9
-#define ALARM_TIME_EXTREME    6
+#define ALARM_VECTOR_ANGLE    10.0f
+#define ALARM_VECTOR_SPEED     2.0f   // was 0.3 (m/s) which may have caused alarms on tow
+#define ALARM_TIME_CLOSE      30.0f
+#define ALARM_TIME_LOW        19.0f
+#define ALARM_TIME_IMPORTANT  13.0f
+#define ALARM_TIME_URGENT      9.0f
+#define ALARM_TIME_EXTREME     6.0f
 
-#define VERTICAL_SLOPE                5  /* slope effect for alerts */
-#define VERTICAL_SLACK               30  /* meters  - allow for GPS alt error */
-#define VERTICAL_SEPARATION          80  /* meters adj_alt_diff - after SLACK removed - was 300 */
-#define VERTICAL_VISIBILITY_RANGE   900  /* this value higher than FLARM specs */
+#define VERTICAL_SLOPE             5.0f  /* slope effect for alerts */
+#define VERTICAL_SLACK            30.0f  /* meters  - allow for GPS alt error */
+#define VERTICAL_SEPARATION       80.0f  /* meters adj_alt_diff - after SLACK removed - was 300 */
+//#define VERTICAL_VISIBILITY_RANGE   900  /* this value higher than FLARM specs */
 
 /* stealth mode visibility range */
-#define STEALTH_DISTANCE 2000
-#define STEALTH_VERTICAL  300
+#define STEALTH_DISTANCE 2000.0f
+#define STEALTH_VERTICAL  300.0f
 
 #define TRAFFIC_VECTOR_UPDATE_INTERVAL 2 /* seconds */
 #define TRAFFIC_UPDATE_INTERVAL_MS (TRAFFIC_VECTOR_UPDATE_INTERVAL * 1000)
@@ -57,6 +57,12 @@ typedef struct traffic_by_dist_struct {
   container_t *fop;
   float distance;
 } traffic_by_dist_t;
+
+typedef struct excess_traffic_struct {
+  uint32_t addr;
+  uint32_t expire;
+  bool is_jet;
+} excess_traffic_t;
 
 enum
 {
@@ -84,6 +90,7 @@ enum
 
 void stage_air_relay(container_t *cip);
 void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len);
+void AddExcess(uint32_t addr, bool jet_identity);
 void ParseData(void);
 void Traffic_setup(void);
 void Traffic_loop(void);
@@ -108,6 +115,7 @@ float CosLat(void);
 float InvCosLat(void);
 
 extern container_t Container[MAX_TRACKING_OBJECTS];  // EmptyContainer;
+extern excess_traffic_t excess[MAX_TRACKING_OBJECTS]; 
 extern ufo_t fo;  // EmptyFO;
 extern uint8_t fo_raw[MAX_PKT_SIZE];
 extern char fo_callsign[33];

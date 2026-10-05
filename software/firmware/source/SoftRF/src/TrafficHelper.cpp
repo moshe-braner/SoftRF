@@ -26,13 +26,15 @@
 #include "TrafficHelper.h"
 #include "driver/Settings.h"
 #include "driver/RF.h"
+//#include "protocol/radio/Legacy.h"
+//#include "protocol/radio/ES1090.h"
 #include "driver/GNSS.h"
 #include "driver/Buzzer.h"
 #include "driver/Strobe.h"
 #include "driver/Filesys.h"
 #include "ui/Web.h"
-#include "protocol/radio/Legacy.h"
 #include "protocol/data/NMEA.h"
+//#include "protocol/data/FNF.h"
 #include "protocol/data/IGC.h"
 #include "Wind.h"
 
@@ -80,8 +82,11 @@ void startlogs()
         if (AlarmLog) {
             AlarmLogOpen = true;
             if (append == false) {
+              snprintf(NMEABuffer,sizeof(NMEABuffer),"originator: model %d fw %s ID %06X\r\n",
+                           hw_info.model, SOFTRF_FIRMWARE_VERSION, ThisAircraft.addr);
+              AlarmLog.print((const char *) NMEABuffer);
               const char *p = "date,time,lat,lon,level,count,ID,relbrg,hdist,vdist\r\n";
-              AlarmLog.write((const uint8_t *)p, strlen(p));
+              AlarmLog.print(p);
             }
         } else {
             Serial.println(F("Failed to open alarmlog.txt"));
@@ -122,8 +127,9 @@ void stoplogs()
 
 unsigned long UpdateTrafficTimeMarker = 0;
 
-container_t Container[MAX_TRACKING_OBJECTS];    // more fields
-ufo_t fo;                                       // fewer fields
+container_t Container[MAX_TRACKING_OBJECTS];     // more fields
+ufo_t fo;                                        // fewer fields
+excess_traffic_t excess[MAX_TRACKING_OBJECTS];   // farther traffic not tracked
 
 void EmptyContainer(container_t *cip) { memset(cip, 0, sizeof(CONTAINER)); }
 void EmptyFO(ufo_t *fop) { memset(fop, 0, sizeof(UFO)); }
@@ -1528,6 +1534,21 @@ void report_landed_out(ufo_t *fop)
         AlarmLog.print((const char *) NMEABuffer);
 }
 
+void AddExcess(uint32_t addr, bool jet_identity)
+{
+    for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+        if (excess[i].addr == 0) {
+            excess[i].addr = addr;
+            excess[i].expire = OurTime + 2;
+            excess[i].is_jet = jet_identity;
+            // jet_identity is for ADS-B traffic not yet tracked but
+            //   marked as a jet by a preceding identity message
+            return;
+        }
+    }
+    // if no room in excess[] then do nothing
+}
+
 void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
 {
     container_t *cip;
@@ -1694,6 +1715,8 @@ void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
         adj_distance = Container[i].adj_distance;
         if (adj_distance < Container[i].distance)
             adj_distance = Container[i].distance;
+        if (Container[i].aircraft_type == AIRCRAFT_TYPE_JET)
+            adj_distance *= 0.5;           // track jets from farther away
         if (adj_distance > max_dist)  {
           max_dist_ndx = i;
           max_dist = adj_distance;
@@ -1702,15 +1725,16 @@ void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
     }
 
     /* replace the farthest currently-tracked object, */
-    /* but only if the new object is closer (or "followed", or relayed) */;
+    /* but only if the new object is closer (or "followed" or relayed) */;
     Stash_Traffic_Distances(fop);
     adj_distance = stash.distance + VERTICAL_SLOPE * fabs(stash.alt_diff);
+    if (fop->aircraft_type == AIRCRAFT_TYPE_JET)
+        adj_distance *= 0.5;           // track jets from farther away
+    // - note: ADS-B traffic is handled in ES1090.cpp not here
     if (max_dist_ndx < MAX_TRACKING_OBJECTS
         && (adj_distance < max_dist || fop->addr == follow_id || fop->relayed)) {
       cip = &Container[max_dist_ndx];
-      //if (cip->addr == priority_relay)
-      //    priority_relay = 0;
-      //*cip = EmptyContainer;
+      AddExcess(cip->addr, false);     // mark to be ignored for a couple of seconds
       EmptyContainer(cip);
       CopyTraffic(cip, fop, callsign, cs_len);
       Copy_Traffic_Distances(cip);     // computed above by Stash_Traffic_Distances(fop)
@@ -1720,7 +1744,8 @@ void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
       return;
     }
 
-    /* otherwise ignore the new object */
+    // otherwise ignore the new object - but mark it as known excess
+    AddExcess(fop->addr, false);
 }
 
 void ParseData(void)
@@ -1728,8 +1753,9 @@ void ParseData(void)
     uint8_t rf_protocol = RF_last_protocol;
        // may differ from settings->rf_protocol in dual-protocol mode
     //size_t rx_size = RF_Payload_Size(rf_protocol);
-    size_t rx_size = curr_rx_protocol_ptr->payload_size;
-    rx_size = rx_size > sizeof(fo_raw) ? sizeof(fo_raw) : rx_size;
+    //size_t rx_size = curr_rx_protocol_ptr->payload_size;
+    size_t rx_size = RF_last_rx_len;
+    if (rx_size > sizeof(fo_raw))  rx_size = sizeof(fo_raw);
 
     if (memcmp(RxBuffer, TxBuffer, rx_size) == 0) {
 Serial.println("RF loopback is detected");     // seen on the sx1262?
@@ -1747,6 +1773,16 @@ Serial.println("RF loopback is detected");     // seen on the sx1262?
       StdOut.print(bytes2Hex(fo_raw, rx_size)); StdOut.print(F(","));
       StdOut.println(RF_last_rssi);
     }
+
+// this is now done from within fanet_decode()
+//#if defined(INCLUDE_FNF)
+#if 0
+    /* Send raw FANET frame as #FNF to XCGuide (if connected via BLE with high MTU).
+     * Use RF_last_rx_len (actual LoRa received length) not rx_size (fixed struct size),
+     * since FANET types 2/3 are variable-length. */
+    if (rf_protocol == RF_PROTOCOL_FANET && FNF_dest != DEST_NONE)
+        NMEA_FNF_Out(fo_raw, rx_size);
+#endif
 
     EmptyFO(&fo);    /* to ensure no data from past packets remains in any field */
 
@@ -1888,6 +1924,10 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
           // EmptyContainer(fop);
           fop->addr = 0;
 
+#if defined(INCLUDE_ES1090)
+          maxcprdiff_used = maxcprdiff_set;       // cancel reduced ADS-B range
+#endif
+
           /* implied by empty:
           fop->addr = 0;
           fop->alert = 0;
@@ -1968,6 +2008,14 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
         }
 #endif
       //}
+    }
+
+    // clear expired excess traffic
+    for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
+        if (excess[i].addr != 0) {
+            if (OurTime > excess[i].expire)
+                excess[i].addr = 0;
+        }
     }
 
     UpdateTrafficTimeMarker = millis();
