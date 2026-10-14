@@ -130,6 +130,7 @@ unsigned long UpdateTrafficTimeMarker = 0;
 container_t Container[MAX_TRACKING_OBJECTS];     // more fields
 ufo_t fo;                                        // fewer fields
 excess_traffic_t excess[MAX_TRACKING_OBJECTS];   // farther traffic not tracked
+bool congested = false;
 
 void EmptyContainer(container_t *cip) { memset(cip, 0, sizeof(CONTAINER)); }
 void EmptyFO(ufo_t *fop) { memset(fop, 0, sizeof(UFO)); }
@@ -1479,6 +1480,8 @@ void CopyTraffic(container_t *cip, ufo_t *fop, const char *callsign, size_t cs_l
     cip->stealth = fop->stealth;
     cip->no_track = fop->no_track;
     cip->relayed = fop->relayed;
+    if (fop->relayed)                           // if relayed by others
+        cip->timerelayed = fop->timestamp;      // postpone relaying by us
 
     cip->rssi = RF_last_rssi;
 
@@ -1546,7 +1549,8 @@ void AddExcess(uint32_t addr, bool jet_identity)
             return;
         }
     }
-    // if no room in excess[] then do nothing
+    // if no room in excess[] then do nothing, but report that situation via "congested":
+    congested = true;
 }
 
 void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
@@ -1587,11 +1591,8 @@ void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
 
       if (cip->addr == fop->addr) {
 
-        if (fop->relayed)                           // if relayed by others
-            cip->timerelayed = fop->timestamp;      // postpone relaying by us
-
-        bool fop_adsb = fop->protocol == RF_PROTOCOL_GDL90 || fop->protocol == RF_PROTOCOL_ADSB_1090;
-        bool cip_adsb = cip->protocol == RF_PROTOCOL_GDL90 || cip->protocol == RF_PROTOCOL_ADSB_1090;
+        bool fop_adsb = (fop->protocol == RF_PROTOCOL_GDL90 || fop->protocol == RF_PROTOCOL_ADSB_1090);
+        bool cip_adsb = (cip->protocol == RF_PROTOCOL_GDL90 || cip->protocol == RF_PROTOCOL_ADSB_1090);
 
         if (fop_adsb && (! cip_adsb)) {
             // ignore external (ADS-B) data about aircraft we also receive from directly
@@ -1715,8 +1716,10 @@ void AddTraffic(ufo_t *fop, const char *callsign, size_t cs_len)
         adj_distance = Container[i].adj_distance;
         if (adj_distance < Container[i].distance)
             adj_distance = Container[i].distance;
-        if (Container[i].aircraft_type == AIRCRAFT_TYPE_JET)
-            adj_distance *= 0.5;           // track jets from farther away
+        if (Container[i].airborne == 0)
+            adj_distance *= 2.0f;           // prioritize airborne traffic
+        else if (Container[i].aircraft_type == AIRCRAFT_TYPE_JET)
+            adj_distance *= 0.5f;           // track jets from farther away
         if (adj_distance > max_dist)  {
           max_dist_ndx = i;
           max_dist = adj_distance;
@@ -1755,6 +1758,8 @@ void ParseData(void)
     //size_t rx_size = RF_Payload_Size(rf_protocol);
     //size_t rx_size = curr_rx_protocol_ptr->payload_size;
     size_t rx_size = RF_last_rx_len;
+    if (rx_size == 0)
+        return;
     if (rx_size > sizeof(fo_raw))  rx_size = sizeof(fo_raw);
 
     if (memcmp(RxBuffer, TxBuffer, rx_size) == 0) {
@@ -2011,12 +2016,17 @@ if (fop->protocol == RF_PROTOCOL_ADSB_1090 && (settings->debug_flags & DEBUG_DEE
     }
 
     // clear expired excess traffic
+    int excess_count = 0;
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
         if (excess[i].addr != 0) {
             if (OurTime > excess[i].expire)
                 excess[i].addr = 0;
+            else
+                ++excess_count;
         }
     }
+    if (excess_count < (MAX_TRACKING_OBJECTS - 2))   // at least 3 open slots in excess[]
+        congested = false;
 
     UpdateTrafficTimeMarker = millis();
 }

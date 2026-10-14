@@ -899,6 +899,9 @@ bool legacy_decode(void *buffer, container_t *this_aircraft, ufo_t *fop) {
         }
       }
     }
+#else
+if (settings->nmea_d || settings->nmea2_d)
+Serial.println("decoded old FLARM protocol");
 #endif
 
     return true;
@@ -1167,6 +1170,15 @@ size_t legacy_encode(void *pkt_buffer, container_t *aircraft)
     if (current_TX_protocol == RF_PROTOCOL_LATEST &&
             (!relay || relay_landed_out || (settings->relay >= RELAY_ONLY)))
         return latest_encode(pkt_buffer, aircraft);
+
+#if 0
+if (settings->nmea_d || settings->nmea2_d) {
+if (relay)
+Serial.println("relaying in old FLARM protocol");
+else if (settings->rf_protocol != RF_PROTOCOL_LEGACY)
+Serial.println("encoding old FLARM protocol!?");
+}
+#endif
 
     int ndx;
     uint8_t pkt_parity;

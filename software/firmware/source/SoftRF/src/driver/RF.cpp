@@ -34,6 +34,7 @@
 #include "Settings.h"
 #include "Battery.h"
 #include "../ui/Web.h"
+#include "../protocol/radio/FANET.h"
 #include "../protocol/data/NMEA.h"
 #if !defined(EXCLUDE_MAVLINK)
 #include "../protocol/data/MAVLink.h"
@@ -363,6 +364,7 @@ static bool receive()
   uint16_t crc16, pkt_crc16;
   uint8_t i;
   bool success = false;
+  RF_last_rx_len = 0;
 
   // rf_chip->receive() does:
   //   if not already listening:
@@ -417,7 +419,7 @@ Serial.println(bytes2Hex((byte *)RL_rxPacket, size));
           RF_last_protocol = RF_PROTOCOL_NONE;
           //success = false;
 //Serial.printf("sw Unidentified packet protocol 0x%02x 0x%02x\r\n", byte1, byte2);
-          return 0;
+          return false;
       }
     } else {  // Manchester hardware or no Manchester - assume inverted payload
       // examine 2 later bytes in the sync word to identify the protocol
@@ -438,7 +440,7 @@ Serial.println(bytes2Hex((byte *)RL_rxPacket, size));
           //success = false;
 Serial.printf("hw Unidentified packet protocol 0x%02x 0x%02x s.b. 0x%02x 0x%02x\r\n",
 byte1, byte2, FLR_ID_BYTE_1, FLR_ID_BYTE_2);
-          return 0;
+          return false;
       }
     }
   }
@@ -474,7 +476,7 @@ byte1, byte2, FLR_ID_BYTE_1, FLR_ID_BYTE_2);
               // chances of passing CRC are slim, abort this packet
               ++invalid_manchester_packets;
 Serial.println("invalid Manchester");
-              return 0;
+              return false;
           }
 #endif
           byte newbyte = (val & 0xFF);
@@ -493,7 +495,7 @@ Serial.println("invalid Manchester");
           if (invalid_manchester_counter > 1) {
               // chances of passing CRC are slim, abort this packet
               ++invalid_manchester_packets;
-              return 0;
+              return false;
           }
 #endif
           RxBuffer[i] = (val & 0xFF);
@@ -663,7 +665,6 @@ Serial.println("PAW external CRC8 wrong");
     break;
   //case RF_CHECKSUM_TYPE_NONE:
   default:
-    RF_last_rx_len = size2;    // for variable-length FANET packets
     success = true;
     break;
   }
@@ -678,6 +679,7 @@ Serial.printf("RX in prot %d, time slot %d, sec %d(%d) + %d ms, RSSI %d\r\n",
 #endif
 
   if (success) {
+      RF_last_rx_len = size2;    // needed for variable-length FANET packets
       if (curr_rx_protocol_ptr->type == RF_PROTOCOL_ADSB_1090)
           ++adsb_packets_counter;
       else if (curr_rx_protocol_ptr->type == RF_PROTOCOL_FANET)
@@ -1464,6 +1466,25 @@ void RF_loop()
     return;
 
   uint32_t now_ms = millis();
+
+  // send FANET messages, acks & relayed packets in the next Slot 1 rather than a later future one
+  bool fast_lane = (fnf_queued_ack_id != 0 || fn_tx_pending_len > 0 /* || fanet relay pending */);
+  if (fast_lane) {
+    if (TxTimeMarker2 < now_ms + 1020 || congested || fanet_acfts > 5) {
+          fast_lane = false;
+    } else if (dual_protocol == RF_FANET_PAW) {
+      if ((RF_time & 0x07) == 0 || (RF_time & 0x07) == 5)
+          fast_lane = false;
+    } else if (dual_protocol == RF_PAW_FANET) {
+      if ((RF_time & 0x07) == 0 || (RF_time & 0x07) == 2 || (RF_time & 0x07) == 5)
+          fast_lane = false;
+    } else if (dual_protocol == RF_FANET_ADSB) {
+        if ((RF_time & 0x03) == 0x03)
+          fast_lane = false;
+    }
+  }
+  if (fast_lane)
+      TxTimeMarker2 -= (1000 * ((TxTimeMarker2 - now_ms)/1000));
 
   // no need to adjust RF_time until setting up a new Time Slot
   if (now_ms < RF_OK_until)      /* channel already computed */

@@ -129,7 +129,9 @@ void FN_process_FNG(const char *args)
 static uint8_t  fnf_ack_pending_mfr = 0;
 static uint16_t fnf_ack_pending_id  = 0;
 static uint32_t fnf_ack_pending_ms  = 0;
-#define FNF_ACK_TIMEOUT_MS  15000
+#define FNF_ACK_TIMEOUT_MS  6000
+   // - was 15000, but with the "fast lane" scheduling of messages can make this quicker
+   // - could be as short as 3000, but leave time for a position message to be sent first
 
 /* Retransmission of unicast ACK-required frames when no ACK arrives in time.
  * Original frame is kept so it can be re-queued unchanged (same payload,
@@ -315,9 +317,8 @@ void FN_check_ack(uint8_t sender_mfr, uint16_t sender_id, uint8_t type)
 /*
  * Check for ACK timeout - called periodically from NMEA_Export().
  * If we've been waiting for an ACK longer than FNF_ACK_TIMEOUT_MS:
- *   - if resend attempts remain, re-queue the original frame for TX and
- *     restart the timeout (up to FNF_ACK_MAX_RESENDS extra attempts, every
- *     FNF_ACK_TIMEOUT_MS);
+ *   - if resend attempts remain, re-queue the original frame for TX and restart the
+ *     timeout (up to FNF_ACK_MAX_RESENDS extra attempts, every FNF_ACK_TIMEOUT_MS);
  *   - otherwise give up and send #FNR NACK to XCGuide.
  */
 void FN_check_ack_timeout()

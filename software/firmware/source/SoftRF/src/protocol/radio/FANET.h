@@ -133,6 +133,9 @@ typedef struct {
 #define FANET_TX_INTERVAL_MIN 2500 /* in ms */
 #define FANET_TX_INTERVAL_MAX 3500
 
+#define FANET_ENTRY_RELAY_TIME 18  // seconds - how often to relay same aircraft
+#define FANET_ANY_RELAY_TIME   13  // seconds - how often to relay any aircraft
+
 extern const rf_proto_desc_t fanet_proto_desc;
 extern const uint8_t aircraft_type_to_fanet[];
 extern const uint8_t aircraft_type_from_fanet[];
@@ -146,6 +149,7 @@ extern const uint8_t aircraft_type_from_fanet[];
 extern uint8_t fanet_sos_count;
 extern uint8_t fn_tx_pending_buf[];
 extern uint8_t fn_tx_pending_len;
+extern uint16_t fnf_queued_ack_id;
 
 bool fanet_decode(void *, container_t *, ufo_t *);
 size_t fanet_encode(void *, container_t *);

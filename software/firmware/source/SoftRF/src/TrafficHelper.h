@@ -116,6 +116,7 @@ float InvCosLat(void);
 
 extern container_t Container[MAX_TRACKING_OBJECTS];  // EmptyContainer;
 extern excess_traffic_t excess[MAX_TRACKING_OBJECTS]; 
+extern bool congested;   // when even excess[] is full
 extern ufo_t fo;  // EmptyFO;
 extern uint8_t fo_raw[MAX_PKT_SIZE];
 extern char fo_callsign[33];

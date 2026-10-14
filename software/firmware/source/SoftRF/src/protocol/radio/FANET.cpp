@@ -164,8 +164,8 @@ static void payload_absolut2coord(float *lat, float *lon, uint8_t *buf)
 // a situation where many messages queue up is not viable anyway.
 
 /* Pending FANET ACK TX queue - transmitted in next available TX slot */
-static uint8_t  fnf_queued_ack_vendor = 0;
-static uint16_t fnf_queued_ack_id     = 0;
+uint8_t  fnf_queued_ack_vendor = 0;
+uint16_t fnf_queued_ack_id     = 0;
 
 // Pending FANET TX queue
 // pre-built frame queued here and transmitted in next available TX slot
